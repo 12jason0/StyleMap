@@ -33,11 +33,24 @@ interface Booking {
     participants: number;
 }
 
+interface Favorite {
+    id: number;
+    course_id: number;
+    title: string;
+    description: string;
+    imageUrl: string;
+    price: string;
+    rating: number;
+    concept: string;
+    created_at: string;
+}
+
 const MyPage = () => {
     const router = useRouter();
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
     const [bookings, setBookings] = useState<Booking[]>([]);
+    const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [activeTab, setActiveTab] = useState("profile");
     const [loading, setLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -55,6 +68,7 @@ const MyPage = () => {
         fetchUserInfo();
         fetchUserPreferences();
         fetchBookings();
+        fetchFavorites();
     }, []);
 
     const fetchUserInfo = async () => {
@@ -130,6 +144,57 @@ const MyPage = () => {
             }
         } catch (error) {
             console.error("Failed to fetch bookings:", error);
+        }
+    };
+
+    const fetchFavorites = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                router.push("/login");
+                return;
+            }
+
+            const response = await fetch("/api/users/favorites", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setFavorites(data || []);
+            } else {
+                console.error("Failed to fetch favorites");
+            }
+        } catch (error) {
+            console.error("Failed to fetch favorites:", error);
+        }
+    };
+
+    const removeFavorite = async (courseId: number) => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                router.push("/login");
+                return;
+            }
+
+            const response = await fetch(`/api/users/favorites?courseId=${courseId}`, {
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                // 찜 목록에서 제거
+                setFavorites((prev) => prev.filter((fav) => fav.course_id !== courseId));
+            } else {
+                console.error("Failed to remove favorite");
+            }
+        } catch (error) {
+            console.error("Failed to remove favorite:", error);
         }
     };
 
@@ -404,6 +469,72 @@ const MyPage = () => {
         </div>
     );
 
+    const renderFavoritesTab = () => (
+        <div className="space-y-6">
+            {/* 찜 목록 */}
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">찜 목록</h3>
+
+                {favorites.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {favorites.map((favorite) => (
+                            <div
+                                key={favorite.id}
+                                className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                onClick={() => router.push(`/courses/${favorite.course_id}`)}
+                            >
+                                <div className="relative">
+                                    <img
+                                        src={favorite.imageUrl || "/images/default-course.jpg"}
+                                        alt={favorite.title}
+                                        className="w-full h-48 object-cover"
+                                    />
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeFavorite(favorite.course_id);
+                                        }}
+                                        className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                                    >
+                                        ×
+                                    </button>
+                                    <div className="absolute bottom-2 left-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                                        {favorite.concept}
+                                    </div>
+                                </div>
+                                <div className="p-4">
+                                    <h4 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                                        {favorite.title}
+                                    </h4>
+                                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{favorite.description}</p>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-yellow-400">★</span>
+                                            <span className="text-sm font-medium">{favorite.rating}</span>
+                                        </div>
+                                        <span className="text-blue-600 font-semibold">{favorite.price}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-8">
+                        <div className="text-6xl mb-4">💖</div>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-2">찜한 코스가 없어요</h4>
+                        <p className="text-gray-600 mb-4">마음에 드는 코스를 찜해보세요!</p>
+                        <button
+                            onClick={() => router.push("/courses")}
+                            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                        >
+                            코스 둘러보기
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -438,6 +569,7 @@ const MyPage = () => {
                                 { id: "profile", label: "프로필", icon: "👤" },
                                 { id: "preferences", label: "선호도", icon: "🎯" },
                                 { id: "bookings", label: "예약내역", icon: "📋" },
+                                { id: "favorites", label: "찜 목록", icon: "💖" },
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
@@ -460,6 +592,7 @@ const MyPage = () => {
                 {activeTab === "profile" && renderProfileTab()}
                 {activeTab === "preferences" && renderPreferencesTab()}
                 {activeTab === "bookings" && renderBookingsTab()}
+                {activeTab === "favorites" && renderFavoritesTab()}
             </main>
 
             {/* 프로필 수정 모달 */}

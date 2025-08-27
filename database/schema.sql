@@ -36,6 +36,23 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 코스 테이블
+CREATE TABLE IF NOT EXISTS courses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    duration VARCHAR(100),
+    region VARCHAR(100),
+    price VARCHAR(100),
+    imageUrl VARCHAR(500),
+    concept VARCHAR(100),
+    rating DECIMAL(3,2) DEFAULT 0.00,
+    current_participants INT DEFAULT 0,
+    max_participants INT DEFAULT 10,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 -- 예약 테이블
 CREATE TABLE IF NOT EXISTS bookings (
     id INT AUTO_INCREMENT PRIMARY KEY,

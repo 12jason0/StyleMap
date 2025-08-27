@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
 
     useEffect(() => {
         const handleScroll = () => {
@@ -79,6 +80,27 @@ const Header = () => {
         setIsMenuOpen(false);
     };
 
+    // 로그아웃 함수
+    const handleLogout = () => {
+        // 로컬 스토리지에서 토큰 제거
+        localStorage.removeItem("authToken");
+
+        // 로그인 상태 업데이트
+        setIsLoggedIn(false);
+
+        // 커스텀 이벤트 발생 (다른 컴포넌트에서 로그아웃 감지)
+        window.dispatchEvent(new CustomEvent("authTokenChange"));
+
+        // 홈페이지로 리다이렉트
+        router.push("/");
+
+        // 로그아웃 완료 메시지
+        alert("로그아웃되었습니다.");
+
+        // 모바일 메뉴 닫기
+        closeMenu();
+    };
+
     return (
         <header
             className={` fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -137,12 +159,20 @@ const Header = () => {
                     {/* 사용자 메뉴 */}
                     <div className="hidden md:flex items-center space-x-4">
                         {isLoggedIn ? (
-                            <Link
-                                href="/mypage"
-                                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                            >
-                                마이페이지
-                            </Link>
+                            <>
+                                <Link
+                                    href="/mypage"
+                                    className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                                >
+                                    마이페이지
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors active:scale-95 transform"
+                                >
+                                    로그아웃
+                                </button>
+                            </>
                         ) : (
                             <>
                                 <Link
@@ -229,13 +259,21 @@ const Header = () => {
 
                         <div className="pt-4 pb-3 border-t border-gray-200">
                             {isLoggedIn ? (
-                                <Link
-                                    href="/mypage"
-                                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                    onClick={closeMenu}
-                                >
-                                    마이페이지
-                                </Link>
+                                <>
+                                    <Link
+                                        href="/mypage"
+                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                        onClick={closeMenu}
+                                    >
+                                        마이페이지
+                                    </Link>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors active:scale-95 transform"
+                                    >
+                                        로그아웃
+                                    </button>
+                                </>
                             ) : (
                                 <>
                                     <Link

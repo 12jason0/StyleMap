@@ -146,7 +146,10 @@ export default function Home() {
     }, [courses.length]);
 
     const topCourses = courses.slice(0, 5);
-    const hotCourses = courses.filter((c) => c.participants > 10).slice(0, 6);
+    const hotCourses = courses
+        .filter((c) => c.participants > 10 || c.rating >= 4.5)
+        .sort((a, b) => b.participants - a.participants || b.rating - a.rating)
+        .slice(0, 6);
     const newCourses = courses.slice(-3);
 
     return (

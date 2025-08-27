@@ -92,7 +92,7 @@ const AIOnboarding = () => {
         switch (currentStep) {
             case 1:
                 return (
-                    <div className="text-center">
+                    <div className="text-center text-black">
                         <div className="text-6xl mb-6">🎯</div>
                         <h2 className="text-3xl font-bold mb-4">나만의 여행 스타일을 찾아보세요</h2>
                         <p className="text-gray-600 mb-8">

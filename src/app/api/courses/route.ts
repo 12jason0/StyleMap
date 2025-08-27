@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
                 title: course.title,
                 description: course.description || "",
                 duration: course.duration || "",
-                location: course.region || "",
+                location: course.location || "",
                 price: course.price || "",
                 imageUrl: course.imageUrl || "/images/default-course.jpg",
                 concept: course.concept || "",
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
         try {
             const [result] = await connection.execute(
-                "INSERT INTO courses (title, description, duration, region, price, imageUrl, concept) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO courses (title, description, duration, location, price, imageUrl, concept) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [title, description, duration, location, price, imageUrl, concept]
             );
 
