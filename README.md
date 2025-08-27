@@ -1,181 +1,220 @@
-# StyleMap
+# StyleMap - AI-Powered Travel Course Recommendation System
 
-StyleMap은 여러분의 스타일을 지도에 표시하고 공유할 수 있는 플랫폼입니다.
+StyleMap은 딥러닝과 머신러닝을 활용한 개인화된 여행 코스 추천 플랫폼입니다. 사용자의 취향, 행동 패턴, 컨텍스트 정보를 분석하여 최적의 여행 경험을 제공합니다.
 
-## 🚀 시작하기
+## 🚀 주요 기능
 
-### 필수 요구사항
+### 🎯 AI 추천 시스템
 
--   Node.js 18+
--   MySQL 8.0+
--   npm 또는 yarn
+-   **개인화된 추천**: 사용자 선호도와 행동 패턴 기반 맞춤형 코스 추천
+-   **실시간 학습**: TensorFlow.js 기반 딥러닝 모델의 온라인 학습
+-   **다중 목표 최적화**: 클릭률, 전환율, 평점 예측을 동시에 최적화
+-   **컨텍스트 인식**: 시간, 날씨, 위치 등 상황별 추천
 
-### 설치
+### 📊 A/B 테스트 시스템
 
-1. 저장소 클론
+-   **알고리즘 비교**: 다양한 추천 알고리즘의 성능 비교
+-   **통계적 유의성**: 실시간 통계 분석 및 결과 해석
+-   **트래픽 분할**: 사용자 그룹별 차별화된 테스트
+-   **성과 모니터링**: CTR, 전환율, 수익 등 핵심 지표 추적
 
-```bash
-git clone <repository-url>
-cd StyleMap
+### 📈 실시간 성과 모니터링
+
+-   **시스템 헬스**: CPU, 메모리, 응답시간 모니터링
+-   **비즈니스 지표**: 수익, 사용자 만족도, 재방문율 추적
+-   **알림 시스템**: 임계값 기반 실시간 알림
+-   **트렌드 분석**: 시간별 성과 변화 추이
+
+### 💬 피드백 시스템
+
+-   **사용자 피드백**: 추천 품질에 대한 상세한 피드백 수집
+-   **AI 학습**: 피드백 데이터를 활용한 모델 개선
+-   **성과 분석**: 만족도, 정확도 등 품질 지표 분석
+-   **개선 제안**: 사용자 의견 기반 시스템 개선
+
+## 🏗️ 기술 스택
+
+### Frontend
+
+-   **Next.js 14**: React 기반 풀스택 프레임워크
+-   **TypeScript**: 타입 안전성 보장
+-   **Tailwind CSS**: 유틸리티 기반 스타일링
+-   **Recharts**: 데이터 시각화 라이브러리
+
+### AI/ML
+
+-   **TensorFlow.js**: 브라우저 기반 딥러닝
+-   **딥러닝 모델**: 다층 신경망 기반 추천 시스템
+-   **특성 엔지니어링**: 사용자/아이템 특성 벡터화
+-   **온라인 학습**: 실시간 모델 업데이트
+
+### Backend
+
+-   **Next.js API Routes**: 서버리스 API
+-   **Prisma**: 데이터베이스 ORM
+-   **PostgreSQL**: 관계형 데이터베이스
+
+## 📁 프로젝트 구조
+
+```
+src/
+├── app/
+│   ├── api/                    # API 엔드포인트
+│   │   ├── ab-tests/          # A/B 테스트 관리
+│   │   ├── feedback/          # 피드백 시스템
+│   │   └── notifications/     # 알림 시스템
+│   ├── ab-testing/            # A/B 테스트 대시보드
+│   ├── feedback/              # 피드백 페이지
+│   ├── notifications/         # 알림 센터
+│   ├── performance-monitoring/ # 성과 모니터링
+│   └── personalized-home/     # AI 추천 홈
+├── components/                # 재사용 가능한 컴포넌트
+├── lib/
+│   ├── db.ts                 # 데이터베이스 연결
+│   └── ml/
+│       └── deepLearningRecommender.ts # AI 추천 엔진
+└── types/                    # TypeScript 타입 정의
 ```
 
-2. 의존성 설치
+## 🎯 AI 추천 시스템 아키텍처
+
+### 1. 특성 엔지니어링
+
+-   **사용자 특성**: 나이, 선호도, 행동 패턴, 위치, 시간
+-   **아이템 특성**: 카테고리, 가격, 평점, 인기도, 콘텐츠
+-   **컨텍스트 특성**: 날씨, 요일, 계절, 공휴일
+
+### 2. 딥러닝 모델
+
+```
+사용자 임베딩 (32차원)
+    ↓
+아이템 임베딩 (32차원) → 결합 → 심층 신경망 → 다중 출력
+    ↓
+컨텍스트 임베딩 (16차원)
+```
+
+### 3. 다중 목표 최적화
+
+-   **평점 예측**: 사용자 만족도 예측
+-   **클릭 예측**: 관심도 예측
+-   **전환 예측**: 예약 확률 예측
+
+## 📊 A/B 테스트 시스템
+
+### 테스트 구성
+
+-   **컨트롤 그룹**: 기존 알고리즘
+-   **실험 그룹**: 새로운 알고리즘
+-   **트래픽 분할**: 50:50 또는 사용자 정의 비율
+-   **지속 기간**: 설정 가능한 테스트 기간
+
+### 성과 지표
+
+-   **CTR (Click-Through Rate)**: 클릭률
+-   **전환율**: 예약 완료율
+-   **수익**: 매출액
+-   **통계적 유의성**: p-value 기반 결과 검증
+
+## 🔧 설치 및 실행
+
+### 1. 의존성 설치
 
 ```bash
 npm install
 ```
 
-3. 환경변수 설정
-   `.env` 파일을 생성하고 다음 내용을 추가하세요:
-
-```env
-DATABASE_URL="mysql://username:password@localhost:3306/stylemap"
-```
-
-**MySQL 연결 정보:**
-
--   `root`: MySQL 사용자명
--   `127.0.0.1:3306`: MySQL 서버 주소와 포트
--   `stylemap`: 데이터베이스 이름
-
-### 데이터베이스 설정
-
-1. MySQL에서 데이터베이스 생성
-
-```sql
-CREATE DATABASE stylemap;
-```
-
-2. Prisma 마이그레이션 실행
+### 2. 환경 변수 설정
 
 ```bash
-npx prisma migrate dev --name init
+# .env.local
+DATABASE_URL="postgresql://..."
+NEXT_PUBLIC_KAKAO_MAP_API_KEY="your_kakao_map_api_key"
 ```
 
-3. Prisma 클라이언트 생성
+### 3. 데이터베이스 설정
 
 ```bash
 npx prisma generate
+npx prisma db push
 ```
 
-### 개발 서버 실행
+### 4. 개발 서버 실행
 
 ```bash
 npm run dev
 ```
 
-브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 확인하세요.
+## 🚀 배포
 
-## 📁 프로젝트 구조
+### Vercel 배포
 
-```
-StyleMap/
-├── src/
-│   ├── app/
-│   │   ├── api/           # API 라우트
-│   │   │   ├── courses/   # 코스 관련 API
-│   │   │   ├── users/     # 사용자 관련 API
-│   │   │   ├── bookings/  # 예약 관련 API
-│   │   │   └── reviews/   # 리뷰 관련 API
-│   │   ├── components/    # React 컴포넌트
-│   │   │   ├── Header.tsx
-│   │   │   └── Footer.tsx
-│   │   ├── courses/       # 코스 페이지
-│   │   └── page.tsx       # 메인 페이지
-│   ├── lib/
-│   │   └── db.ts         # Prisma 클라이언트 설정
-│   └── types/
-│       └── kakao.d.ts    # Kakao Map 타입 정의
-├── prisma/
-│   └── schema.prisma     # 데이터베이스 스키마
-└── public/
-    └── images/           # 이미지 파일들
+```bash
+npm run build
+vercel --prod
 ```
 
-## 🗄️ 데이터베이스 스키마
+### 환경 변수 설정
 
-### User (사용자)
+-   Vercel 대시보드에서 환경 변수 설정
+-   데이터베이스 연결 정보 구성
+-   API 키 설정
 
--   `id`: 고유 식별자
--   `email`: 이메일 (고유)
--   `name`: 이름
--   `password`: 비밀번호
--   `createdAt`: 생성일
--   `updatedAt`: 수정일
+## 📈 성능 최적화
 
-### Course (코스)
+### 모델 최적화
 
--   `id`: 고유 식별자
--   `title`: 제목
--   `description`: 설명
--   `duration`: 소요 시간
--   `location`: 위치
--   `price`: 가격
--   `imageUrl`: 이미지 URL
--   `concept`: 컨셉 (카페투어, 맛집투어 등)
--   `rating`: 평점
--   `reviewCount`: 리뷰 수
--   `participants`: 참가자 수
--   `creatorId`: 생성자 ID (User 참조)
+-   **배치 처리**: 대량 데이터 효율적 처리
+-   **메모리 관리**: TensorFlow.js 메모리 정리
+-   **캐싱**: 추천 결과 캐싱으로 응답 속도 향상
 
-### Review (리뷰)
+### 프론트엔드 최적화
 
--   `id`: 고유 식별자
--   `rating`: 평점 (1-5)
--   `comment`: 댓글
--   `userId`: 작성자 ID (User 참조)
--   `courseId`: 코스 ID (Course 참조)
+-   **코드 스플리팅**: 페이지별 번들 분리
+-   **이미지 최적화**: Next.js Image 컴포넌트 활용
+-   **SSR/SSG**: 서버 사이드 렌더링 최적화
 
-### Booking (예약)
+## 🔒 보안
 
--   `id`: 고유 식별자
--   `status`: 상태 (pending, confirmed, cancelled, completed)
--   `userId`: 사용자 ID (User 참조)
--   `courseId`: 코스 ID (Course 참조)
+### 데이터 보호
 
-## 🔧 API 엔드포인트
+-   **개인정보 암호화**: 사용자 데이터 보안
+-   **API 인증**: JWT 기반 인증 시스템
+-   **입력 검증**: XSS, SQL Injection 방지
 
-### 코스 관련
+### AI 모델 보안
 
--   `GET /api/courses` - 모든 코스 조회
--   `GET /api/courses?concept=카페투어` - 특정 컨셉 코스 조회
--   `POST /api/courses` - 새 코스 생성
+-   **모델 검증**: 입력 데이터 검증
+-   **결과 필터링**: 부적절한 추천 필터링
+-   **접근 제어**: 모델 접근 권한 관리
 
-### 사용자 관련
+## 🤝 기여하기
 
--   `GET /api/users` - 모든 사용자 조회
--   `GET /api/users?email=user@example.com` - 특정 사용자 조회
--   `POST /api/users` - 새 사용자 생성
+### 개발 환경 설정
 
-### 예약 관련
+1. 프로젝트 포크
+2. 로컬 환경 설정
+3. 기능 브랜치 생성
+4. 코드 작성 및 테스트
+5. Pull Request 생성
 
--   `GET /api/bookings` - 모든 예약 조회
--   `GET /api/bookings?userId=123` - 특정 사용자 예약 조회
--   `POST /api/bookings` - 새 예약 생성
+### 코딩 컨벤션
 
-### 리뷰 관련
-
--   `GET /api/reviews` - 모든 리뷰 조회
--   `GET /api/reviews?courseId=123` - 특정 코스 리뷰 조회
--   `POST /api/reviews` - 새 리뷰 생성
-
-## 🎨 주요 기능
-
--   **컨셉별 코스 탐색**: 카페투어, 맛집투어, 쇼핑 등 다양한 컨셉
--   **실시간 위치 기반 서비스**: Kakao Map API 연동
--   **코스 예약 시스템**: 실시간 예약 및 참가자 수 관리
--   **리뷰 및 평점 시스템**: 사용자 리뷰와 평점 관리
--   **반응형 디자인**: 모바일, 태블릿, 데스크톱 지원
-
-## 🛠️ 기술 스택
-
--   **Frontend**: Next.js 15, React, TypeScript, Tailwind CSS
--   **Backend**: Next.js API Routes
--   **Database**: MySQL 8.0
--   **ORM**: Prisma
--   **Maps**: Kakao Map JavaScript API
--   **Styling**: Tailwind CSS
+-   **TypeScript**: 엄격한 타입 체크
+-   **ESLint**: 코드 품질 관리
+-   **Prettier**: 코드 포맷팅
+-   **커밋 메시지**: Conventional Commits
 
 ## 📝 라이선스
 
 이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+
+## 📞 지원
+
+-   **이슈 리포트**: GitHub Issues
+-   **문서**: 프로젝트 Wiki
+-   **이메일**: support@stylemap.com
+
+---
+
+**StyleMap** - AI로 더 스마트한 여행을 경험하세요! 🎯✈️

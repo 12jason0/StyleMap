@@ -142,9 +142,10 @@ export default function CoursesPage() {
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {courses.map((course) => (
-                        <div
+                        <Link
                             key={course.id}
-                            className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer"
+                            href={`/courses/${course.id}`}
+                            className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer block"
                         >
                             {/* 이미지 */}
                             <div className="relative h-48 rounded-t-2xl overflow-hidden">
@@ -196,7 +197,7 @@ export default function CoursesPage() {
                                     </button>
                                 </div>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
 

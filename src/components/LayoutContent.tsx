@@ -7,13 +7,14 @@ import Footer from "@/components/Footer";
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isMapPage = pathname === "/map";
+    const isAuthPage = pathname === "/login" || pathname === "/signup";
+    const isCourseDetailPage = pathname.startsWith("/courses/");
 
     return (
         <>
             <Header />
             <main className="flex-1">{children}</main>
-            {!isMapPage && <Footer />}
+            {!isMapPage && !isAuthPage && <Footer />}
         </>
     );
 }
-

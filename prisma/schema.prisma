@@ -49,6 +49,7 @@ model Courses {
   creator   User?     @relation(fields: [userId], references: [id])
   reviews   Review[]
   bookings  Booking[]
+  tags      CourseTag[]
 
   @@map("courses")
 }
@@ -78,4 +79,62 @@ model Booking {
   // Relations
   user   User     @relation(fields: [userId], references: [id])
   course Courses  @relation(fields: [courseId], references: [id])
+}
+
+// AI 추천 시스템을 위한 테이블들
+model UserPreferences {
+  id         Int      @id @default(autoincrement())
+  userId     String   @unique @db.VarChar(100)
+  preferences Json    @db.Json
+  createdAt  DateTime @default(now()) @db.Timestamp(0)
+  updatedAt  DateTime @updatedAt @db.Timestamp(0)
+
+  @@map("user_preferences")
+}
+
+model UserBehavior {
+  id                    Int      @id @default(autoincrement())
+  userId                String   @unique @db.VarChar(100)
+  viewedCourses         Json     @default("[]") @db.Json
+  bookedCourses         Json     @default("[]") @db.Json
+  likedCourses          Json     @default("[]") @db.Json
+  searchHistory         Json     @default("[]") @db.Json
+  timeSpent             Json     @default("{}") @db.Json
+  preferences           Json     @default("{}") @db.Json
+  lastActiveAt          DateTime @default(now()) @db.Timestamp(0)
+  lastRecommendationAt  DateTime?
+  createdAt             DateTime @default(now()) @db.Timestamp(0)
+  updatedAt             DateTime @updatedAt @db.Timestamp(0)
+
+  // Relations
+  trackingEvents TrackingEvent[]
+
+  @@map("user_behavior")
+}
+
+model TrackingEvent {
+  id          Int      @id @default(autoincrement())
+  userId      String   @db.VarChar(100)
+  eventType   String   @db.VarChar(50)
+  courseId    String?  @db.VarChar(100)
+  searchQuery String?  @db.Text
+  timeSpent   Int?
+  metadata    Json     @default("{}") @db.Json
+  timestamp   DateTime @default(now()) @db.Timestamp(0)
+
+  // Relations
+  userBehavior UserBehavior @relation(fields: [userId], references: [userId])
+
+  @@map("tracking_events")
+}
+
+model CourseTag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+
+  // Relations
+  courses Courses[]
+
+  @@map("course_tags")
 }

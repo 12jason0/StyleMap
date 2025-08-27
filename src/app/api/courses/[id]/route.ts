@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import pool from "@/lib/db";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -14,35 +14,42 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         console.log("API: Parsed course ID:", courseId);
 
-        const course = await prisma.courses.findUnique({
-            where: { id: courseId },
-        });
+        const connection = await pool.getConnection();
 
-        console.log("API: Found course:", course);
+        try {
+            const [courses] = await connection.execute("SELECT * FROM courses WHERE id = ?", [courseId]);
 
-        if (!course) {
-            return NextResponse.json({ error: "Course not found" }, { status: 404 });
+            const coursesArray = courses as any[];
+            console.log("API: Found courses:", coursesArray);
+
+            if (coursesArray.length === 0) {
+                return NextResponse.json({ error: "Course not found" }, { status: 404 });
+            }
+
+            const course = coursesArray[0];
+
+            const courseData = {
+                id: course.id.toString(),
+                title: course.title,
+                description: course.description || "",
+                duration: course.duration || "",
+                location: course.region || "",
+                price: course.price || "",
+                imageUrl: course.imageUrl || "",
+                concept: course.concept || "",
+                rating: Number(course.rating) || 0,
+                participants: course.current_participants || 0,
+                maxParticipants: course.max_participants || 0,
+                isPopular: course.isPopular || false,
+                createdAt: course.createdAt,
+                updatedAt: course.updatedAt,
+            };
+
+            console.log("API: Returning course data:", courseData);
+            return NextResponse.json(courseData);
+        } finally {
+            connection.release();
         }
-
-        const courseData = {
-            id: course.id.toString(),
-            title: course.title,
-            description: course.description || "",
-            duration: course.duration || "",
-            location: course.region || "",
-            price: course.price || "",
-            imageUrl: course.imageUrl || "",
-            concept: course.concept || "",
-            rating: Number(course.rating),
-            participants: course.current_participants,
-            maxParticipants: course.max_participants,
-            isPopular: course.isPopular,
-            createdAt: course.createdAt,
-            updatedAt: course.updatedAt,
-        };
-
-        console.log("API: Returning course data:", courseData);
-        return NextResponse.json(courseData);
     } catch (error) {
         console.error("API: Error fetching course:", error);
         console.error("API: Error details:", {

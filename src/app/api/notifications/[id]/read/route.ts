@@ -1,0 +1,18 @@
+import { NextRequest, NextResponse } from "next/server";
+
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+    try {
+        const { id } = params;
+
+        // 실제로는 데이터베이스에서 특정 알림을 읽음 처리
+        console.log(`Marking notification ${id} as read`);
+
+        return NextResponse.json({
+            success: true,
+            message: `Notification ${id} marked as read`,
+        });
+    } catch (error) {
+        console.error("Failed to mark notification as read:", error);
+        return NextResponse.json({ error: "Failed to mark notification as read" }, { status: 500 });
+    }
+}

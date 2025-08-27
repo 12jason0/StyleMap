@@ -32,7 +32,58 @@ export default function Home() {
             try {
                 const response = await fetch("/api/courses");
                 const data = await response.json();
-                setCourses(data.slice(0, 12));
+
+                // API 응답이 배열인지 확인하고 에러 객체인지 확인
+                if (Array.isArray(data)) {
+                    setCourses(data.slice(0, 12));
+                } else if (data.error) {
+                    console.error("API Error:", data.error, data.details);
+                    // 에러 발생 시 더미 데이터 사용
+                    setCourses([
+                        {
+                            id: "1",
+                            title: "성수 감성 카페투어",
+                            description: "인스타 감성 카페 3곳을 둘러보는 특별한 코스",
+                            duration: "3시간",
+                            location: "성수동",
+                            price: "30000원",
+                            imageUrl: "/images/CoffeTrand.png",
+                            concept: "핫플투어",
+                            rating: 4.8,
+                            reviewCount: 23,
+                            participants: 15,
+                        },
+                        {
+                            id: "2",
+                            title: "홍대 팝업스토어 투어",
+                            description: "최신 팝업스토어를 한번에",
+                            duration: "4시간",
+                            location: "홍대",
+                            price: "40000원",
+                            imageUrl: "/images/Popup.png",
+                            concept: "핫플투어",
+                            rating: 4.6,
+                            reviewCount: 18,
+                            participants: 12,
+                        },
+                        {
+                            id: "3",
+                            title: "비오는날 실내 데이트",
+                            description: "날씨 걱정 없는 완벽한 실내 코스",
+                            duration: "5시간",
+                            location: "강남",
+                            price: "50000원",
+                            imageUrl: "/images/RainDate.png",
+                            concept: "힐링여행",
+                            rating: 4.7,
+                            reviewCount: 31,
+                            participants: 8,
+                        },
+                    ]);
+                } else {
+                    console.error("Unexpected data format:", data);
+                    setCourses([]);
+                }
             } catch (error) {
                 console.error("Failed to fetch courses:", error);
                 // 더미 데이터 폴백

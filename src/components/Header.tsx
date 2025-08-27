@@ -1,267 +1,328 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-export default function Header() {
-    const [currentLocation, setCurrentLocation] = useState<string>("위치 확인 중");
+const Header = () => {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const router = useRouter();
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const pathname = usePathname();
 
-    // 스크롤 시 헤더 스타일 변경
     useEffect(() => {
         const handleScroll = () => {
-            setIsScrolled(window.scrollY > 10);
+            setIsScrolled(window.scrollY > 0);
         };
+
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    // 현재 위치 가져오기
     useEffect(() => {
-        const getLocation = () => {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        try {
-                            // 카카오 역지오코딩으로 동네 이름 가져오기
-                            if (window.kakao?.maps?.services) {
-                                const geocoder = new window.kakao.maps.services.Geocoder();
-                                geocoder.coord2RegionCode(
-                                    position.coords.longitude,
-                                    position.coords.latitude,
-                                    (result: any[], status: string) => {
-                                        if (status === window.kakao.maps.services.Status.OK) {
-                                            const dong =
-                                                result[0]?.region_3depth_name ||
-                                                result[0]?.region_2depth_name ||
-                                                "위치 확인됨";
-                                            setCurrentLocation(dong);
-                                        } else {
-                                            setCurrentLocation("서울");
-                                        }
-                                    }
-                                );
-                            } else {
-                                // 카카오맵 API가 로드되지 않은 경우 기본 위치 설정
-                                setCurrentLocation("서울");
-                            }
-                        } catch (error) {
-                            console.error("위치 정보 가져오기 실패:", error);
-                            setCurrentLocation("서울");
-                        }
+        // JWT 토큰 유효성 검증
+        const checkLoginStatus = async () => {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                setIsLoggedIn(false);
+                return;
+            }
+
+            try {
+                const response = await fetch("/api/auth/verify", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
                     },
-                    (error) => {
-                        console.error("위치 권한 거부 또는 오류:", error);
-                        setCurrentLocation("서울");
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 300000,
-                    }
-                );
-            } else {
-                setCurrentLocation("서울");
+                });
+
+                if (response.ok) {
+                    setIsLoggedIn(true);
+                } else {
+                    localStorage.removeItem("authToken");
+                    setIsLoggedIn(false);
+                }
+            } catch (error) {
+                console.error("토큰 검증 오류:", error);
+                localStorage.removeItem("authToken");
+                setIsLoggedIn(false);
             }
         };
 
-        // 카카오맵 API 로드 확인 후 위치 가져오기
-        if (window.kakao?.maps?.services) {
-            getLocation();
-        } else {
-            // API 로드 대기
-            const checkKakaoAPI = setInterval(() => {
-                if (window.kakao?.maps?.services) {
-                    clearInterval(checkKakaoAPI);
-                    getLocation();
-                }
-            }, 100);
+        checkLoginStatus();
 
-            // 5초 후 타임아웃
-            setTimeout(() => {
-                clearInterval(checkKakaoAPI);
-                if (currentLocation === "위치 확인 중") {
-                    setCurrentLocation("서울");
-                }
-            }, 5000);
-        }
-    }, [currentLocation]);
+        // localStorage 변경 감지를 위한 이벤트 리스너
+        const handleStorageChange = (e: StorageEvent) => {
+            if (e.key === "authToken") {
+                checkLoginStatus();
+            }
+        };
 
-    const isActive = (path: string) => pathname === path;
+        // 커스텀 이벤트 리스너 (같은 탭에서의 변경 감지)
+        const handleCustomStorageChange = () => {
+            checkLoginStatus();
+        };
+
+        window.addEventListener("storage", handleStorageChange);
+        window.addEventListener("authTokenChange", handleCustomStorageChange);
+
+        return () => {
+            window.removeEventListener("storage", handleStorageChange);
+            window.removeEventListener("authTokenChange", handleCustomStorageChange);
+        };
+    }, []);
+
+    const toggleMenu = () => {
+        setIsMenuOpen(!isMenuOpen);
+    };
+
+    const closeMenu = () => {
+        setIsMenuOpen(false);
+    };
 
     return (
-        <>
-            {/* 데스크탑 헤더 */}
-            <header
-                className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-                    isScrolled ? "bg-white shadow-md" : "bg-white/95 backdrop-blur-sm"
-                }`}
-            >
-                <div className="max-w-7xl mx-auto px-4">
-                    <div className="flex items-center justify-between h-16 w-full">
-                        {/* 왼쪽: 로고 */}
-                        <div className="flex-shrink-0">
-                            <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition">
-                                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
-                                    StyleMap
-                                </span>
-                            </Link>
+        <header
+            className={` fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+                isScrolled ? "bg-white/95 backdrop-blur-md shadow-lg" : "bg-white"
+            }`}
+        >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center h-16">
+                    {/* 로고 */}
+                    <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                            <span className="text-white font-bold text-sm">S</span>
                         </div>
-
-                        {/* 중앙: 메인 네비게이션 */}
-                        <nav className="hidden md:flex items-center space-x-1 absolute left-1/2 transform -translate-x-1/2">
-                            <Link
-                                href="/courses"
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                                    isActive("/courses") ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                            >
-                                코스 찾기
-                            </Link>
-                            <Link
-                                href="/my-courses"
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                                    isActive("/my-courses")
-                                        ? "bg-blue-50 text-blue-700"
-                                        : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                            >
-                                내 코스
-                            </Link>
-                            <Link
-                                href="/map"
-                                className={`px-4 py-2 rounded-full text-sm font-medium transition-all relative ${
-                                    isActive("/map") ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                            >
-                                실시간
-                                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                            </Link>
-                        </nav>
-
-                        {/* 오른쪽: 위치 및 버튼 */}
-                        <div className="flex items-center space-x-4 flex-shrink-0">
-                            {/* 현재 위치 */}
-                            <button
-                                onClick={() => router.push(`/courses?location=${currentLocation}`)}
-                                className="hidden md:flex items-center space-x-1 px-3 py-1.5 rounded-full bg-gray-50 hover:bg-gray-100 transition"
-                            >
-                                <span className="text-sm">📍</span>
-                                <span className="text-sm text-gray-700">{currentLocation}</span>
-                            </button>
-
-                            {/* 로그인/프로필 */}
-                            <button
-                                onClick={() => router.push("/login")}
-                                className="hidden md:block px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-sky-500 rounded-full hover:shadow-lg transition-all"
-                            >
-                                시작하기
-                            </button>
-
-                            {/* 모바일 메뉴 버튼 */}
-                            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-2">
-                                <div className="space-y-1">
-                                    <div
-                                        className={`w-6 h-0.5 bg-gray-700 transition-all ${
-                                            isMobileMenuOpen ? "rotate-45 translate-y-1.5" : ""
-                                        }`}
-                                    />
-                                    <div
-                                        className={`w-6 h-0.5 bg-gray-700 transition-all ${
-                                            isMobileMenuOpen ? "opacity-0" : ""
-                                        }`}
-                                    />
-                                    <div
-                                        className={`w-6 h-0.5 bg-gray-700 transition-all ${
-                                            isMobileMenuOpen ? "-rotate-45 -translate-y-1.5" : ""
-                                        }`}
-                                    />
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
-            {/* 모바일 메뉴 */}
-            <div
-                className={`fixed inset-x-0 top-16 bg-white shadow-lg z-40 md:hidden transition-all duration-300 ${
-                    isMobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible"
-                }`}
-            >
-                <div className="px-4 py-4 space-y-2">
-                    <Link
-                        href="/courses"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`block px-4 py-3 rounded-lg text-base font-medium ${
-                            isActive("/courses") ? "bg-blue-50 text-blue-700" : "text-gray-700"
-                        }`}
-                    >
-                        코스 찾기
+                        <span className="text-xl font-bold text-gray-900">StyleMap</span>
                     </Link>
-                    <Link
-                        href="/my-courses"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`block px-4 py-3 rounded-lg text-base font-medium ${
-                            isActive("/my-courses") ? "bg-blue-50 text-blue-700" : "text-gray-700"
-                        }`}
-                    >
-                        내 코스
-                    </Link>
-                    <Link
-                        href="/map"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`block px-4 py-3 rounded-lg text-base font-medium ${
-                            isActive("/map") ? "bg-blue-50 text-blue-700" : "text-gray-700"
-                        }`}
-                    >
-                        실시간 지도
-                    </Link>
-                    <div className="pt-2 border-t">
-                        <div className="px-4 py-2 text-sm text-gray-500">📍 {currentLocation}</div>
-                        <button
-                            onClick={() => {
-                                setIsMobileMenuOpen(false);
-                                router.push("/login");
-                            }}
-                            className="w-full mt-2 px-4 py-3 text-center font-medium text-white bg-gradient-to-r from-blue-600 to-sky-500 rounded-lg"
+
+                    {/* 데스크톱 네비게이션 */}
+                    <nav className="hidden md:flex items-center space-x-8">
+                        <Link
+                            href="/"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+                            }`}
                         >
-                            시작하기
-                        </button>
-                    </div>
-                </div>
-            </div>
+                            홈
+                        </Link>
+                        <Link
+                            href="/courses"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/courses" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+                            }`}
+                        >
+                            코스
+                        </Link>
+                        <Link
+                            href="/personalized-home"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/personalized-home"
+                                    ? "text-blue-600"
+                                    : "text-gray-700 hover:text-blue-600"
+                            }`}
+                        >
+                            🎯 AI 추천
+                        </Link>
 
-            {/* 모바일 하단 탭바 */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t md:hidden z-40">
-                <div className="grid grid-cols-3 h-16">
-                    <Link
-                        href="/courses"
-                        className={`flex flex-col items-center justify-center space-y-1 ${
-                            isActive("/courses") ? "text-blue-600" : "text-gray-500"
-                        }`}
+                        <Link
+                            href="/map"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/map" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+                            }`}
+                        >
+                            지도
+                        </Link>
+                    </nav>
+
+                    {/* 사용자 메뉴 */}
+                    <div className="hidden md:flex items-center space-x-4">
+                        {isLoggedIn ? (
+                            <Link
+                                href="/mypage"
+                                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                            >
+                                마이페이지
+                            </Link>
+                        ) : (
+                            <>
+                                <Link
+                                    href="/login"
+                                    className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                                >
+                                    로그인
+                                </Link>
+                                <Link
+                                    href="/signup"
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                                >
+                                    회원가입
+                                </Link>
+                            </>
+                        )}
+                    </div>
+
+                    {/* 모바일 메뉴 버튼 */}
+                    <button
+                        onClick={toggleMenu}
+                        className="md:hidden p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors cursor-pointer"
                     >
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
                                 strokeWidth={2}
-                                d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                                d="M4 6h16M4 12h16M4 18h16"
+                            />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {/* 모바일 메뉴 */}
+            {isMenuOpen && (
+                <div className="md:hidden bg-white border-t border-gray-200">
+                    <div className="px-4 py-2 space-y-1">
+                        <Link
+                            href="/"
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                pathname === "/"
+                                    ? "text-blue-600 bg-blue-50"
+                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            }`}
+                            onClick={closeMenu}
+                        >
+                            홈
+                        </Link>
+                        <Link
+                            href="/courses"
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                pathname === "/courses"
+                                    ? "text-blue-600 bg-blue-50"
+                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            }`}
+                            onClick={closeMenu}
+                        >
+                            코스
+                        </Link>
+                        <Link
+                            href="/personalized-home"
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                pathname === "/personalized-home"
+                                    ? "text-blue-600 bg-blue-50"
+                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            }`}
+                            onClick={closeMenu}
+                        >
+                            🎯 AI 추천
+                        </Link>
+                        <Link
+                            href="/map"
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                pathname === "/map"
+                                    ? "text-blue-600 bg-blue-50"
+                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            }`}
+                            onClick={closeMenu}
+                        >
+                            지도
+                        </Link>
+
+                        <div className="pt-4 pb-3 border-t border-gray-200">
+                            {isLoggedIn ? (
+                                <Link
+                                    href="/mypage"
+                                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                    onClick={closeMenu}
+                                >
+                                    마이페이지
+                                </Link>
+                            ) : (
+                                <>
+                                    <Link
+                                        href="/login"
+                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                        onClick={closeMenu}
+                                    >
+                                        로그인
+                                    </Link>
+                                    <Link
+                                        href="/signup"
+                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                        onClick={closeMenu}
+                                    >
+                                        회원가입
+                                    </Link>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 모바일 하단 탭 바 */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+                <div className="grid grid-cols-4 gap-1 p-2">
+                    <Link
+                        href="/"
+                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
+                            pathname === "/" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
+                        }`}
+                        onClick={closeMenu}
+                    >
+                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                            />
+                        </svg>
+                        <span className="text-xs">홈</span>
+                    </Link>
+                    <Link
+                        href="/courses"
+                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
+                            pathname === "/courses" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
+                        }`}
+                        onClick={closeMenu}
+                    >
+                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                             />
                         </svg>
                         <span className="text-xs">코스</span>
                     </Link>
                     <Link
-                        href="/map"
-                        className={`flex flex-col items-center justify-center space-y-1 ${
-                            isActive("/map") ? "text-blue-600" : "text-gray-500"
+                        href="/personalized-home"
+                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
+                            pathname === "/personalized-home"
+                                ? "text-blue-600 bg-blue-50"
+                                : "text-gray-600 hover:text-blue-600"
                         }`}
+                        onClick={closeMenu}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                            />
+                        </svg>
+                        <span className="text-xs">AI 추천</span>
+                    </Link>
+                    <Link
+                        href="/map"
+                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
+                            pathname === "/map" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
+                        }`}
+                        onClick={closeMenu}
+                    >
+                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -275,29 +336,12 @@ export default function Header() {
                                 d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                             />
                         </svg>
-                        <span className="text-xs">실시간</span>
-                    </Link>
-                    <Link
-                        href="/my-courses"
-                        className={`flex flex-col items-center justify-center space-y-1 ${
-                            isActive("/my-courses") ? "text-blue-600" : "text-gray-500"
-                        }`}
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                            />
-                        </svg>
-                        <span className="text-xs">내 코스</span>
+                        <span className="text-xs">지도</span>
                     </Link>
                 </div>
-            </nav>
-
-            {/* 헤더 높이만큼 여백 */}
-            <div className="h-10 bg-white" />
-        </>
+            </div>
+        </header>
     );
-}
+};
+
+export default Header;
