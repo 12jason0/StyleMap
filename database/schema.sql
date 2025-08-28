@@ -53,6 +53,89 @@ CREATE TABLE IF NOT EXISTS courses (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- 장소 테이블
+CREATE TABLE IF NOT EXISTS places (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    address VARCHAR(500),
+    description TEXT,
+    category VARCHAR(100),
+    avg_cost_range VARCHAR(100),
+    opening_hours VARCHAR(200),
+    phone VARCHAR(50),
+    website VARCHAR(500),
+    parking_available BOOLEAN DEFAULT FALSE,
+    reservation_required BOOLEAN DEFAULT FALSE,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    image_url VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 코스-장소 연결 테이블
+CREATE TABLE IF NOT EXISTS course_places (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id INT NOT NULL,
+    place_id INT NOT NULL,
+    order_index INT NOT NULL,
+    estimated_duration INT DEFAULT 60,
+    recommended_time VARCHAR(100),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    FOREIGN KEY (place_id) REFERENCES places(id) ON DELETE CASCADE,
+    INDEX idx_course_id (course_id),
+    INDEX idx_order (course_id, order_index)
+);
+
+-- 하이라이트 테이블
+CREATE TABLE IF NOT EXISTS highlights (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    icon VARCHAR(10),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
+
+-- 혜택 테이블
+CREATE TABLE IF NOT EXISTS benefits (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id INT NOT NULL,
+    benefit_text TEXT NOT NULL,
+    category VARCHAR(100),
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
+
+-- 공지사항 테이블
+CREATE TABLE IF NOT EXISTS notices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id INT NOT NULL,
+    notice_text TEXT NOT NULL,
+    type VARCHAR(100) DEFAULT 'info',
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
+
+-- 연락처 테이블
+CREATE TABLE IF NOT EXISTS contacts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id INT NOT NULL,
+    type VARCHAR(100),
+    icon VARCHAR(10),
+    label VARCHAR(255),
+    value VARCHAR(500),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
+
 -- 예약 테이블
 CREATE TABLE IF NOT EXISTS bookings (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -73,3 +156,9 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX idx_bookings_status ON bookings(status);
+CREATE INDEX idx_places_category ON places(category);
+CREATE INDEX idx_course_places_course_id ON course_places(course_id);
+CREATE INDEX idx_highlights_course_id ON highlights(course_id);
+CREATE INDEX idx_benefits_course_id ON benefits(course_id);
+CREATE INDEX idx_notices_course_id ON notices(course_id);
+CREATE INDEX idx_contacts_course_id ON contacts(course_id);

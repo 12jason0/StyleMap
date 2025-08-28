@@ -21,7 +21,7 @@ const Header = () => {
     }, []);
 
     useEffect(() => {
-        // JWT 토큰 유효성 검증
+        // JWT 토큰 유효성 검증 함수
         const checkLoginStatus = async () => {
             const token = localStorage.getItem("authToken");
             if (!token) {
@@ -49,7 +49,14 @@ const Header = () => {
             }
         };
 
-        checkLoginStatus();
+        // 첫 페이지 접속 시 강제로 로그아웃 상태로 설정
+        if (pathname === "/") {
+            localStorage.removeItem("authToken");
+            setIsLoggedIn(false);
+        } else {
+            // 다른 페이지에서는 기존 로직 사용
+            checkLoginStatus();
+        }
 
         // localStorage 변경 감지를 위한 이벤트 리스너
         const handleStorageChange = (e: StorageEvent) => {

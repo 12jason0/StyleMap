@@ -9,8 +9,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const connection = await pool.getConnection();
 
         try {
-            const [courses] = await connection.execute("SELECT * FROM courses WHERE id = ?", [courseId]);
-
+            // 코스 기본 정보와 장소 수를 한 번에 가져오기
+            const [courses] = await connection.execute(
+                `
+                SELECT c.*, 
+                       (SELECT COUNT(*) FROM course_places WHERE course_id = c.id) as place_count
+                FROM courses c 
+                WHERE c.id = ?
+            `,
+                [courseId]
+            );
             const coursesArray = courses as any[];
 
             if (coursesArray.length === 0) {
@@ -22,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             // 코스 상세 정보 포맷팅
             const formattedCourse = {
                 id: course.id.toString(),
-                title: course.title,
+                title: course.title || "",
                 description: course.description || "",
                 duration: course.duration || "",
                 location: course.location || "",
@@ -30,28 +38,34 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 imageUrl: course.imageUrl || "/images/default-course.jpg",
                 concept: course.concept || "",
                 rating: Number(course.rating) || 0,
-                reviewCount: 0, // 리뷰 카운트는 별도 테이블에서 가져와야 함
+                reviewCount: 0,
                 participants: course.current_participants || 0,
                 maxParticipants: course.total_places || 10,
                 isPopular: Boolean(course.isPopular),
                 recommendedTime: course.recommended_time || "",
-                season: course.season || "",
-                courseType: course.course_type || "",
-                transportation: course.transportation || "",
-                parkingInfo: course.parking_info || "",
+                season: course.season || "사계절",
+                courseType: course.course_type || "일반",
+                transportation: course.transportation || "대중교통",
+                parking: course.parking_info || "주차 가능",
                 reservationRequired: Boolean(course.reservation_required),
+                placeCount: course.place_count || 0,
                 createdAt: course.createdAt,
                 updatedAt: course.updatedAt,
             };
 
-            console.log("API: Returning course details");
             return NextResponse.json(formattedCourse);
         } finally {
             connection.release();
         }
     } catch (error) {
         console.error("API: Error fetching course:", error);
-        return NextResponse.json({ error: "Failed to fetch course" }, { status: 500 });
+        return NextResponse.json(
+            {
+                error: "Failed to fetch course",
+                details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 }
+        );
     }
 }
 

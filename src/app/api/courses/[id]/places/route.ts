@@ -10,7 +10,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         console.log("Database connection established");
 
         try {
-            console.log("Executing query for course places");
             const [coursePlaces] = await connection.execute(
                 `SELECT 
                     cp.id,
@@ -32,14 +31,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     p.reservation_required,
                     p.latitude,
                     p.longitude,
-                    p.image_url
+                    p.imageUrl
                 FROM course_places cp
                 JOIN places p ON cp.place_id = p.id
                 WHERE cp.course_id = ?
                 ORDER BY cp.order_index ASC`,
                 [courseId]
             );
-            console.log("Query executed successfully, found", (coursePlaces as any[]).length, "places");
 
             // 결과를 중첩된 객체 구조로 변환
             const formattedPlaces = (coursePlaces as any[]).map((cp) => ({
@@ -64,11 +62,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     reservation_required: cp.reservation_required,
                     latitude: cp.latitude,
                     longitude: cp.longitude,
-                    image_url: cp.image_url,
+                    image_url: cp.imageUrl || "/images/CoffeTrand.png",
                 },
             }));
 
-            console.log("Formatted places:", formattedPlaces);
             return NextResponse.json(formattedPlaces);
         } finally {
             connection.release();

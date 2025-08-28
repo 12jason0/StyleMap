@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         try {
             const [benefits] = await connection.execute(
-                "SELECT id, title, description, icon FROM benefits WHERE course_id = ?",
+                "SELECT id, benefit_text, category, display_order FROM benefits WHERE course_id = ? ORDER BY display_order ASC",
                 [courseId]
             );
 

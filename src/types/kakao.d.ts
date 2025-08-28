@@ -28,6 +28,15 @@ declare global {
                 };
             };
         };
+        FB: {
+            init: (params: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
+            AppEvents: {
+                logPageView: () => void;
+            };
+            login: (callback: (response: any) => void, options?: { scope: string }) => void;
+            getLoginStatus: (callback: (response: any) => void) => void;
+            api: (path: string, callback: (response: any) => void) => void;
+        };
     }
 }
 

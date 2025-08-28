@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
@@ -15,6 +15,49 @@ const Signup = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    // Instagram 인증 성공/실패 처리
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const authSuccess = urlParams.get("auth_success");
+        const token = urlParams.get("token");
+        const userParam = urlParams.get("user");
+        const error = urlParams.get("error");
+        const message = urlParams.get("message");
+
+        // 인증 성공 처리
+        if (authSuccess === "true" && token && userParam) {
+            console.log("Instagram 회원가입 성공!");
+
+            try {
+                const user = JSON.parse(decodeURIComponent(userParam));
+
+                // 토큰과 사용자 정보 저장
+                localStorage.setItem("token", token);
+                localStorage.setItem("user", JSON.stringify(user));
+
+                // URL 파라미터 제거
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, "", cleanUrl);
+
+                // 홈페이지로 이동
+                router.push("/?welcome=true");
+            } catch (parseError) {
+                console.error("사용자 정보 파싱 오류:", parseError);
+                setError("회원가입 처리 중 오류가 발생했습니다.");
+            }
+        }
+
+        // 에러 처리
+        if (error === "instagram_auth_failed" && message) {
+            console.error("Instagram 인증 실패:", message);
+            setError(`Instagram 회원가입 실패: ${decodeURIComponent(message)}`);
+
+            // URL 파라미터 제거
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, "", cleanUrl);
+        }
+    }, [router]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
@@ -72,36 +115,69 @@ const Signup = () => {
     };
 
     const handleSocialSignup = async (provider: string) => {
+        if (loading) return;
+
         setLoading(true);
         setError("");
 
         try {
-            // 실제 구현에서는 각 소셜 로그인 SDK를 사용해야 합니다
-            // 여기서는 데모용으로 시뮬레이션합니다
-            const mockToken = `mock-${provider}-token-${Date.now()}`;
+            if (provider === "instagram") {
+                // Instagram OAuth URL로 직접 리다이렉트
+                const clientId = process.env.NEXT_PUBLIC_INSTAGRAM_CLIENT_ID || "1762397561331881";
+                const redirectUri = `${window.location.origin}/api/auth/instagram/callback`;
 
-            const response = await fetch(`/api/auth/${provider}`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ accessToken: mockToken }),
-            });
+                console.log("Instagram 회원가입 시작");
+                console.log("클라이언트 ID:", clientId);
+                console.log("리다이렉트 URI:", redirectUri);
 
-            const data = await response.json();
+                const instagramAuthUrl =
+                    `https://api.instagram.com/oauth/authorize?` +
+                    new URLSearchParams({
+                        client_id: clientId,
+                        redirect_uri: redirectUri,
+                        scope: "user_profile",
+                        response_type: "code",
+                    }).toString();
 
-            if (response.ok) {
-                localStorage.setItem("authToken", data.token);
-                window.dispatchEvent(new Event("authTokenChange"));
-                router.push("/");
-            } else {
-                setError(data.error || `${provider} 회원가입에 실패했습니다.`);
+                console.log("Instagram 인증 URL:", instagramAuthUrl);
+
+                // 직접 리다이렉트 (API 호출 없이)
+                window.location.href = instagramAuthUrl;
+                return; // 리다이렉트되므로 여기서 종료
+            }
+
+            // Google과 Kakao는 기존 로직 유지
+            if (provider === "google" || provider === "kakao") {
+                // 실제 구현에서는 각 소셜 로그인 SDK를 사용해야 합니다
+                // 여기서는 데모용으로 시뮬레이션합니다
+                const mockToken = `mock-${provider}-token-${Date.now()}`;
+
+                const response = await fetch(`/api/auth/${provider}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ accessToken: mockToken }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem("authToken", data.token);
+                    window.dispatchEvent(new Event("authTokenChange"));
+                    router.push("/");
+                } else {
+                    setError(data.error || `${provider} 회원가입에 실패했습니다.`);
+                }
             }
         } catch (error) {
             console.error(`${provider} 회원가입 오류:`, error);
             setError(`${provider} 회원가입 중 오류가 발생했습니다.`);
         } finally {
-            setLoading(false);
+            // Instagram의 경우 리다이렉트되므로 setLoading(false)가 실행되지 않음
+            if (provider !== "instagram") {
+                setLoading(false);
+            }
         }
     };
 

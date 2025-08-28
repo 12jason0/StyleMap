@@ -6,28 +6,47 @@ const JWT_SECRET = "stylemap-secret-key-2024";
 
 export async function POST(request: NextRequest) {
     try {
-        const { accessToken } = await request.json();
+        const { code } = await request.json();
 
-        if (!accessToken) {
-            return NextResponse.json({ error: "카카오 액세스 토큰이 필요합니다." }, { status: 400 });
+        if (!code) {
+            return NextResponse.json({ error: "카카오 인증 코드가 필요합니다." }, { status: 400 });
         }
 
-        // 카카오 API를 통해 사용자 정보 가져오기
-        const kakaoResponse = await fetch("https://kapi.kakao.com/v2/user/me", {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
-            },
+        // 카카오 액세스 토큰 교환
+        const tokenResponse = await fetch("https://kauth.kakao.com/oauth/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                grant_type: "authorization_code",
+                client_id: "833e9f9d0fea3b8c19f979c877cc0b23",
+                code,
+                redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`,
+            }),
         });
 
-        if (!kakaoResponse.ok) {
-            return NextResponse.json({ error: "카카오 토큰이 유효하지 않습니다." }, { status: 401 });
+        const tokenData = await tokenResponse.json();
+        console.log("Kakao token response:", tokenData);
+
+        if (!tokenResponse.ok) {
+            throw new Error(tokenData.error_description || "토큰 교환 실패");
         }
 
-        const kakaoUser = await kakaoResponse.json();
-        const { id, properties } = kakaoUser;
+        // 카카오 사용자 정보 가져오기
+        const userResponse = await fetch("https://kapi.kakao.com/v2/user/me", {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` },
+        });
+
+        if (!userResponse.ok) {
+            console.error("Kakao user API error:", await userResponse.text());
+            return NextResponse.json({ error: "카카오 사용자 정보를 가져올 수 없습니다." }, { status: 401 });
+        }
+
+        const userData = await userResponse.json();
+        console.log("Kakao user data:", userData);
+
+        const { id, properties } = userData;
         const { nickname, profile_image } = properties;
-        const email = kakaoUser.kakao_account?.email || `${id}@kakao.com`;
+        const email = userData.kakao_account?.email || `${id}@kakao.com`;
 
         const connection = await pool.getConnection();
 

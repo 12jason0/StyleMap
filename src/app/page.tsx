@@ -145,6 +145,94 @@ export default function Home() {
         }
     }, [courses.length]);
 
+    // 인증 성공 처리
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const authSuccess = urlParams.get("auth_success");
+        const token = urlParams.get("token");
+        const user = urlParams.get("user");
+
+        if (authSuccess === "true" && token && user) {
+            try {
+                // 토큰을 localStorage에 저장
+                localStorage.setItem("token", token);
+                localStorage.setItem("user", user);
+
+                // URL에서 파라미터 제거
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, "", newUrl);
+
+                // 성공 메시지 표시 (선택사항)
+                alert("Instagram 로그인이 성공했습니다!");
+            } catch (error) {
+                console.error("인증 처리 중 오류:", error);
+            }
+        }
+    }, []);
+
+    // Facebook 로그인 상태 확인 (로컬 환경에서만 작동)
+    useEffect(() => {
+        const checkFacebookLoginStatus = () => {
+            // localhost가 아닌 HTTP 환경에서는 Facebook 로그인 상태 확인을 건너뜀
+            if (
+                typeof window !== "undefined" &&
+                window.location.protocol === "http:" &&
+                window.location.hostname !== "localhost"
+            ) {
+                console.log("Facebook 로그인은 localhost 또는 HTTPS 환경에서만 작동합니다.");
+                return;
+            }
+
+            if (typeof window !== "undefined" && window.FB) {
+                console.log("Facebook 로그인 상태 확인 중...");
+
+                // localhost 환경에서만 Facebook API 호출
+                if (window.location.hostname === "localhost" || window.location.protocol === "https:") {
+                    try {
+                        window.FB.getLoginStatus(function (response) {
+                            console.log("Facebook 로그인 상태:", response);
+
+                            if (response.status === "connected") {
+                                // 사용자가 Facebook과 앱에 로그인됨
+                                console.log("Facebook 로그인됨:", response.authResponse);
+
+                                // 액세스 토큰과 사용자 ID 저장
+                                localStorage.setItem("facebook_access_token", response.authResponse.accessToken);
+                                localStorage.setItem("facebook_user_id", response.authResponse.userID);
+
+                                // 사용자 정보 가져오기
+                                window.FB.api("/me", function (userInfo) {
+                                    console.log("Facebook 사용자 정보:", userInfo);
+                                    localStorage.setItem("facebook_user_info", JSON.stringify(userInfo));
+
+                                    // 로그인된 환경으로 리디렉션 또는 상태 업데이트
+                                    // 여기서 필요한 처리 수행
+                                });
+                            } else if (response.status === "not_authorized") {
+                                // 사용자가 Facebook에는 로그인했지만 앱에는 로그인하지 않음
+                                console.log("Facebook 로그인됨, 앱 권한 없음");
+                            } else {
+                                // 사용자가 Facebook에 로그인하지 않음
+                                console.log("Facebook 로그인되지 않음");
+                            }
+                        });
+                    } catch (error) {
+                        console.log("Facebook 로그인 상태 확인 중 오류:", error);
+                    }
+                } else {
+                    console.log("현재 환경에서는 Facebook 로그인 상태 확인을 건너뜁니다.");
+                }
+            } else {
+                // Facebook SDK가 아직 로드되지 않음, 잠시 후 다시 시도
+                setTimeout(checkFacebookLoginStatus, 2000);
+            }
+        };
+
+        // 페이지 로드 후 잠시 대기 후 Facebook 로그인 상태 확인
+        const timer = setTimeout(checkFacebookLoginStatus, 1000);
+        return () => clearTimeout(timer);
+    }, []);
+
     const topCourses = courses.slice(0, 5);
     const hotCourses = courses
         .filter((c) => c.participants > 10 || c.rating >= 4.5)
@@ -246,10 +334,10 @@ export default function Home() {
                                     key={course.id}
                                     href={`/courses/${course.id}`}
                                     className={`
-                                        group relative bg-white rounded-2xl overflow-hidden shadow-xl 
-                                        hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2
-                                        ${index === 0 ? "md:col-span-2 md:row-span-2" : ""}
-                                    `}
+                                            group relative bg-white rounded-2xl overflow-hidden shadow-xl 
+                                            hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2
+                                            ${index === 0 ? "md:col-span-2 md:row-span-2" : ""}
+                                        `}
                                     onMouseEnter={() => setHoveredCard(course.id)}
                                     onMouseLeave={() => setHoveredCard(null)}
                                 >
@@ -258,9 +346,9 @@ export default function Home() {
                                             src={course.imageUrl}
                                             alt={course.title}
                                             className={`
-                                                w-full h-full object-cover transition-transform duration-700
-                                                ${hoveredCard === course.id ? "scale-110" : "scale-100"}
-                                            `}
+                                                    w-full h-full object-cover transition-transform duration-700
+                                                    ${hoveredCard === course.id ? "scale-110" : "scale-100"}
+                                                `}
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
 
@@ -269,15 +357,15 @@ export default function Home() {
                                             <div className="absolute top-4 left-4">
                                                 <span
                                                     className={`
-                                                    px-4 py-2 font-bold rounded-full text-white shadow-lg
-                                                    ${
-                                                        index === 0
-                                                            ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-lg"
-                                                            : index === 1
-                                                            ? "bg-gradient-to-r from-gray-300 to-gray-400"
-                                                            : "bg-gradient-to-r from-orange-400 to-orange-600"
-                                                    }
-                                                `}
+                                                        px-4 py-2 font-bold rounded-full text-white shadow-lg
+                                                        ${
+                                                            index === 0
+                                                                ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-lg"
+                                                                : index === 1
+                                                                ? "bg-gradient-to-r from-gray-300 to-gray-400"
+                                                                : "bg-gradient-to-r from-orange-400 to-orange-600"
+                                                        }
+                                                    `}
                                                 >
                                                     {index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위"}
                                                 </span>
@@ -329,7 +417,7 @@ export default function Home() {
                                 <Link
                                     key={course.id}
                                     href={`/courses/${course.id}`}
-                                    className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all"
+                                    className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all text-black"
                                 >
                                     <div className="relative h-48 overflow-hidden">
                                         <img

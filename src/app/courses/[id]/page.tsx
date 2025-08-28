@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, useLayoutEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -73,20 +73,10 @@ interface Notice {
     type: string;
 }
 
-interface Contact {
-    id: number;
-    type: string;
-    icon: string;
-    label: string;
-    value: string;
-    description: string;
-}
-
 interface CourseData extends Course {
     highlights?: Highlight[];
     benefits?: Benefit[];
     notices?: Notice[];
-    contacts?: Contact[];
     coursePlaces?: CoursePlace[];
 }
 
@@ -169,6 +159,7 @@ export default function CourseDetailPage() {
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
     const [mapLoading, setMapLoading] = useState(true);
     const [isShareLoading, setIsShareLoading] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
 
     // 지도 관련 상태
     const mapRef = useRef<HTMLDivElement>(null);
@@ -177,6 +168,20 @@ export default function CourseDetailPage() {
 
     // 1. API 키를 컴포넌트 최상단에서 한 번만 선언합니다.
     const kakaoMapApiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY;
+
+    // 성능 최적화를 위한 메모이제이션
+    const sortedCoursePlaces = useMemo(() => {
+        if (!courseData?.coursePlaces) return [];
+        return [...courseData.coursePlaces].sort((a, b) => a.order_index - b.order_index);
+    }, [courseData?.coursePlaces]);
+
+    const hasPlaces = useMemo(() => {
+        return sortedCoursePlaces.length > 0;
+    }, [sortedCoursePlaces]);
+
+    const firstPlace = useMemo(() => {
+        return sortedCoursePlaces[0];
+    }, [sortedCoursePlaces]);
 
     // 토스트 표시 함수
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
@@ -196,63 +201,26 @@ export default function CourseDetailPage() {
         [map]
     );
 
-    // 카카오맵 초기화
+    // 장소별 지도 이동 핸들러 (메모이제이션)
+    const createMapCenterHandler = useCallback(
+        (lat: number, lng: number) => () => {
+            moveMapCenter(lat, lng);
+        },
+        [moveMapCenter]
+    );
+
+    // 길찾기 핸들러 (메모이제이션)
+    const createNavigationHandler = useCallback(
+        (name: string, lat: number, lng: number) => () => {
+            const url = `https://map.kakao.com/link/to/${name},${lat},${lng}`;
+            window.open(url, "_blank");
+        },
+        []
+    );
+
+    // 마커 업데이트 (지도가 이미 초기화된 경우)
     useEffect(() => {
-        console.log("Loaded API Key:", kakaoMapApiKey); // 바깥에 선언된 변수를 사용
-
-        // `kakaoMapApiKey`를 여기서 또 선언할 필요가 없습니다.
-
-        if (!kakaoMapApiKey) {
-            setError("지도 API 키가 설정되지 않았습니다.");
-            setMapLoading(false);
-            return;
-        }
-
-        const loadKakaoMap = () => {
-            if ((window as any).kakao && (window as any).kakao.maps) {
-                initializeMap();
-            } else {
-                const script = document.createElement("script");
-                script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoMapApiKey}&libraries=services,clusterer`;
-                script.async = true;
-                script.onload = () => {
-                    (window as any).kakao.maps.load(() => {
-                        initializeMap();
-                    });
-                };
-                script.onerror = () => {
-                    setError("지도를 불러오는데 실패했습니다.");
-                    setMapLoading(false);
-                };
-                document.head.appendChild(script);
-            }
-        };
-
-        const initializeMap = () => {
-            if (!mapRef.current) return;
-
-            try {
-                const kakao = (window as any).kakao;
-                const options = {
-                    center: new kakao.maps.LatLng(37.5665, 126.978),
-                    level: 8,
-                };
-
-                const kakaoMap = new kakao.maps.Map(mapRef.current, options);
-                setMap(kakaoMap);
-                setMapLoading(false);
-
-                if (courseData?.coursePlaces && courseData.coursePlaces.length > 0) {
-                    addMarkersToMap(kakaoMap, courseData.coursePlaces);
-                }
-            } catch (err) {
-                console.error("Map initialization error:", err);
-                setError("지도 초기화에 실패했습니다.");
-                setMapLoading(false);
-            }
-        };
-
-        const addMarkersToMap = (kakaoMap: any, places: CoursePlace[]) => {
+        if (map && hasPlaces && sortedCoursePlaces.length > 0) {
             try {
                 const kakao = (window as any).kakao;
                 const newMarkers: any[] = [];
@@ -261,41 +229,41 @@ export default function CourseDetailPage() {
                 // 기존 마커 제거
                 markers.forEach((marker) => marker.setMap(null));
 
-                places.forEach((coursePlace, index) => {
+                sortedCoursePlaces.forEach((coursePlace, index) => {
                     if (coursePlace.place.latitude && coursePlace.place.longitude) {
                         const position = new kakao.maps.LatLng(coursePlace.place.latitude, coursePlace.place.longitude);
 
                         const markerImage = new kakao.maps.MarkerImage(
                             `data:image/svg+xml;base64,${btoa(`
-                                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="20" cy="20" r="20" fill="#6366f1"/>
-                                    <text x="20" y="26" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${
-                                        index + 1
-                                    }</text>
-                                </svg>
-                            `)}`,
+                            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="20" cy="20" r="20" fill="#6366f1"/>
+                                <text x="20" y="26" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${
+                                    index + 1
+                                }</text>
+                            </svg>
+                        `)}`,
                             new kakao.maps.Size(40, 40)
                         );
 
                         const marker = new kakao.maps.Marker({
                             position: position,
-                            map: kakaoMap,
+                            map: map,
                             title: coursePlace.place.name,
                             image: markerImage,
                         });
 
                         const infowindow = new kakao.maps.InfoWindow({
                             content: `
-                                <div style="padding: 15px; min-width: 250px; font-family: Arial, sans-serif;">
-                                    <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #333;">${coursePlace.place.name}</h3>
-                                    <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">${coursePlace.place.category}</p>
-                                    <p style="margin: 0 0 12px 0; font-size: 12px; color: #999;">${coursePlace.place.address}</p>
-                                </div>
-                            `,
+                            <div style="padding: 15px; min-width: 250px; font-family: Arial, sans-serif;">
+                                <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #333;">${coursePlace.place.name}</h3>
+                                <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">${coursePlace.place.category}</p>
+                                <p style="margin: 0 0 12px 0; font-size: 12px; color: #999;">${coursePlace.place.address}</p>
+                            </div>
+                        `,
                         });
 
                         kakao.maps.event.addListener(marker, "click", function () {
-                            infowindow.open(kakaoMap, marker);
+                            infowindow.open(map, marker);
                         });
 
                         newMarkers.push(marker);
@@ -306,19 +274,135 @@ export default function CourseDetailPage() {
                 setMarkers(newMarkers);
 
                 if (newMarkers.length > 0) {
-                    kakaoMap.setBounds(bounds);
+                    map.setBounds(bounds);
                 }
             } catch (err) {
-                console.error("Marker creation error:", err);
-                showToast("마커 생성에 실패했습니다.", "error");
+                console.error("Marker update error:", err);
             }
-        };
+        }
+    }, [map, sortedCoursePlaces]); // 지도와 장소 데이터만 의존
 
-        if (courseData) {
+    // 지도 참조가 준비되면 지도 초기화 (무한 루프 방지)
+    useEffect(() => {
+        if (courseData && mapRef.current && !map && kakaoMapApiKey) {
+            console.log("Map ref is ready, initializing map...");
+
+            const loadKakaoMap = () => {
+                if ((window as any).kakao && (window as any).kakao.maps) {
+                    initializeMap();
+                } else {
+                    const script = document.createElement("script");
+                    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoMapApiKey}&libraries=services,clusterer`;
+                    script.async = true;
+                    script.onload = () => {
+                        (window as any).kakao.maps.load(() => {
+                            initializeMap();
+                        });
+                    };
+                    script.onerror = () => {
+                        setError("지도를 불러오는데 실패했습니다.");
+                        setMapLoading(false);
+                    };
+                    document.head.appendChild(script);
+                }
+            };
+
+            const initializeMap = () => {
+                if (!mapRef.current) return;
+
+                try {
+                    const kakao = (window as any).kakao;
+                    let centerLat = 37.5665;
+                    let centerLng = 126.978;
+
+                    if (firstPlace && firstPlace.place.latitude && firstPlace.place.longitude) {
+                        centerLat = firstPlace.place.latitude;
+                        centerLng = firstPlace.place.longitude;
+                    }
+
+                    const options = {
+                        center: new kakao.maps.LatLng(centerLat, centerLng),
+                        level: 8,
+                    };
+
+                    const kakaoMap = new kakao.maps.Map(mapRef.current, options);
+                    setMap(kakaoMap);
+                    setMapLoading(false);
+
+                    if (hasPlaces) {
+                        // 마커 추가 로직을 여기에 직접 구현
+                        try {
+                            const kakao = (window as any).kakao;
+                            const newMarkers: any[] = [];
+                            const bounds = new kakao.maps.LatLngBounds();
+
+                            // 기존 마커 제거
+                            markers.forEach((marker) => marker.setMap(null));
+
+                            sortedCoursePlaces.forEach((coursePlace, index) => {
+                                if (coursePlace.place.latitude && coursePlace.place.longitude) {
+                                    const position = new kakao.maps.LatLng(
+                                        coursePlace.place.latitude,
+                                        coursePlace.place.longitude
+                                    );
+
+                                    const markerImage = new kakao.maps.MarkerImage(
+                                        `data:image/svg+xml;base64,${btoa(`
+                                        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <circle cx="20" cy="20" r="20" fill="#6366f1"/>
+                                            <text x="20" y="26" text-anchor="middle" fill="white" font-size="14" font-weight="bold">${
+                                                index + 1
+                                            }</text>
+                                        </svg>
+                                    `)}`,
+                                        new kakao.maps.Size(40, 40)
+                                    );
+
+                                    const marker = new kakao.maps.Marker({
+                                        position: position,
+                                        map: kakaoMap,
+                                        title: coursePlace.place.name,
+                                        image: markerImage,
+                                    });
+
+                                    const infowindow = new kakao.maps.InfoWindow({
+                                        content: `
+                                        <div style="padding: 15px; min-width: 250px; font-family: Arial, sans-serif;">
+                                            <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: bold; color: #333;">${coursePlace.place.name}</h3>
+                                            <p style="margin: 0 0 8px 0; font-size: 14px; color: #666;">${coursePlace.place.category}</p>
+                                            <p style="margin: 0 0 12px 0; font-size: 12px; color: #999;">${coursePlace.place.address}</p>
+                                        </div>
+                                    `,
+                                    });
+
+                                    kakao.maps.event.addListener(marker, "click", function () {
+                                        infowindow.open(kakaoMap, marker);
+                                    });
+
+                                    newMarkers.push(marker);
+                                    bounds.extend(position);
+                                }
+                            });
+
+                            setMarkers(newMarkers);
+
+                            if (newMarkers.length > 0) {
+                                kakaoMap.setBounds(bounds);
+                            }
+                        } catch (err) {
+                            console.error("Marker creation error:", err);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Map initialization error:", err);
+                    setError("지도 초기화에 실패했습니다.");
+                    setMapLoading(false);
+                }
+            };
+
             loadKakaoMap();
         }
-        // 2. 의존성 배열에 올바른 변수 이름(kakaoMapApiKey)을 넣어줍니다.
-    }, [courseData, kakaoMapApiKey, markers, showToast]);
+    }, [courseData?.id, kakaoMapApiKey]); // 의존성 배열을 최소화
 
     // 찜 상태 확인
     const checkFavoriteStatus = useCallback(async () => {
@@ -342,49 +426,62 @@ export default function CourseDetailPage() {
         }
     }, [params.id]);
 
-    // 코스 데이터 가져오기
+    // 코스 데이터 가져오기 (최적화된 버전)
     const fetchCourseData = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
 
-            const courseResponse = await fetch(`/api/courses/${params.id}`);
-            if (!courseResponse.ok) {
-                throw new Error("코스를 찾을 수 없습니다.");
-            }
-            const course = await courseResponse.json();
+            // 캐시 키 생성
+            const cacheKey = `course_${params.id}`;
+            const cachedData = sessionStorage.getItem(cacheKey);
 
-            // 추가 데이터들을 병렬로 가져오기
-            const [highlightsRes, benefitsRes, noticesRes, contactsRes, placesRes] = await Promise.allSettled([
+            if (cachedData) {
+                const parsedData = JSON.parse(cachedData);
+                setCourseData(parsedData);
+                setLoading(false);
+                document.title = `${parsedData.title} - 코스 상세`;
+                return;
+            }
+
+            // 코스 기본 정보와 추가 데이터를 병렬로 가져오기
+            const [courseResponse, ...endpointPromises] = await Promise.allSettled([
+                fetch(`/api/courses/${params.id}`),
                 fetch(`/api/courses/${params.id}/highlights`),
                 fetch(`/api/courses/${params.id}/benefits`),
                 fetch(`/api/courses/${params.id}/notices`),
-                fetch(`/api/courses/${params.id}/contacts`),
                 fetch(`/api/courses/${params.id}/places`),
             ]);
 
-            const highlights =
-                highlightsRes.status === "fulfilled" && highlightsRes.value.ok ? await highlightsRes.value.json() : [];
-            const benefits =
-                benefitsRes.status === "fulfilled" && benefitsRes.value.ok ? await benefitsRes.value.json() : [];
-            const notices =
-                noticesRes.status === "fulfilled" && noticesRes.value.ok ? await noticesRes.value.json() : [];
-            const contacts =
-                contactsRes.status === "fulfilled" && contactsRes.value.ok ? await contactsRes.value.json() : [];
-            const coursePlaces =
-                placesRes.status === "fulfilled" && placesRes.value.ok ? await placesRes.value.json() : [];
+            // 코스 기본 정보 처리
+            if (courseResponse.status === "rejected" || !courseResponse.value.ok) {
+                throw new Error("코스를 찾을 수 없습니다.");
+            }
+            const course = await courseResponse.value.json();
 
-            console.log("Fetched notices:", notices);
-            setCourseData({
+            // 추가 데이터 처리
+            const [highlights, benefits, notices, coursePlaces] = await Promise.all(
+                endpointPromises.map(async (promise) => {
+                    if (promise.status === "fulfilled" && promise.value.ok) {
+                        return await promise.value.json();
+                    }
+                    return [];
+                })
+            );
+
+            const finalCourseData = {
                 ...course,
                 highlights,
                 benefits,
                 notices,
-                contacts,
-                coursePlaces: coursePlaces.sort((a: CoursePlace, b: CoursePlace) => a.order_index - b.order_index),
-            });
+                coursePlaces: coursePlaces,
+            };
 
-            // 메타데이터 설정
+            // 캐시에 저장 (5분간 유효)
+            sessionStorage.setItem(cacheKey, JSON.stringify(finalCourseData));
+            setTimeout(() => sessionStorage.removeItem(cacheKey), 5 * 60 * 1000);
+
+            setCourseData(finalCourseData);
             document.title = `${course.title} - 코스 상세`;
             const metaDescription = document.querySelector('meta[name="description"]');
             if (metaDescription) {
@@ -466,26 +563,65 @@ export default function CourseDetailPage() {
     };
 
     // 공유하기 처리
-    const handleShareCourse = async () => {
-        try {
-            setIsShareLoading(true);
+    const handleShareCourse = () => {
+        setShowShareModal(true);
+    };
 
-            if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
-                await navigator.share({
-                    title: courseData?.title,
-                    text: courseData?.description,
-                    url: window.location.href,
-                });
-                showToast("공유되었습니다.", "success");
+    // 카카오톡 공유
+    const handleKakaoShare = () => {
+        try {
+            // 카카오톡 공유 URL (더 정확한 방법)
+            const shareUrl = `https://story.kakao.com/share?url=${encodeURIComponent(
+                window.location.href
+            )}&text=${encodeURIComponent(courseData?.title || "")}`;
+
+            // 모바일에서는 카카오톡 앱으로 직접 공유
+            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                window.location.href = shareUrl;
             } else {
-                await navigator.clipboard.writeText(window.location.href);
-                showToast("링크가 클립보드에 복사되었습니다.", "success");
+                // 데스크톱에서는 팝업으로 열기
+                window.open(shareUrl, "_blank", "width=600,height=600");
             }
+
+            setShowShareModal(false);
+            showToast("카카오톡으로 공유되었습니다.", "success");
         } catch (error) {
-            console.error("Error sharing:", error);
-            showToast("공유에 실패했습니다.", "error");
-        } finally {
-            setIsShareLoading(false);
+            console.error("Error sharing to KakaoTalk:", error);
+            showToast("카카오톡 공유에 실패했습니다.", "error");
+        }
+    };
+
+    // 디엠 공유
+    const handleDMShare = () => {
+        try {
+            // 인스타그램 디엠 공유 (모바일에서 더 잘 작동)
+            const shareUrl = `instagram://library?AssetPath=${encodeURIComponent(window.location.href)}`;
+
+            // 모바일에서는 인스타그램 앱으로 직접 공유
+            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                window.location.href = shareUrl;
+            } else {
+                // 데스크톱에서는 인스타그램 웹으로 이동
+                window.open("https://www.instagram.com/direct/inbox/", "_blank");
+            }
+
+            setShowShareModal(false);
+            showToast("디엠으로 공유되었습니다.", "success");
+        } catch (error) {
+            console.error("Error sharing to DM:", error);
+            showToast("디엠 공유에 실패했습니다.", "error");
+        }
+    };
+
+    // 링크 복사
+    const handleCopyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(window.location.href);
+            setShowShareModal(false);
+            showToast("링크가 클립보드에 복사되었습니다.", "success");
+        } catch (error) {
+            console.error("Error copying link:", error);
+            showToast("링크 복사에 실패했습니다.", "error");
         }
     };
 
@@ -643,16 +779,15 @@ export default function CourseDetailPage() {
                                     {/* 지도 섹션 */}
                                     <div className="mb-8 rounded-2xl overflow-hidden shadow-lg">
                                         <div className="relative">
-                                            {mapLoading ? (
-                                                <div className="w-full h-80 bg-gray-200 rounded-2xl flex items-center justify-center">
+                                            <div
+                                                ref={mapRef}
+                                                className="w-full h-80 rounded-2xl"
+                                                style={{ minHeight: "320px" }}
+                                            />
+                                            {mapLoading && (
+                                                <div className="absolute inset-0 bg-gray-200 rounded-2xl flex items-center justify-center">
                                                     <LoadingSpinner size="small" />
                                                 </div>
-                                            ) : (
-                                                <div
-                                                    ref={mapRef}
-                                                    className="w-full h-80 rounded-2xl"
-                                                    style={{ minHeight: "320px" }}
-                                                />
                                             )}
 
                                             {/* 지도 오버레이 */}
@@ -679,11 +814,11 @@ export default function CourseDetailPage() {
                                     </div>
 
                                     {/* 타임라인 */}
-                                    <div className="relative pl-8 md:pl-10">
+                                    <div className="relative pl-8 md:pl-10" style={{ willChange: "transform" }}>
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
 
-                                        {courseData.coursePlaces && courseData.coursePlaces.length > 0 ? (
-                                            courseData.coursePlaces.map((coursePlace, index) => (
+                                        {hasPlaces ? (
+                                            sortedCoursePlaces.map((coursePlace, index) => (
                                                 <div key={coursePlace.id} className="relative mb-8">
                                                     <div className="absolute -left-7 md:-left-8 top-6 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white shadow-lg"></div>
                                                     <div className="absolute -left-10 md:-left-12 top-4 w-8 h-8 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg">
@@ -703,10 +838,18 @@ export default function CourseDetailPage() {
                                                                         height={80}
                                                                         className="w-full h-full object-cover"
                                                                         loading="lazy"
+                                                                        placeholder="blur"
+                                                                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+                                                                        onError={(e) => {
+                                                                            const target = e.target as HTMLImageElement;
+                                                                            target.style.display = "none";
+                                                                            target.nextElementSibling?.classList.remove(
+                                                                                "hidden"
+                                                                            );
+                                                                        }}
                                                                     />
-                                                                ) : (
-                                                                    <span className="text-2xl">📍</span>
-                                                                )}
+                                                                ) : null}
+                                                                <span className="text-2xl">📍</span>
                                                             </div>
 
                                                             {/* 장소 정보 */}
@@ -733,27 +876,21 @@ export default function CourseDetailPage() {
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     <button
-                                                                        onClick={() =>
-                                                                            moveMapCenter(
-                                                                                coursePlace.place.latitude,
-                                                                                coursePlace.place.longitude
-                                                                            )
-                                                                        }
+                                                                        onClick={createMapCenterHandler(
+                                                                            coursePlace.place.latitude,
+                                                                            coursePlace.place.longitude
+                                                                        )}
                                                                         className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
                                                                         disabled={mapLoading}
                                                                     >
                                                                         지도에서 보기
                                                                     </button>
                                                                     <button
-                                                                        onClick={() => {
-                                                                            if (
-                                                                                coursePlace.place.latitude &&
-                                                                                coursePlace.place.longitude
-                                                                            ) {
-                                                                                const url = `https://map.kakao.com/link/to/${coursePlace.place.name},${coursePlace.place.latitude},${coursePlace.place.longitude}`;
-                                                                                window.open(url, "_blank");
-                                                                            }
-                                                                        }}
+                                                                        onClick={createNavigationHandler(
+                                                                            coursePlace.place.name,
+                                                                            coursePlace.place.latitude,
+                                                                            coursePlace.place.longitude
+                                                                        )}
                                                                         className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
                                                                     >
                                                                         길찾기
@@ -870,7 +1007,7 @@ export default function CourseDetailPage() {
                                 <div className="sticky top-6 space-y-6">
                                     {/* 코스 액션 카드 */}
                                     <div className="bg-white rounded-2xl shadow-lg p-6">
-                                        <h3 className="text-xl font-bold mb-4">이 코스</h3>
+                                        <h3 className="text-xl font-bold mb-4">{courseData.title}</h3>
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-600">장소 수</span>
@@ -965,31 +1102,6 @@ export default function CourseDetailPage() {
                                         </div>
                                     </div>
 
-                                    {/* 연락처 정보 */}
-                                    {courseData.contacts && courseData.contacts.length > 0 && (
-                                        <div className="bg-white rounded-2xl shadow-lg p-6">
-                                            <h3 className="text-xl font-bold mb-4">문의하기</h3>
-                                            <div className="space-y-4">
-                                                {courseData.contacts.map((contact) => (
-                                                    <div key={contact.id} className="flex items-start gap-3">
-                                                        <span className="text-blue-500 text-xl mt-1">
-                                                            {contact.icon}
-                                                        </span>
-                                                        <div className="flex-1">
-                                                            <p className="text-gray-700 font-medium">{contact.label}</p>
-                                                            <p className="text-gray-600 text-sm break-all">
-                                                                {contact.value}
-                                                            </p>
-                                                            <p className="text-gray-500 text-xs">
-                                                                {contact.description}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
                                     {/* 관련 코스 추천 (미래 기능) */}
                                     <div className="bg-white rounded-2xl shadow-lg p-6">
                                         <h3 className="text-xl font-bold mb-4">비슷한 코스</h3>
@@ -1032,6 +1144,68 @@ export default function CourseDetailPage() {
                 {/* 모바일에서 하단 여백 추가 */}
                 <div className="lg:hidden h-20"></div>
             </div>
+
+            {/* 공유 모달 */}
+            {showShareModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-gray-800">공유하기</h3>
+                            <button
+                                onClick={() => setShowShareModal(false)}
+                                className="text-gray-400 hover:text-gray-600 text-2xl"
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* 카카오톡 공유 */}
+                            <button
+                                onClick={handleKakaoShare}
+                                className="w-full flex items-center gap-4 p-4 bg-yellow-400 text-white rounded-xl hover:bg-yellow-500 transition-colors"
+                            >
+                                <div className="text-2xl">💬</div>
+                                <div className="text-left">
+                                    <div className="font-bold">카카오톡으로 공유</div>
+                                    <div className="text-sm opacity-90">카카오톡 채팅으로 공유하기</div>
+                                </div>
+                            </button>
+
+                            {/* 디엠 공유 */}
+                            <button
+                                onClick={handleDMShare}
+                                className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-colors"
+                            >
+                                <div className="text-2xl">📱</div>
+                                <div className="text-left">
+                                    <div className="font-bold">디엠으로 공유</div>
+                                    <div className="text-sm opacity-90">인스타그램 디엠으로 공유하기</div>
+                                </div>
+                            </button>
+
+                            {/* 링크 복사 */}
+                            <button
+                                onClick={handleCopyLink}
+                                className="w-full flex items-center gap-4 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                            >
+                                <div className="text-2xl">📋</div>
+                                <div className="text-left">
+                                    <div className="font-bold">링크 복사</div>
+                                    <div className="text-sm opacity-90">클립보드에 링크 복사하기</div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setShowShareModal(false)}
+                            className="w-full mt-6 py-3 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                            취소
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* JSON-LD 구조화 데이터 */}
             <script

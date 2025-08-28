@@ -15,7 +15,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         try {
             const [notices] = await connection.execute(
-                "SELECT id, notice_text, display_order FROM notices WHERE course_id = ? ORDER BY display_order ASC",
+                "SELECT id, notice_text, type, display_order FROM notices WHERE course_id = ? ORDER BY display_order ASC",
                 [courseId]
             );
 

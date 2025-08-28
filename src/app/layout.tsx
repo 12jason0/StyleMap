@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { metadata } from "./metadata";
 import LayoutContent from "@/components/LayoutContent";
+import FacebookSDK from "@/components/FacebookSDK";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -27,6 +28,7 @@ export default function RootLayout({
                 />
             </head>
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
+                <FacebookSDK />
                 <LayoutContent>{children}</LayoutContent>
             </body>
         </html>
