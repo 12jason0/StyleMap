@@ -191,7 +191,7 @@ export default function CoursesPage() {
                                             e.stopPropagation();
                                             handleBooking(course.id);
                                         }}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors active:scale-95"
                                     >
                                         코스 시작하기
                                     </button>
@@ -217,6 +217,8 @@ export default function CoursesPage() {
                     </div>
                 )}
             </div>
+            {/* 모바일 하단 네비게이션을 위한 여백 */}
+            <div className="md:hidden h-20"></div>
         </div>
     );
 }

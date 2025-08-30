@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-const JWT_SECRET = "stylemap-secret-key-2024";
+const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
 
 export async function POST(request: NextRequest) {
     try {
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
             );
             console.log("사용자 조회 결과:", users);
 
-            const userArray = users as any[];
+            const userArray = users as Array<{ id: number; email: string; password: string; nickname: string }>;
 
             if (userArray.length === 0) {
                 console.log("사용자를 찾을 수 없음:", email);

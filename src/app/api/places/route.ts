@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import pool from "@/lib/db";
 
 export async function GET(request: NextRequest) {
     try {
@@ -13,28 +13,40 @@ export async function GET(request: NextRequest) {
         }
 
         // 데이터베이스에서 해당 지역의 장소들을 가져오기
-        const places = await prisma.courses.findMany({
-            where: {
-                region: {
-                    contains: region || "",
-                },
-            },
-            select: {
-                id: true,
-                title: true,
-                description: true,
-                region: true,
-                concept: true,
-                rating: true,
-                current_participants: true,
-                max_participants: true,
-                imageUrl: true,
-            },
-            take: 10,
-        });
+        const connection = await pool.getConnection();
+        let places: Array<{
+            id: number;
+            title: string;
+            description: string;
+            region: string;
+            concept: string;
+            rating: number;
+            current_participants: number;
+            max_participants: number;
+            imageUrl: string;
+        }>;
+        try {
+            const [result] = await connection.execute(
+                "SELECT id, title, description, region, concept, rating, current_participants, max_participants, imageUrl FROM courses WHERE region LIKE ? LIMIT 10",
+                [`%${region || ""}%`]
+            );
+            places = result as Array<{
+                id: number;
+                title: string;
+                description: string;
+                region: string;
+                concept: string;
+                rating: number;
+                current_participants: number;
+                max_participants: number;
+                imageUrl: string;
+            }>;
+        } finally {
+            connection.release();
+        }
 
         // 장소 데이터를 Place 인터페이스에 맞게 변환
-        const transformedPlaces = places.map((place, index) => {
+        const transformedPlaces = places.map((place) => {
             // 혼잡도 계산 (참가자 수 기반)
             const participationRate = place.current_participants / place.max_participants;
             let crowdLevel = "여유";
@@ -78,7 +90,3 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "장소 검색 중 오류가 발생했습니다." }, { status: 500 });
     }
 }
-
-
-
-

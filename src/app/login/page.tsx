@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
-import SocialLogin from "@/components/SocialLogin";
 
 const Login = () => {
     const router = useRouter();
@@ -14,6 +13,20 @@ const Login = () => {
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [message, setMessage] = useState("");
+
+    // URL 파라미터에서 메시지 확인
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlMessage = urlParams.get("message");
+
+        if (urlMessage) {
+            setMessage(decodeURIComponent(urlMessage));
+            // URL에서 메시지 파라미터 제거
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, "", cleanUrl);
+        }
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
@@ -26,6 +39,7 @@ const Login = () => {
         e.preventDefault();
         setLoading(true);
         setError("");
+        setMessage("");
 
         try {
             const response = await fetch("/api/auth/login", {
@@ -41,10 +55,13 @@ const Login = () => {
             if (response.ok) {
                 // 토큰을 localStorage에 저장
                 localStorage.setItem("authToken", data.token);
+                localStorage.setItem("user", JSON.stringify(data.user));
+
                 // 헤더 상태 업데이트를 위한 이벤트 발생
-                window.dispatchEvent(new Event("authTokenChange"));
-                // 홈페이지로 이동
-                router.push("/");
+                window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
+
+                // 홈페이지로 이동 (로그인 성공 모달 표시를 위해 파라미터 추가)
+                router.push("/?login_success=true");
             } else {
                 setError(data.error || "로그인에 실패했습니다.");
             }
@@ -54,6 +71,114 @@ const Login = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // login/page.tsx 파일의 이 함수 전체를 교체하세요.
+
+    const handleSocialLogin = (provider: string) => {
+        // async를 제거하고, setLoading은 각 분기점에서 처리합니다.
+        if (loading) return;
+        setLoading(true);
+        setError("");
+        setMessage("");
+
+        if (provider === "kakao") {
+            const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID || "833e9f9d0fea3b8c19f979c877cc0b23";
+            const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`;
+
+            const kakaoAuthUrl =
+                `https://kauth.kakao.com/oauth/authorize?` +
+                new URLSearchParams({
+                    client_id: kakaoClientId,
+                    redirect_uri: redirectUri,
+                    response_type: "code",
+                    scope: "profile_nickname, profile_image", // email은 권한 문제로 임시 제거
+                }).toString();
+
+            console.log("카카오 로그인 시작");
+            console.log("카카오 인증 URL:", kakaoAuthUrl);
+
+            const popup = window.open(
+                kakaoAuthUrl,
+                "kakao-login",
+                "width=500,height=700,scrollbars=yes,resizable=yes,left=" +
+                    (screen.width / 2 - 250) +
+                    ",top=" +
+                    (screen.height / 2 - 350)
+            );
+
+            if (!popup) {
+                setError("팝업이 차단되었습니다. 팝업 차단을 해제해주세요.");
+                setLoading(false);
+                return;
+            }
+
+            // --- 코드 정리 및 안정성 개선 ---
+
+            // 팝업, 이벤트 리스너, 인터벌을 정리하는 함수를 하나로 통합
+            let intervalId: NodeJS.Timeout | null = null;
+
+            const cleanup = () => {
+                if (intervalId) clearInterval(intervalId);
+                window.removeEventListener("message", messageHandler);
+                if (popup && !popup.closed) popup.close();
+                setLoading(false);
+            };
+
+            const messageHandler = async (event: MessageEvent) => {
+                if (event.origin !== (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000")) {
+                    return;
+                }
+
+                console.log("팝업에서 받은 메시지:", event.data);
+
+                const { type, code, error, error_description } = event.data;
+
+                if (type === "KAKAO_AUTH_CODE" && code) {
+                    try {
+                        const response = await fetch("/api/auth/kakao", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ code }),
+                        });
+
+                        const data = await response.json();
+                        if (!response.ok) {
+                            // 백엔드에서 보낸 에러 메시지를 표시
+                            throw new Error(data.details || data.error || "서버 처리 중 오류가 발생했습니다.");
+                        }
+
+                        console.log("카카오 로그인 최종 성공!", data);
+                        localStorage.setItem("authToken", data.token);
+                        localStorage.setItem("user", JSON.stringify(data.user));
+                        window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
+                        router.push("/?login_success=true");
+                    } catch (err: unknown) {
+                        setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+                    } finally {
+                        cleanup(); // 성공하든 실패하든 항상 정리
+                    }
+                } else if (type === "KAKAO_AUTH_ERROR") {
+                    setError(`카카오 인증 실패: ${error_description || error}`);
+                    cleanup(); // 에러 발생 시 정리
+                }
+            };
+
+            // 팝업이 사용자에 의해 닫혔는지 확인
+            intervalId = setInterval(() => {
+                if (popup.closed) {
+                    console.log("카카오 인증 팝업이 닫혔습니다.");
+                    cleanup(); // 사용자가 직접 닫았을 때 정리
+                }
+            }, 1000);
+
+            window.addEventListener("message", messageHandler);
+
+            return;
+        }
+
+        // 다른 소셜 로그인 로직
+        setLoading(false);
     };
 
     return (
@@ -67,16 +192,21 @@ const Login = () => {
                         <p className="text-gray-600">StyleMap에 오신 것을 환영합니다</p>
                     </div>
 
+                    {/* 성공 메시지 */}
+                    {message && (
+                        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-green-600 text-sm">{message}</p>
+                        </div>
+                    )}
+
+                    {/* 에러 메시지 */}
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                             <p className="text-red-600 text-sm">{error}</p>
                         </div>
                     )}
 
-                    <form
-                        onSubmit={handleSubmit}
-                        className="space-y-6 text-gray-600Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
-                    >
+                    <form onSubmit={handleSubmit} className="space-y-6 text-gray-600">
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                                 이메일
@@ -127,7 +257,7 @@ const Login = () => {
                         </p>
                     </div>
 
-                    {/* 소셜 로그인 */}
+                    {/* 소셜 로그인 구분선 */}
                     <div className="mt-8">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -139,17 +269,20 @@ const Login = () => {
                         </div>
                     </div>
 
-                    <div className="mt-6">
-                        <SocialLogin
-                            onSuccess={(token, user) => {
-                                localStorage.setItem("authToken", token);
-                                window.dispatchEvent(new Event("authTokenChange"));
-                                router.push("/");
-                            }}
-                            onError={(error) => {
-                                setError(error);
-                            }}
-                        />
+                    {/* 소셜 로그인 버튼들 */}
+                    <div className="mt-6 space-y-3 text-black">
+                        {/* 카카오톡 로그인 버튼 */}
+                        <button
+                            type="button"
+                            onClick={() => handleSocialLogin("kakao")}
+                            disabled={loading}
+                            className="w-full flex items-center justify-center px-4 py-3 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium"
+                        >
+                            <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 3c5.799 0 10.5 3.402 10.5 7.5 0 4.098-4.701 7.5-10.5 7.5-.955 0-1.886-.1-2.777-.282L3.234 21l1.781-3.13C3.69 16.56 1.5 14.165 1.5 10.5 1.5 6.402 6.201 3 12 3z" />
+                            </svg>
+                            {loading ? "카카오톡 인증 중..." : "카카오톡으로 로그인"}
+                        </button>
                     </div>
                 </div>
             </main>

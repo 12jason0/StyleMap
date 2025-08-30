@@ -22,8 +22,14 @@ type Course = {
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [currentSlide, setCurrentSlide] = useState(0);
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
     const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+    const [showWelcome, setShowWelcome] = useState(false);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [showAdModal, setShowAdModal] = useState(false);
+
+    const [isSignup, setIsSignup] = useState(false);
+    const [showAiAdModal, setShowAiAdModal] = useState(false);
     const router = useRouter();
 
     // 코스 데이터 가져오기
@@ -38,96 +44,18 @@ export default function Home() {
                     setCourses(data.slice(0, 12));
                 } else if (data.error) {
                     console.error("API Error:", data.error, data.details);
-                    // 에러 발생 시 더미 데이터 사용
-                    setCourses([
-                        {
-                            id: "1",
-                            title: "성수 감성 카페투어",
-                            description: "인스타 감성 카페 3곳을 둘러보는 특별한 코스",
-                            duration: "3시간",
-                            location: "성수동",
-                            price: "30000원",
-                            imageUrl: "/images/CoffeTrand.png",
-                            concept: "핫플투어",
-                            rating: 4.8,
-                            reviewCount: 23,
-                            participants: 15,
-                        },
-                        {
-                            id: "2",
-                            title: "홍대 팝업스토어 투어",
-                            description: "최신 팝업스토어를 한번에",
-                            duration: "4시간",
-                            location: "홍대",
-                            price: "40000원",
-                            imageUrl: "/images/Popup.png",
-                            concept: "핫플투어",
-                            rating: 4.6,
-                            reviewCount: 18,
-                            participants: 12,
-                        },
-                        {
-                            id: "3",
-                            title: "비오는날 실내 데이트",
-                            description: "날씨 걱정 없는 완벽한 실내 코스",
-                            duration: "5시간",
-                            location: "강남",
-                            price: "50000원",
-                            imageUrl: "/images/RainDate.png",
-                            concept: "힐링여행",
-                            rating: 4.7,
-                            reviewCount: 31,
-                            participants: 8,
-                        },
-                    ]);
+                    // 데이터베이스 연결 실패 시 사용자에게 알림
+                    alert("데이터베이스 연결에 실패했습니다. 환경 변수와 데이터베이스 설정을 확인해주세요.");
+                    setCourses([]);
                 } else {
                     console.error("Unexpected data format:", data);
                     setCourses([]);
                 }
             } catch (error) {
                 console.error("Failed to fetch courses:", error);
-                // 더미 데이터 폴백
-                setCourses([
-                    {
-                        id: "1",
-                        title: "성수 감성 카페투어",
-                        description: "인스타 감성 카페 3곳을 둘러보는 특별한 코스",
-                        duration: "3시간",
-                        location: "성수동",
-                        price: "30000원",
-                        imageUrl: "/images/CoffeTrand.png",
-                        concept: "핫플투어",
-                        rating: 4.8,
-                        reviewCount: 23,
-                        participants: 15,
-                    },
-                    {
-                        id: "2",
-                        title: "홍대 팝업스토어 투어",
-                        description: "최신 팝업스토어를 한번에",
-                        duration: "4시간",
-                        location: "홍대",
-                        price: "40000원",
-                        imageUrl: "/images/Popup.png",
-                        concept: "핫플투어",
-                        rating: 4.6,
-                        reviewCount: 18,
-                        participants: 12,
-                    },
-                    {
-                        id: "3",
-                        title: "비오는날 실내 데이트",
-                        description: "날씨 걱정 없는 완벽한 실내 코스",
-                        duration: "5시간",
-                        location: "강남",
-                        price: "50000원",
-                        imageUrl: "/images/RainDate.png",
-                        concept: "힐링여행",
-                        rating: 4.7,
-                        reviewCount: 31,
-                        participants: 8,
-                    },
-                ]);
+                // 네트워크 오류 시 사용자에게 알림
+                alert("코스 데이터를 가져오는데 실패했습니다. 네트워크 연결을 확인해주세요.");
+                setCourses([]);
             } finally {
                 setLoading(false);
             }
@@ -145,92 +73,73 @@ export default function Home() {
         }
     }, [courses.length]);
 
-    // 인증 성공 처리
+    // 환영 메시지 및 로그인 모달 처리
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
-        const authSuccess = urlParams.get("auth_success");
-        const token = urlParams.get("token");
-        const user = urlParams.get("user");
+        const welcome = urlParams.get("welcome");
+        const loginSuccess = urlParams.get("login_success");
+        const signupSuccess = urlParams.get("signup_success");
 
-        if (authSuccess === "true" && token && user) {
-            try {
-                // 토큰을 localStorage에 저장
-                localStorage.setItem("token", token);
-                localStorage.setItem("user", user);
+        if (welcome === "true") {
+            setShowWelcome(true);
 
-                // URL에서 파라미터 제거
-                const newUrl = window.location.pathname;
-                window.history.replaceState({}, "", newUrl);
+            // URL에서 파라미터 제거
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, "", newUrl);
 
-                // 성공 메시지 표시 (선택사항)
-                alert("Instagram 로그인이 성공했습니다!");
-            } catch (error) {
-                console.error("인증 처리 중 오류:", error);
-            }
+            // 3초 후 환영 메시지 숨기기
+            setTimeout(() => {
+                setShowWelcome(false);
+            }, 3000);
+        }
+
+        if (loginSuccess === "true") {
+            setShowLoginModal(true);
+
+            // URL에서 파라미터 제거
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, "", newUrl);
+        }
+
+        if (signupSuccess === "true") {
+            setShowLoginModal(true);
+            setIsSignup(true);
+
+            // URL에서 파라미터 제거
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, "", newUrl);
         }
     }, []);
 
-    // Facebook 로그인 상태 확인 (로컬 환경에서만 작동)
+    // 로그인 상태 초기화 및 AI 광고 모달 자동 표시 처리
     useEffect(() => {
-        const checkFacebookLoginStatus = () => {
-            // localhost가 아닌 HTTP 환경에서는 Facebook 로그인 상태 확인을 건너뜀
-            if (
-                typeof window !== "undefined" &&
-                window.location.protocol === "http:" &&
-                window.location.hostname !== "localhost"
-            ) {
-                console.log("Facebook 로그인은 localhost 또는 HTTPS 환경에서만 작동합니다.");
-                return;
-            }
+        // 로그인 상태 초기화 (페이지 로드 시 무조건 로그아웃 상태로)
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
 
-            if (typeof window !== "undefined" && window.FB) {
-                console.log("Facebook 로그인 상태 확인 중...");
+        // Header 업데이트를 위한 이벤트 발생
+        window.dispatchEvent(new CustomEvent("authTokenChange"));
 
-                // localhost 환경에서만 Facebook API 호출
-                if (window.location.hostname === "localhost" || window.location.protocol === "https:") {
-                    try {
-                        window.FB.getLoginStatus(function (response) {
-                            console.log("Facebook 로그인 상태:", response);
+        // 로그인 상태 변경 감지
+        const handleAuthChange = () => {
+            const token = localStorage.getItem("authToken");
+            if (token) {
+                // 로그인 성공 시 AI 모달 표시
+                const hideUntil = localStorage.getItem("hideAiAdUntil");
+                const now = new Date().getTime();
 
-                            if (response.status === "connected") {
-                                // 사용자가 Facebook과 앱에 로그인됨
-                                console.log("Facebook 로그인됨:", response.authResponse);
-
-                                // 액세스 토큰과 사용자 ID 저장
-                                localStorage.setItem("facebook_access_token", response.authResponse.accessToken);
-                                localStorage.setItem("facebook_user_id", response.authResponse.userID);
-
-                                // 사용자 정보 가져오기
-                                window.FB.api("/me", function (userInfo) {
-                                    console.log("Facebook 사용자 정보:", userInfo);
-                                    localStorage.setItem("facebook_user_info", JSON.stringify(userInfo));
-
-                                    // 로그인된 환경으로 리디렉션 또는 상태 업데이트
-                                    // 여기서 필요한 처리 수행
-                                });
-                            } else if (response.status === "not_authorized") {
-                                // 사용자가 Facebook에는 로그인했지만 앱에는 로그인하지 않음
-                                console.log("Facebook 로그인됨, 앱 권한 없음");
-                            } else {
-                                // 사용자가 Facebook에 로그인하지 않음
-                                console.log("Facebook 로그인되지 않음");
-                            }
-                        });
-                    } catch (error) {
-                        console.log("Facebook 로그인 상태 확인 중 오류:", error);
-                    }
-                } else {
-                    console.log("현재 환경에서는 Facebook 로그인 상태 확인을 건너뜁니다.");
+                if (!hideUntil || now > parseInt(hideUntil)) {
+                    setShowAiAdModal(true);
                 }
-            } else {
-                // Facebook SDK가 아직 로드되지 않음, 잠시 후 다시 시도
-                setTimeout(checkFacebookLoginStatus, 2000);
             }
         };
 
-        // 페이지 로드 후 잠시 대기 후 Facebook 로그인 상태 확인
-        const timer = setTimeout(checkFacebookLoginStatus, 1000);
-        return () => clearTimeout(timer);
+        // 이벤트 리스너 등록
+        window.addEventListener("authTokenChange", handleAuthChange);
+
+        return () => {
+            window.removeEventListener("authTokenChange", handleAuthChange);
+        };
     }, []);
 
     const topCourses = courses.slice(0, 5);
@@ -243,6 +152,172 @@ export default function Home() {
     return (
         <>
             <Header />
+
+            {/* 환영 메시지 */}
+            {showWelcome && (
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in">
+                    <div className="flex items-center space-x-2">
+                        <span className="text-xl">🎉</span>
+                        <span className="font-semibold">카카오 로그인에 성공했습니다!</span>
+                    </div>
+                </div>
+            )}
+
+            {/* 로그인 성공 모달 */}
+            {showLoginModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-fade-in relative">
+                        {/* X 버튼 */}
+                        <button
+                            onClick={() => setShowLoginModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+
+                        <div className="text-6xl mb-4">🎉</div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인 성공!</h2>
+                        <p className="text-gray-600 mb-4">StyleMap에 오신 것을 환영합니다</p>
+                        <div className="flex items-center justify-center space-x-2 text-green-600">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                            <span className="font-semibold">환영합니다!</span>
+                        </div>
+
+                        {/* 확인 버튼 */}
+                        <button
+                            onClick={() => {
+                                setShowLoginModal(false);
+                                // Header 업데이트를 위한 이벤트 발생
+                                window.dispatchEvent(new CustomEvent("authTokenChange"));
+                                // 회원가입인 경우에만 광고 모달 표시
+                                if (isSignup) {
+                                    setShowAdModal(true);
+                                } else {
+                                    // 로그인인 경우 AI 광고 모달 표시
+                                    const hideUntil = localStorage.getItem("hideAiAdUntil");
+                                    const now = new Date().getTime();
+
+                                    if (!hideUntil || now > parseInt(hideUntil)) {
+                                        setShowAiAdModal(true);
+                                    }
+                                }
+                            }}
+                            className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            확인
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 광고 모달 */}
+            {showAdModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hover:cursor-pointer">
+                    <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
+                        {/* X 버튼 */}
+                        <button
+                            onClick={() => setShowAdModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+
+                        <div className="text-4xl mb-4">🤖</div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">AI 추천 티켓 지급!</h2>
+                        <p className="text-gray-600 mb-4">새로 가입하신 고객님을 위한 특별한 혜택</p>
+                        <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg mb-4">
+                            <div className="text-2xl font-bold mb-1">AI 추천 티켓 1회</div>
+                            <div className="text-sm opacity-90">개인 맞춤 코스 추천을 받아보세요!</div>
+                        </div>
+                        <button
+                            onClick={() => setShowAdModal(false)}
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                            확인
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* AI 광고 모달 (홈페이지 접속 시) */}
+            {showAiAdModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
+                        {/* X 버튼 */}
+                        <button
+                            onClick={() => {
+                                setShowAiAdModal(false);
+                                // 1시간 후 다시 표시
+                                const hideUntil = new Date().getTime() + 60 * 60 * 1000; // 1시간
+                                localStorage.setItem("hideAiAdUntil", hideUntil.toString());
+                            }}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+
+                        <div className="text-4xl mb-4">🤖</div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">AI 코스 이용해보세요!</h2>
+                        <p className="text-gray-600 mb-4">개인 맞춤 AI 추천 코스를 경험해보세요</p>
+                        <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white p-4 rounded-lg mb-4">
+                            <div className="text-2xl font-bold mb-1">AI 맞춤 추천</div>
+                            <div className="text-sm opacity-90">당신만을 위한 특별한 여행 코스</div>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => {
+                                    setShowAiAdModal(false);
+                                    router.push("/personalized-home");
+                                }}
+                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                                AI 코스 시작하기
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    setShowAiAdModal(false);
+                                    // 1시간 동안 보지 않기
+                                    const hideUntil = new Date().getTime() + 60 * 60 * 1000; // 1시간
+                                    localStorage.setItem("hideAiAdUntil", hideUntil.toString());
+                                }}
+                                className="text-gray-500 text-sm hover:text-gray-700 transition-colors"
+                            >
+                                1시간 동안 보지 않기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className="min-h-screen bg-white">
                 {/* Hero Section - 대형 슬라이드 */}
                 <section className="relative h-[500px] overflow-hidden">
@@ -292,7 +367,7 @@ export default function Home() {
 
                                     <button
                                         onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300"
+                                        className="hover:cursor-pointer px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300"
                                     >
                                         코스 시작하기 →
                                     </button>
@@ -443,6 +518,8 @@ export default function Home() {
                     </div>
                 </section>
             </main>
+            {/* 모바일 하단 네비게이션을 위한 여백 */}
+            <div className="md:hidden h-20"></div>
         </>
     );
 }

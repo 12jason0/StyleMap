@@ -137,13 +137,16 @@ const MyPage = () => {
             if (response.ok) {
                 const data = await response.json();
                 console.log("예약 내역 응답:", data);
-                setBookings(data.bookings);
+                setBookings(data.bookings || []);
             } else {
-                const errorData = await response.json();
-                console.error("Failed to fetch bookings:", errorData);
+                // 예약 내역 조회 실패 시 빈 배열로 설정
+                console.log("예약 내역 조회 실패, 빈 배열로 설정");
+                setBookings([]);
             }
         } catch (error) {
             console.error("Failed to fetch bookings:", error);
+            // 오류 발생 시에도 빈 배열로 설정
+            setBookings([]);
         }
     };
 
@@ -165,10 +168,14 @@ const MyPage = () => {
                 const data = await response.json();
                 setFavorites(data || []);
             } else {
-                console.error("Failed to fetch favorites");
+                // 찜 목록 조회 실패 시 빈 배열로 설정
+                console.log("찜 목록 조회 실패, 빈 배열로 설정");
+                setFavorites([]);
             }
         } catch (error) {
             console.error("Failed to fetch favorites:", error);
+            // 오류 발생 시에도 빈 배열로 설정
+            setFavorites([]);
         }
     };
 
@@ -213,8 +220,8 @@ const MyPage = () => {
     const handleEditClick = () => {
         if (userInfo) {
             setEditForm({
-                name: userInfo.name,
-                email: userInfo.email,
+                name: userInfo.name || "",
+                email: userInfo.email || "",
                 mbti: userInfo.mbti || "",
                 age: userInfo.age?.toString() || "",
             });
@@ -624,7 +631,7 @@ const MyPage = () => {
                                     type="text"
                                     id="name"
                                     name="name"
-                                    value={editForm.name}
+                                    value={editForm.name || ""}
                                     onChange={handleEditChange}
                                     required
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-500"
@@ -640,7 +647,7 @@ const MyPage = () => {
                                     type="email"
                                     id="email"
                                     name="email"
-                                    value={editForm.email}
+                                    value={editForm.email || ""}
                                     onChange={handleEditChange}
                                     required
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-500"
@@ -655,7 +662,7 @@ const MyPage = () => {
                                 <select
                                     id="mbti"
                                     name="mbti"
-                                    value={editForm.mbti}
+                                    value={editForm.mbti || ""}
                                     onChange={handleEditChange}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-500"
                                 >
@@ -687,7 +694,7 @@ const MyPage = () => {
                                     type="number"
                                     id="age"
                                     name="age"
-                                    value={editForm.age}
+                                    value={editForm.age || ""}
                                     onChange={handleEditChange}
                                     min="1"
                                     max="120"

@@ -10,17 +10,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         try {
             const [highlights] = await connection.execute(
-                "SELECT id, title, description, icon FROM highlights WHERE course_id = ?",
+                "SELECT id, title, description, icon FROM highlights WHERE course_id = ? ORDER BY id",
                 [courseId]
             );
 
-            console.log("API: Returning highlights from database");
-            return NextResponse.json(highlights);
+            const highlightsArray = highlights as Array<{
+                id: number;
+                title: string;
+                description: string;
+                icon: string;
+            }>;
+            console.log("API: Found highlights:", highlightsArray.length);
+
+            return NextResponse.json(highlightsArray);
         } finally {
             connection.release();
         }
     } catch (error) {
         console.error("API: Error fetching highlights:", error);
-        return NextResponse.json({ error: "Failed to fetch highlights" }, { status: 500 });
+        return NextResponse.json(
+            {
+                error: "Failed to fetch highlights",
+                details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 }
+        );
     }
 }

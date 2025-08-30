@@ -11,7 +11,10 @@ export async function GET(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        const decoded = jwt.verify(token, "stylemap-secret-key-2024") as any;
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure"
+        ) as { userId: string };
         const userId = decoded.userId;
 
         const connection = await pool.getConnection();
@@ -46,7 +49,10 @@ export async function POST(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        const decoded = jwt.verify(token, "stylemap-secret-key-2024") as any;
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure"
+        ) as { userId: string };
         const userId = decoded.userId;
 
         const body = await request.json();
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
                 [userId, courseId]
             );
 
-            if ((existing as any[]).length > 0) {
+            if ((existing as Array<{ id: number }>).length > 0) {
                 return NextResponse.json({ error: "Already favorited" }, { status: 400 });
             }
 
@@ -94,7 +100,10 @@ export async function DELETE(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        const decoded = jwt.verify(token, "stylemap-secret-key-2024") as any;
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure"
+        ) as { userId: string };
         const userId = decoded.userId;
 
         const { searchParams } = new URL(request.url);
@@ -121,4 +130,3 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: "Failed to remove favorite" }, { status: 500 });
     }
 }
-

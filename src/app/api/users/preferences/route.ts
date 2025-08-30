@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
 
 // JWT 토큰에서 사용자 ID 추출
 const getUserIdFromToken = (request: NextRequest) => {
@@ -13,9 +13,9 @@ const getUserIdFromToken = (request: NextRequest) => {
 
     const token = authHeader.substring(7);
     try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
         return decoded.userId;
-    } catch (error) {
+    } catch {
         return null;
     }
 };
@@ -107,7 +107,16 @@ export async function GET(request: NextRequest) {
                 userId,
             ]);
 
-            const preferencesArray = preferences as any[];
+            const preferencesArray = preferences as Array<{
+                travel_style: string;
+                budget_range: string;
+                time_preference: string;
+                food_preference: string;
+                activity_level: string;
+                group_size: string;
+                interests: string;
+                location_preferences: string;
+            }>;
 
             if (preferencesArray.length === 0) {
                 return NextResponse.json(null);

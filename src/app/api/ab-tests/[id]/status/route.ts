@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = params;
+        const { id } = await params;
         const body = await request.json();
         const { status } = body;
 
@@ -14,8 +14,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
             success: true,
             message: `A/B test status updated to ${status}`,
         });
-    } catch (error) {
-        console.error("Failed to update A/B test status:", error);
+    } catch {
+        console.error("Failed to update A/B test status");
         return NextResponse.json({ error: "Failed to update A/B test status" }, { status: 500 });
     }
 }

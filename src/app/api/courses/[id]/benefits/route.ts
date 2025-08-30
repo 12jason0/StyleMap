@@ -10,17 +10,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         try {
             const [benefits] = await connection.execute(
-                "SELECT id, benefit_text, category, display_order FROM benefits WHERE course_id = ? ORDER BY display_order ASC",
+                "SELECT id, benefit_text, category, display_order FROM benefits WHERE course_id = ? ORDER BY display_order, id",
                 [courseId]
             );
 
-            console.log("API: Returning benefits from database");
-            return NextResponse.json(benefits);
+            const benefitsArray = benefits as Array<{
+                id: number;
+                benefit_text: string;
+                category: string;
+                display_order: number;
+            }>;
+            console.log("API: Found benefits:", benefitsArray.length);
+
+            return NextResponse.json(benefitsArray);
         } finally {
             connection.release();
         }
     } catch (error) {
         console.error("API: Error fetching benefits:", error);
-        return NextResponse.json({ error: "Failed to fetch benefits" }, { status: 500 });
+        return NextResponse.json(
+            {
+                error: "Failed to fetch benefits",
+                details: error instanceof Error ? error.message : "Unknown error",
+            },
+            { status: 500 }
+        );
     }
 }

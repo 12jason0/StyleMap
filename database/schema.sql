@@ -10,13 +10,14 @@ CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255),
-    name VARCHAR(100) NOT NULL,
-    profile_image VARCHAR(500),
-    google_id VARCHAR(255) UNIQUE,
-    kakao_id VARCHAR(255) UNIQUE,
-    instagram_id VARCHAR(255) UNIQUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    nickname VARCHAR(100) NOT NULL,
+    profileImageUrl VARCHAR(500),
+    socialId VARCHAR(255),
+    provider VARCHAR(50) NOT NULL DEFAULT 'local',
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_provider_socialId (provider, socialId),
+    INDEX idx_email (email)
 );
 
 -- 사용자 선호도 테이블
@@ -35,6 +36,8 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+
 
 -- 코스 테이블
 CREATE TABLE IF NOT EXISTS courses (
@@ -123,6 +126,18 @@ CREATE TABLE IF NOT EXISTS notices (
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
 
+-- 코스 공지사항 테이블 (course_notices)
+CREATE TABLE IF NOT EXISTS course_notices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id INT NOT NULL,
+    notice_text TEXT NOT NULL,
+    type VARCHAR(100) DEFAULT 'info',
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+);
+
 -- 연락처 테이블
 CREATE TABLE IF NOT EXISTS contacts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -151,14 +166,28 @@ CREATE TABLE IF NOT EXISTS bookings (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- 사용자 찜 목록 테이블
+CREATE TABLE IF NOT EXISTS user_favorites (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    course_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_course (user_id, course_id)
+);
+
 -- 인덱스 생성
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
 CREATE INDEX idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX idx_bookings_status ON bookings(status);
+CREATE INDEX idx_user_favorites_user_id ON user_favorites(user_id);
+CREATE INDEX idx_user_favorites_course_id ON user_favorites(course_id);
 CREATE INDEX idx_places_category ON places(category);
 CREATE INDEX idx_course_places_course_id ON course_places(course_id);
 CREATE INDEX idx_highlights_course_id ON highlights(course_id);
 CREATE INDEX idx_benefits_course_id ON benefits(course_id);
 CREATE INDEX idx_notices_course_id ON notices(course_id);
+CREATE INDEX idx_course_notices_course_id ON course_notices(course_id);
 CREATE INDEX idx_contacts_course_id ON contacts(course_id);

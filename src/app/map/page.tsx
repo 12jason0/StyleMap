@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
@@ -80,7 +82,7 @@ export default function MapPage() {
     };
 
     // 혼잡도 예측 함수 (실제로는 API에서 받아와야 함)
-    const predictCrowdLevel = (category: string, rating?: number): string => {
+    const predictCrowdLevel = (): string => {
         const crowdLevels = ["여유", "보통", "혼잡", "매우 혼잡"];
         const randomIndex = Math.floor(Math.random() * crowdLevels.length);
         return crowdLevels[randomIndex];
@@ -143,7 +145,10 @@ export default function MapPage() {
 
     // 주변 장소 검색 함수
     const searchNearbyPlaces = async (lat: number, lng: number, region: string) => {
-        if (!window.kakao?.maps) return;
+        if (!window.kakao?.maps?.services) {
+            console.error("카카오맵 서비스 API가 로드되지 않았습니다.");
+            return;
+        }
 
         setIsLoadingPlaces(true);
 
@@ -160,7 +165,7 @@ export default function MapPage() {
                 const distance = calculateDistance(lat, lng, randomLat, randomLng);
                 const category = categories[Math.floor(Math.random() * categories.length)];
                 const name = placeNames[Math.floor(Math.random() * placeNames.length)];
-                const crowd = predictCrowdLevel(category);
+                const crowd = predictCrowdLevel();
 
                 places.push({
                     name: `${name} ${i + 1}`,
@@ -232,14 +237,31 @@ export default function MapPage() {
     };
 
     useEffect(() => {
-        // 카카오맵 API 로드 확인
-        if (!window.kakao?.maps) {
-            console.error("카카오맵 API가 로드되지 않았습니다.");
-            return;
-        }
+        const checkKakaoLoaded = () => {
+            if (window.kakao?.maps?.Map) {
+                console.log("카카오맵 API 로드됨");
+                initializeMap();
+            } else {
+                // 아직 로드 안됨
+                setTimeout(checkKakaoLoaded, 100);
+            }
+        };
+
+        checkKakaoLoaded();
 
         const initializeMap = () => {
-            if (!mapRef.current) return;
+            if (!mapRef.current) {
+                console.error("지도 컨테이너를 찾을 수 없습니다.");
+                return;
+            }
+
+            // 카카오맵 API가 완전히 로드되었는지 확인
+            if (!window.kakao?.maps?.LatLng || !window.kakao?.maps?.Map) {
+                console.error("카카오맵 API가 아직 로드되지 않았습니다.");
+                return;
+            }
+
+            console.log("지도 초기화 시작");
 
             // 현재 위치 가져오기
             if (navigator.geolocation) {
@@ -248,6 +270,7 @@ export default function MapPage() {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
 
+                        console.log("현재 위치:", lat, lng);
                         setCurrentCoords({ lat, lng });
 
                         // 카카오맵 초기화
@@ -257,44 +280,58 @@ export default function MapPage() {
                         };
 
                         if (mapRef.current) {
-                            mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+                            try {
+                                mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+                                console.log("지도 생성 성공");
 
-                            // 현재 위치 마커 추가
-                            const marker = new window.kakao.maps.Marker({
-                                position: new window.kakao.maps.LatLng(lat, lng),
-                            });
-                            marker.setMap(mapInstanceRef.current);
-
-                            // 현재 위치 정보 표시
-                            if (window.kakao?.maps?.services) {
-                                const geocoder = new window.kakao.maps.services.Geocoder();
-                                geocoder.coord2RegionCode(lng, lat, (result: any[], status: string) => {
-                                    if (status === window.kakao.maps.services.Status.OK) {
-                                        const region =
-                                            result[0]?.region_3depth_name ||
-                                            result[0]?.region_2depth_name ||
-                                            "현재 위치";
-                                        const fullRegion =
-                                            result[0]?.region_1depth_name + " " + result[0]?.region_2depth_name ||
-                                            region;
-                                        setCurrentLocation(region);
-                                        setCurrentRegion(fullRegion);
-
-                                        // 위치 확인 후 주변 장소 검색
-                                        searchNearbyPlaces(lat, lng, fullRegion);
-                                    }
+                                // 현재 위치 마커 추가
+                                const marker = new window.kakao.maps.Marker({
+                                    position: new window.kakao.maps.LatLng(lat, lng),
                                 });
-                            }
+                                marker.setMap(mapInstanceRef.current);
 
-                            setIsLoading(false);
+                                // 현재 위치 정보 표시
+                                if (window.kakao?.maps?.services) {
+                                    const geocoder = new window.kakao.maps.services.Geocoder();
+                                    geocoder.coord2RegionCode(lng, lat, (result: unknown[], status: string) => {
+                                        if (status === window.kakao.maps.services.Status.OK) {
+                                            const firstResult = result[0] as {
+                                                region_3depth_name?: string;
+                                                region_2depth_name?: string;
+                                                region_1depth_name?: string;
+                                            };
+                                            const region =
+                                                firstResult?.region_3depth_name ||
+                                                firstResult?.region_2depth_name ||
+                                                "현재 위치";
+                                            const fullRegion =
+                                                firstResult?.region_1depth_name +
+                                                    " " +
+                                                    firstResult?.region_2depth_name || region;
+                                            setCurrentLocation(region);
+                                            setCurrentRegion(fullRegion);
+
+                                            // 위치 확인 후 주변 장소 검색
+                                            searchNearbyPlaces(lat, lng, fullRegion);
+                                        }
+                                    });
+                                }
+
+                                setIsLoading(false);
+                            } catch (error) {
+                                console.error("지도 생성 실패:", error);
+                                setIsLoading(false);
+                            }
                         }
                     },
                     (error) => {
                         console.error("위치 권한 거부 또는 오류:", error);
+
                         // 서울 시청을 기본 위치로 설정
                         const defaultLat = 37.5665;
                         const defaultLng = 126.978;
 
+                        console.log("기본 위치로 설정:", defaultLat, defaultLng);
                         setCurrentCoords({ lat: defaultLat, lng: defaultLng });
 
                         const options = {
@@ -303,11 +340,17 @@ export default function MapPage() {
                         };
 
                         if (mapRef.current) {
-                            mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
-                            setCurrentLocation("서울 중구");
-                            setCurrentRegion("서울 중구");
-                            searchNearbyPlaces(defaultLat, defaultLng, "서울 중구");
-                            setIsLoading(false);
+                            try {
+                                mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+                                console.log("기본 위치 지도 생성 성공");
+                                setCurrentLocation("서울 중구");
+                                setCurrentRegion("서울 중구");
+                                searchNearbyPlaces(defaultLat, defaultLng, "서울 중구");
+                                setIsLoading(false);
+                            } catch (error) {
+                                console.error("기본 위치 지도 생성 실패:", error);
+                                setIsLoading(false);
+                            }
                         }
                     },
                     {
@@ -321,6 +364,7 @@ export default function MapPage() {
                 const defaultLat = 37.5665;
                 const defaultLng = 126.978;
 
+                console.log("위치 권한 없음, 기본 위치로 설정:", defaultLat, defaultLng);
                 setCurrentCoords({ lat: defaultLat, lng: defaultLng });
 
                 const options = {
@@ -329,34 +373,22 @@ export default function MapPage() {
                 };
 
                 if (mapRef.current) {
-                    mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
-                    setCurrentLocation("서울 중구");
-                    setCurrentRegion("서울 중구");
-                    searchNearbyPlaces(defaultLat, defaultLng, "서울 중구");
-                    setIsLoading(false);
+                    try {
+                        mapInstanceRef.current = new window.kakao.maps.Map(mapRef.current, options);
+                        console.log("기본 위치 지도 생성 성공");
+                        setCurrentLocation("서울 중구");
+                        setCurrentRegion("서울 중구");
+                        searchNearbyPlaces(defaultLat, defaultLng, "서울 중구");
+                        setIsLoading(false);
+                    } catch (error) {
+                        console.error("기본 위치 지도 생성 실패:", error);
+                        setIsLoading(false);
+                    }
                 }
             }
         };
 
-        // 카카오맵 API 로드 확인 후 초기화
-        if (window.kakao?.maps) {
-            initializeMap();
-        } else {
-            const checkKakaoAPI = setInterval(() => {
-                if (window.kakao?.maps) {
-                    clearInterval(checkKakaoAPI);
-                    initializeMap();
-                }
-            }, 100);
-
-            // 5초 후 타임아웃
-            setTimeout(() => {
-                clearInterval(checkKakaoAPI);
-                if (!mapInstanceRef.current) {
-                    console.error("카카오맵 초기화 실패");
-                }
-            }, 5000);
-        }
+        // 카카오맵 로드 시작 (checkKakaoLoaded 함수가 이미 호출됨)
 
         // 실시간 데이터 업데이트 타이머 설정 (5분마다)
         const updateTimer = setInterval(updateRealTimeData, 5 * 60 * 1000);
@@ -676,6 +708,13 @@ export default function MapPage() {
                     {/* 현재 위치로 가기 버튼 */}
                     <button
                         onClick={() => {
+                            // 카카오맵 API가 완전히 로드되었는지 확인
+                            if (!window.kakao?.maps?.LatLng || !window.kakao?.maps?.Map) {
+                                console.error("카카오맵 API가 아직 로드되지 않았습니다.");
+                                alert("지도가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+                                return;
+                            }
+
                             if (navigator.geolocation) {
                                 navigator.geolocation.getCurrentPosition(
                                     (position) => {
@@ -693,21 +732,30 @@ export default function MapPage() {
                                             // 새로운 위치의 지역명 가져오기
                                             if (window.kakao?.maps?.services) {
                                                 const geocoder = new window.kakao.maps.services.Geocoder();
-                                                geocoder.coord2RegionCode(lng, lat, (result: any[], status: string) => {
-                                                    if (status === window.kakao.maps.services.Status.OK) {
-                                                        const region =
-                                                            result[0]?.region_3depth_name ||
-                                                            result[0]?.region_2depth_name ||
-                                                            "현재 위치";
-                                                        const fullRegion =
-                                                            result[0]?.region_1depth_name +
-                                                                " " +
-                                                                result[0]?.region_2depth_name || region;
-                                                        setCurrentLocation(region);
-                                                        setCurrentRegion(fullRegion);
-                                                        searchNearbyPlaces(lat, lng, fullRegion);
+                                                geocoder.coord2RegionCode(
+                                                    lng,
+                                                    lat,
+                                                    (result: unknown[], status: string) => {
+                                                        if (status === window.kakao.maps.services.Status.OK) {
+                                                            const firstResult = result[0] as {
+                                                                region_3depth_name?: string;
+                                                                region_2depth_name?: string;
+                                                                region_1depth_name?: string;
+                                                            };
+                                                            const region =
+                                                                firstResult?.region_3depth_name ||
+                                                                firstResult?.region_2depth_name ||
+                                                                "현재 위치";
+                                                            const fullRegion =
+                                                                firstResult?.region_1depth_name +
+                                                                    " " +
+                                                                    firstResult?.region_2depth_name || region;
+                                                            setCurrentLocation(region);
+                                                            setCurrentRegion(fullRegion);
+                                                            searchNearbyPlaces(lat, lng, fullRegion);
+                                                        }
                                                     }
-                                                });
+                                                );
                                             }
                                         }
                                     },
@@ -770,6 +818,8 @@ export default function MapPage() {
                     </button>
                 </div>
             </div>
+            {/* 모바일 하단 네비게이션을 위한 여백 */}
+            <div className="md:hidden h-20"></div>
         </div>
     );
 }

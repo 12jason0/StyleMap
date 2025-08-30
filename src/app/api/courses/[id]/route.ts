@@ -19,7 +19,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             `,
                 [courseId]
             );
-            const coursesArray = courses as any[];
+            const coursesArray = courses as Array<{
+                id: number;
+                title: string;
+                description: string;
+                duration: string;
+                region: string;
+                price: string;
+                imageUrl: string;
+                concept: string;
+                rating: number;
+                current_participants: number;
+                max_participants: number;
+                place_count: number;
+                created_at: string;
+                updated_at: string;
+            }>;
 
             if (coursesArray.length === 0) {
                 return NextResponse.json({ error: "Course not found" }, { status: 404 });
@@ -27,30 +42,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
             const course = coursesArray[0];
 
-            // 코스 상세 정보 포맷팅
+            // 코스 상세 정보 포맷팅 (실제 데이터베이스 스키마에 맞춤)
             const formattedCourse = {
                 id: course.id.toString(),
                 title: course.title || "",
                 description: course.description || "",
                 duration: course.duration || "",
-                location: course.location || "",
+                location: course.region || "", // region 필드를 location으로 매핑
                 price: course.price || "",
                 imageUrl: course.imageUrl || "/images/default-course.jpg",
                 concept: course.concept || "",
                 rating: Number(course.rating) || 0,
                 reviewCount: 0,
                 participants: course.current_participants || 0,
-                maxParticipants: course.total_places || 10,
-                isPopular: Boolean(course.isPopular),
-                recommendedTime: course.recommended_time || "",
-                season: course.season || "사계절",
-                courseType: course.course_type || "일반",
-                transportation: course.transportation || "대중교통",
-                parking: course.parking_info || "주차 가능",
-                reservationRequired: Boolean(course.reservation_required),
+                maxParticipants: course.max_participants || 10,
+                isPopular: course.current_participants > 5, // 참가자가 5명 이상이면 인기 코스로 설정
+                recommendedTime: "오후 2시-6시", // 기본값
+                season: "사계절", // 기본값
+                courseType: "일반", // 기본값
+                transportation: "대중교통", // 기본값
+                parking: "주차 가능", // 기본값
+                reservationRequired: false, // 기본값
                 placeCount: course.place_count || 0,
-                createdAt: course.createdAt,
-                updatedAt: course.updatedAt,
+                createdAt: course.created_at,
+                updatedAt: course.updated_at,
             };
 
             return NextResponse.json(formattedCourse);
@@ -78,12 +93,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         const connection = await pool.getConnection();
 
         try {
-            const [result] = await connection.execute(
+            await connection.execute(
                 `UPDATE courses SET 
                 title = ?, 
                 description = ?, 
                 duration = ?, 
-                location = ?, 
+                region = ?, 
                 price = ?, 
                 imageUrl = ?, 
                 concept = ?, 
@@ -129,7 +144,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
             await connection.execute("DELETE FROM course_places WHERE course_id = ?", [courseId]);
 
             // 코스 삭제
-            const [result] = await connection.execute("DELETE FROM courses WHERE id = ?", [courseId]);
+            await connection.execute("DELETE FROM courses WHERE id = ?", [courseId]);
 
             return NextResponse.json({
                 message: "Course deleted successfully",

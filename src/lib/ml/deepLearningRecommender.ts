@@ -43,7 +43,7 @@ class DeepLearningRecommender {
             if (!this.model) {
                 this.model = this.createModel();
             }
-        } catch (error) {
+        } catch {
             console.log("No pre-trained model found, creating new model");
             this.model = this.createModel();
         }
@@ -144,7 +144,7 @@ class DeepLearningRecommender {
     }
 
     // 특성 벡터 생성
-    private createUserFeatures(user: any): UserFeatures {
+    private createUserFeatures(user: unknown): UserFeatures {
         const preferences = this.encodePreferences(user.preferences);
         const behaviorVector = this.createBehaviorVector(user.behavior);
         const timeFeatures = this.createTimeFeatures();
@@ -159,19 +159,19 @@ class DeepLearningRecommender {
         };
     }
 
-    private createItemFeatures(item: any): ItemFeatures {
+    private createItemFeatures(item: unknown): ItemFeatures {
         return {
             categoryEmbedding: this.encodeConcept(item.concept),
             priceNormalized: this.normalizePrice(item.price),
             ratingNormalized: (item.rating || 0) / 5,
             popularityScore: this.calculatePopularityScore(item),
             contentFeatures: this.createContentEmbedding(item.title + " " + item.description),
-            imageFeatures: this.createImageFeatures(item.imageUrl),
+            imageFeatures: this.createImageFeatures(),
         };
     }
 
     // 선호도 원-핫 인코딩
-    private encodePreferences(preferences: any): number[] {
+    private encodePreferences(preferences: unknown): number[] {
         const categories = ["힐링여행", "핫플투어", "로컬맛집", "액티비티", "문화시설", "야경명소"];
         const encoded = new Array(categories.length).fill(0);
 
@@ -186,7 +186,7 @@ class DeepLearningRecommender {
     }
 
     // 행동 패턴 벡터 생성
-    private createBehaviorVector(behavior: any): number[] {
+    private createBehaviorVector(behavior: unknown): number[] {
         return [
             (behavior?.viewedCourses?.length || 0) / 100, // 정규화
             (behavior?.likedCourses?.length || 0) / 50,
@@ -237,7 +237,7 @@ class DeepLearningRecommender {
     }
 
     // 인기도 점수 계산
-    private calculatePopularityScore(item: any): number {
+    private calculatePopularityScore(item: unknown): number {
         const participants = item.current_participants || 0;
         const rating = item.rating || 0;
         return Math.min((participants * 0.1 + rating * 0.2) / 10, 1);
@@ -258,13 +258,13 @@ class DeepLearningRecommender {
     }
 
     // 이미지 특성 (더미 구현 - 실제로는 CNN 사용)
-    private createImageFeatures(imageUrl: string): number[] {
+    private createImageFeatures(): number[] {
         // 실제 구현시에는 사전 훈련된 CNN 모델 사용
         return new Array(50).fill(0).map(() => Math.random());
     }
 
     // 참여도 점수
-    private calculateEngagementScore(behavior: any): number {
+    private calculateEngagementScore(behavior: unknown): number {
         const views = behavior?.viewedCourses?.length || 0;
         const likes = behavior?.likedCourses?.length || 0;
         const bookings = behavior?.bookedCourses?.length || 0;
@@ -272,13 +272,13 @@ class DeepLearningRecommender {
     }
 
     // 다양성 점수
-    private calculateDiversityScore(behavior: any): number {
+    private calculateDiversityScore(behavior: unknown): number {
         const viewedConcepts = new Set(behavior?.viewedConcepts || []);
         return Math.min(viewedConcepts.size / 6, 1); // 6개 컨셉 중 몇 개나 경험했는지
     }
 
     // 최근성 점수
-    private calculateRecencyScore(behavior: any): number {
+    private calculateRecencyScore(behavior: unknown): number {
         const lastActive = behavior?.lastActiveAt ? new Date(behavior.lastActiveAt) : new Date();
         const daysSinceActive = (Date.now() - lastActive.getTime()) / (1000 * 60 * 60 * 24);
         return Math.max(1 - daysSinceActive / 30, 0); // 30일 기준
@@ -302,8 +302,8 @@ class DeepLearningRecommender {
     // 추천 생성
     public async generateRecommendations(
         userId: string,
-        userInfo: any,
-        items: any[],
+        userInfo: unknown,
+        items: unknown[],
         limit: number = 20
     ): Promise<{ itemId: string; score: number; confidence: number }[]> {
         if (!this.model) {
@@ -425,8 +425,8 @@ class DeepLearningRecommender {
             ratingTargets.dispose();
             clickTargets.dispose();
             conversionTargets.dispose();
-        } catch (error) {
-            console.error("Incremental training failed:", error);
+        } catch {
+            console.error("Incremental training failed");
         } finally {
             this.isTraining = false;
         }
@@ -439,8 +439,8 @@ class DeepLearningRecommender {
         try {
             await this.model.save(`localstorage://ml-recommender-v${this.modelVersion}`);
             console.log("Model saved successfully");
-        } catch (error) {
-            console.error("Failed to save model:", error);
+        } catch {
+            console.error("Failed to save model");
         }
     }
 
@@ -448,7 +448,7 @@ class DeepLearningRecommender {
     private async loadModel(): Promise<tf.LayersModel | null> {
         try {
             return await tf.loadLayersModel(`localstorage://ml-recommender-v${this.modelVersion}`);
-        } catch (error) {
+        } catch {
             return null;
         }
     }
@@ -522,8 +522,8 @@ export const deepLearningRecommender = new DeepLearningRecommender();
 // API 엔드포인트에서 사용하는 래퍼 함수
 export async function generateMLRecommendations(
     userId: string,
-    userInfo: any,
-    items: any[],
+    userInfo: unknown,
+    items: unknown[],
     limit: number = 20
 ): Promise<{ itemId: string; score: number; confidence: number; reasons: string[] }[]> {
     try {
@@ -534,8 +534,8 @@ export async function generateMLRecommendations(
             ...rec,
             reasons: generateRecommendationReasons(rec.score, rec.confidence),
         }));
-    } catch (error) {
-        console.error("ML recommendation failed:", error);
+    } catch {
+        console.error("ML recommendation failed");
         // 폴백: 기본 알고리즘 사용
         return [];
     }

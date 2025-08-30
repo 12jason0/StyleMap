@@ -1,30 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = "stylemap-secret-key-2024";
-
 export async function GET(request: NextRequest) {
     try {
+        // Authorization 헤더에서 토큰 추출
         const authHeader = request.headers.get("authorization");
-
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "토큰이 필요합니다." }, { status: 401 });
+            return NextResponse.json({ error: "인증 토큰이 필요합니다." }, { status: 401 });
         }
 
         const token = authHeader.substring(7);
+        const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "your-secret-key";
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET) as any;
+            // JWT 토큰 검증
+            const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; nickname: string };
 
             return NextResponse.json({
                 valid: true,
                 user: {
                     userId: decoded.userId,
                     email: decoded.email,
-                    name: decoded.name,
+                    nickname: decoded.nickname,
                 },
             });
-        } catch (jwtError) {
+        } catch {
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
         }
     } catch (error) {

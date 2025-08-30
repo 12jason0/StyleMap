@@ -8,13 +8,14 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     const pathname = usePathname();
     const isMapPage = pathname === "/map";
     const isAuthPage = pathname === "/login" || pathname === "/signup";
-    const isCourseDetailPage = pathname.startsWith("/courses/");
+    // const isCourseDetailPage = pathname.startsWith("/courses/");
+    const isPersonalizedHomePage = pathname === "/personalized-home";
 
     return (
         <>
             <Header />
             <main className="flex-1">{children}</main>
-            {!isMapPage && !isAuthPage && <Footer />}
+            {!isMapPage && !isAuthPage && !isPersonalizedHomePage && <Footer />}
         </>
     );
 }

@@ -2,21 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-const JWT_SECRET = "stylemap-secret-key-2024";
+const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
 
 export async function GET(request: NextRequest) {
     try {
+        console.log("=== 프로필 API 시작 ===");
         const authHeader = request.headers.get("authorization");
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            console.log("인증 토큰 없음");
             return NextResponse.json({ error: "인증 토큰이 필요합니다." }, { status: 401 });
         }
 
         const token = authHeader.substring(7);
+        console.log("토큰 확인됨");
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET) as any;
+            console.log("JWT 토큰 검증 중...");
+            const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+            console.log("JWT 디코딩 결과:", decoded);
             const userId = decoded.userId;
+            console.log("사용자 ID:", userId);
 
             const connection = await pool.getConnection();
 
@@ -26,7 +32,15 @@ export async function GET(request: NextRequest) {
                     [userId]
                 );
 
-                const userArray = users as any[];
+                const userArray = users as Array<{
+                    id: number;
+                    email: string;
+                    nickname: string;
+                    profileImageUrl: string;
+                    mbti: string;
+                    age: number;
+                    createdAt: string;
+                }>;
 
                 if (userArray.length === 0) {
                     return NextResponse.json({ error: "사용자를 찾을 수 없습니다." }, { status: 404 });
@@ -49,7 +63,7 @@ export async function GET(request: NextRequest) {
             } finally {
                 connection.release();
             }
-        } catch (jwtError) {
+        } catch {
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
         }
     } catch (error) {
@@ -70,7 +84,7 @@ export async function PUT(request: NextRequest) {
         const { name, email, mbti, age } = await request.json();
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET) as any;
+            const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
             const userId = decoded.userId;
 
             const connection = await pool.getConnection();
@@ -82,7 +96,7 @@ export async function PUT(request: NextRequest) {
                     userId,
                 ]);
 
-                const existingUsersArray = existingUsers as any[];
+                const existingUsersArray = existingUsers as Array<{ id: number }>;
                 if (existingUsersArray.length > 0) {
                     return NextResponse.json({ error: "이미 사용 중인 이메일입니다." }, { status: 409 });
                 }
@@ -110,7 +124,7 @@ export async function PUT(request: NextRequest) {
             } finally {
                 connection.release();
             }
-        } catch (jwtError) {
+        } catch {
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
         }
     } catch (error) {
