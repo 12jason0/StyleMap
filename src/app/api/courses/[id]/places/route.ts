@@ -5,6 +5,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
         const { id: courseId } = await params;
         console.log("API: Fetching places for course ID:", courseId);
+        console.log("API: Course ID type:", typeof courseId);
+        console.log("API: Request URL:", request.url);
 
         const connection = await pool.getConnection();
 
@@ -54,6 +56,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 ORDER BY cp.order_index`,
                 [courseId]
             );
+            console.log("API: SQL query executed with courseId:", courseId);
+            console.log("API: Raw course places result:", coursePlaces);
 
             const coursePlacesArray = coursePlaces as Array<{
                 id: number;

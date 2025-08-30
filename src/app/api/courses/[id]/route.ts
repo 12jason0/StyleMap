@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const { id: courseId } = await params;
+        const { id: courseId } = params;
         console.log("API: Fetching course with ID:", courseId);
+        console.log("API: Course ID type:", typeof courseId);
+        console.log("API: Request URL:", request.url);
 
         const connection = await pool.getConnection();
 
@@ -19,6 +21,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             `,
                 [courseId]
             );
+            console.log("API: SQL query executed with courseId:", courseId);
+            console.log("API: Raw database result:", courses);
             const coursesArray = courses as Array<{
                 id: number;
                 title: string;
@@ -41,6 +45,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             }
 
             const course = coursesArray[0];
+            console.log("API: Selected course:", course);
 
             // 코스 상세 정보 포맷팅 (실제 데이터베이스 스키마에 맞춤)
             const formattedCourse = {
@@ -68,6 +73,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 updatedAt: course.updated_at,
             };
 
+            console.log("API: Returning formatted course:", formattedCourse);
             return NextResponse.json(formattedCourse);
         } finally {
             connection.release();

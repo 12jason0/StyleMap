@@ -57,8 +57,14 @@ const Login = () => {
                 localStorage.setItem("authToken", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
 
+                console.log("로그인 성공: 토큰 저장됨", {
+                    token: data.token ? data.token.substring(0, 20) + "..." : "없음",
+                    user: data.user,
+                });
+
                 // 헤더 상태 업데이트를 위한 이벤트 발생
                 window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
+                console.log("authTokenChange 이벤트 발생됨", { token: data.token ? "있음" : "없음" });
 
                 // 홈페이지로 이동 (로그인 성공 모달 표시를 위해 파라미터 추가)
                 router.push("/?login_success=true");

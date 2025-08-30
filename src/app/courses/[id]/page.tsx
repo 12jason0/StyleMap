@@ -7,6 +7,8 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
 import ReviewModal from "@/components/ReviewModal";
+import KakaoMap from "@/components/KakaoMap";
+import { Place as MapPlace, UserLocation } from "@/types/map";
 
 // 인터페이스 정의
 interface Place {
@@ -213,21 +215,16 @@ export default function CourseDetailPage() {
     const [error, setError] = useState<string | null>(null);
     const [isSaved, setIsSaved] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-    const [mapLoading, setMapLoading] = useState(true);
-    const [mapError, setMapError] = useState<string | null>(null);
     const [isShareLoading, setIsShareLoading] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [reviews, setReviews] = useState<any[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
     const [reviewsError, setReviewsError] = useState<string | null>(null);
-    const [kakaoLoaded, setKakaoLoaded] = useState(false);
 
-    // 지도 관련 상태
-    const mapRef = useRef<HTMLDivElement>(null);
-    const [map, setMap] = useState<any>(null);
-    const [markers, setMarkers] = useState<any[]>([]);
-    const mapInitialized = useRef(false);
+    // 지도 관련 상태 (간소화)
+    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
 
     // 성능 최적화를 위한 메모이제이션
     const sortedCoursePlaces = useMemo(() => {
@@ -298,158 +295,11 @@ export default function CourseDetailPage() {
         });
     }, []);
 
-    // 마커 생성 로직
-    const createMapMarkers = useCallback(
-        async (kakaoMap: any, kakao: any): Promise<void> => {
-            try {
-                const newMarkers: any[] = [];
-                const bounds = new kakao.maps.LatLngBounds();
-                let validPlaceCount = 0;
-
-                for (let index = 0; index < sortedCoursePlaces.length; index++) {
-                    const coursePlace = sortedCoursePlaces[index];
-
-                    if (!coursePlace.place?.latitude || !coursePlace.place?.longitude) {
-                        console.warn(`장소 ${coursePlace.place?.name}의 좌표가 없습니다`);
-                        continue;
-                    }
-
-                    validPlaceCount++;
-                    const position = new kakao.maps.LatLng(coursePlace.place.latitude, coursePlace.place.longitude);
-
-                    // 커스텀 마커 이미지 생성
-                    const markerImageSrc = createMarkerImageSrc(index + 1);
-                    const markerSize = new kakao.maps.Size(40, 40);
-                    const markerImage = new kakao.maps.MarkerImage(markerImageSrc, markerSize);
-
-                    // 마커 생성
-                    const marker = new kakao.maps.Marker({
-                        position: position,
-                        image: markerImage,
-                        title: coursePlace.place.name,
-                        clickable: true,
-                    });
-
-                    // 마커를 지도에 표시
-                    marker.setMap(kakaoMap);
-
-                    // 정보창 생성
-                    const infoWindow = createInfoWindow(coursePlace, kakao);
-
-                    // 마커 클릭 이벤트
-                    kakao.maps.event.addListener(marker, "click", () => {
-                        // 다른 정보창들 닫기
-                        newMarkers.forEach((m) => {
-                            if (m.infoWindow) {
-                                m.infoWindow.close();
-                            }
-                        });
-
-                        // 현재 정보창 열기
-                        infoWindow.open(kakaoMap, marker);
-                    });
-
-                    newMarkers.push({ marker, infoWindow });
-                    bounds.extend(position);
-                }
-
-                setMarkers(newMarkers);
-
-                // 지도 범위 조정
-                if (validPlaceCount > 1) {
-                    // 여러 마커가 있으면 모든 마커가 보이도록 조정
-                    kakaoMap.setBounds(bounds);
-                } else if (validPlaceCount === 1) {
-                    // 마커가 하나면 적당한 줌 레벨로 설정
-                    kakaoMap.setLevel(3);
-                }
-
-                console.log(`${validPlaceCount}개 마커 생성 완료`);
-            } catch (error) {
-                console.error("마커 생성 실패:", error);
-                throw error;
-            }
-        },
-        [sortedCoursePlaces, createMarkerImageSrc, createInfoWindow]
-    );
-
-    // 지도 초기화 함수
-    const initializeMap = useCallback(async () => {
-        if (!mapRef.current || mapInitialized.current || !kakaoLoaded) {
-            return;
-        }
-
-        console.log("지도 초기화 시작");
-        setMapLoading(true);
-        setMapError(null);
-
-        try {
-            // 카카오맵 API 확인
-            if (!window.kakao?.maps?.Map) {
-                throw new Error("카카오맵 API가 로드되지 않았습니다");
-            }
-
-            const kakao = window.kakao;
-
-            // 기본 중심점 설정 (서울시청)
-            let centerLat = 37.5665;
-            let centerLng = 126.978;
-
-            // 첫 번째 장소가 있으면 해당 위치로 중심점 설정
-            if (firstPlace?.place?.latitude && firstPlace?.place?.longitude) {
-                centerLat = firstPlace.place.latitude;
-                centerLng = firstPlace.place.longitude;
-            }
-
-            // 지도 옵션 설정
-            const mapOptions = {
-                center: new kakao.maps.LatLng(centerLat, centerLng),
-                level: sortedCoursePlaces.length > 1 ? 8 : 3,
-                mapTypeId: kakao.maps.MapTypeId.ROADMAP,
-            };
-
-            // 지도 생성
-            const newMap = new kakao.maps.Map(mapRef.current, mapOptions);
-            setMap(newMap);
-            mapInitialized.current = true;
-
-            console.log("지도 생성 성공");
-
-            // 마커 생성 및 표시 (장소가 있는 경우만)
-            if (sortedCoursePlaces.length > 0) {
-                await createMapMarkers(newMap, kakao);
-            }
-
-            setMapLoading(false);
-            console.log("지도 초기화 완료");
-        } catch (error) {
-            console.error("지도 초기화 실패:", error);
-            setMapError(error instanceof Error ? error.message : "지도를 불러올 수 없습니다");
-            setMapLoading(false);
-            mapInitialized.current = false;
-        }
-    }, [kakaoLoaded, firstPlace, sortedCoursePlaces, createMapMarkers]);
-
-    // 지도 중심 이동 함수
-    const moveMapCenter = useCallback(
-        (lat: number, lng: number) => {
-            if (map && window.kakao?.maps) {
-                const kakao = (window as any).kakao;
-                const position = new kakao.maps.LatLng(lat, lng);
-                map.setCenter(position);
-                map.setLevel(3);
-            }
-        },
-        [map]
-    );
-
-    // 장소별 지도 이동 핸들러
-    const createMapCenterHandler = useCallback(
-        (lat: number, lng: number) => () => {
-            moveMapCenter(lat, lng);
-        },
-        [moveMapCenter]
-    );
+    // 장소 선택 핸들러
+    const handlePlaceClick = useCallback((place: MapPlace) => {
+        console.log("장소 클릭:", place.name);
+        setSelectedPlace(place);
+    }, []);
 
     // 길찾기 핸들러
     const createNavigationHandler = useCallback(
@@ -460,52 +310,11 @@ export default function CourseDetailPage() {
         []
     );
 
-    // 지도 리셋 함수
-    const resetMap = useCallback(() => {
-        // 기존 마커들 제거
-        markers.forEach((markerObj) => {
-            if (markerObj.marker) {
-                markerObj.marker.setMap(null);
-            }
-            if (markerObj.infoWindow) {
-                markerObj.infoWindow.close();
-            }
-        });
-        setMarkers([]);
-
-        // 지도 초기화 플래그 리셋
-        mapInitialized.current = false;
-        setMap(null);
-        setMapError(null);
-        setMapLoading(true);
-
-        // 잠시 후 재초기화
-        setTimeout(() => {
-            initializeMap();
-        }, 100);
-    }, [markers, initializeMap]);
-
-    // 지도 재시도 함수
-    const retryMapLoad = useCallback(() => {
-        console.log("지도 재시도 시작");
-        resetMap();
-    }, [resetMap]);
-
-    // 전체 지도 보기
+    // 전체 지도 보기 (간소화)
     const handleShowFullMap = useCallback(() => {
-        if (map && courseData?.coursePlaces && window.kakao?.maps) {
-            const kakao = (window as any).kakao;
-            const bounds = new kakao.maps.LatLngBounds();
-
-            courseData.coursePlaces.forEach((place: any) => {
-                if (place.place.latitude && place.place.longitude) {
-                    bounds.extend(new kakao.maps.LatLng(place.place.latitude, place.place.longitude));
-                }
-            });
-
-            map.setBounds(bounds);
-        }
-    }, [map, courseData]);
+        // KakaoMap 컴포넌트에서 자동으로 처리됨
+        console.log("전체 지도 보기");
+    }, []);
 
     // 후기 목록 가져오기
     const fetchReviews = useCallback(async () => {
@@ -560,18 +369,21 @@ export default function CourseDetailPage() {
             setError(null);
 
             console.log("Fetching course data for ID:", courseId);
+            console.log("Course ID type:", typeof courseId);
 
-            // 캐시 확인
+            // 캐시 확인 (임시로 비활성화)
             const cacheKey = `course_${courseId}`;
             const cachedData = sessionStorage.getItem(cacheKey);
+            console.log("Cache check for key:", cacheKey);
+            console.log("Cached data exists:", !!cachedData);
 
-            if (cachedData) {
-                const parsedData = JSON.parse(cachedData);
-                setCourseData(parsedData);
-                setLoading(false);
-                document.title = `${parsedData.title} - 코스 상세`;
-                return;
-            }
+            // if (cachedData) {
+            //     const parsedData = JSON.parse(cachedData);
+            //     setCourseData(parsedData);
+            //     setLoading(false);
+            //     document.title = `${parsedData.title} - 코스 상세`;
+            //     return;
+            // }
 
             // API 호출
             const [courseResponse, highlightsResponse, benefitsResponse, noticesResponse, placesResponse] =
@@ -588,6 +400,7 @@ export default function CourseDetailPage() {
             }
 
             const course = await courseResponse.value.json();
+            console.log("API Response - Course:", course);
 
             const highlights =
                 highlightsResponse.status === "fulfilled" && highlightsResponse.value.ok
@@ -608,6 +421,7 @@ export default function CourseDetailPage() {
                 placesResponse.status === "fulfilled" && placesResponse.value.ok
                     ? await placesResponse.value.json()
                     : [];
+            console.log("API Response - Course Places:", coursePlaces);
 
             const finalCourseData = {
                 ...course,
@@ -617,10 +431,11 @@ export default function CourseDetailPage() {
                 coursePlaces,
             };
 
-            // 캐시 저장
-            sessionStorage.setItem(cacheKey, JSON.stringify(finalCourseData));
-            setTimeout(() => sessionStorage.removeItem(cacheKey), 5 * 60 * 1000);
+            // 캐시 저장 (임시로 비활성화)
+            // sessionStorage.setItem(cacheKey, JSON.stringify(finalCourseData));
+            // setTimeout(() => sessionStorage.removeItem(cacheKey), 5 * 60 * 1000);
 
+            console.log("Final Course Data:", finalCourseData);
             setCourseData(finalCourseData);
             document.title = `${course.title} - 코스 상세`;
         } catch (err) {
@@ -744,11 +559,45 @@ export default function CourseDetailPage() {
     }, [courseData]);
 
     // 초기 데이터 로드
+    // 사용자 위치 가져오기
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                    });
+                },
+                (error) => {
+                    console.log("위치 정보를 가져올 수 없습니다:", error);
+                }
+            );
+        }
+    }, []);
+
     useEffect(() => {
         if (courseId) {
             fetchCourseData();
         }
     }, [courseId, fetchCourseData]);
+
+    // 첫 번째 장소를 기본 선택으로 설정
+    useEffect(() => {
+        if (sortedCoursePlaces.length > 0 && !selectedPlace) {
+            const firstPlace = sortedCoursePlaces[0];
+            setSelectedPlace({
+                id: firstPlace.place.id,
+                name: firstPlace.place.name,
+                latitude: firstPlace.place.latitude,
+                longitude: firstPlace.place.longitude,
+                address: firstPlace.place.address,
+                imageUrl: firstPlace.place.image_url,
+                description: firstPlace.place.description,
+            });
+            console.log(`첫 번째 장소 자동 선택: ${firstPlace.place.name}`);
+        }
+    }, [sortedCoursePlaces, selectedPlace]);
 
     // 찜 상태 확인
     useEffect(() => {
@@ -775,45 +624,6 @@ export default function CourseDetailPage() {
             window.removeEventListener("reviewSubmitted", handleReviewSubmitted);
         };
     }, [fetchReviews]);
-
-    // 지도 초기화 트리거 - 의존성 배열 최적화
-    useEffect(() => {
-        if (courseData && mapRef.current && !mapInitialized.current && sortedCoursePlaces.length > 0) {
-            console.log("지도 초기화 트리거 - 장소 수:", sortedCoursePlaces.length);
-            initializeMap();
-        }
-    }, [courseData, sortedCoursePlaces.length]); // initializeMap 의존성 제거로 무한 루프 방지
-
-    // 컴포넌트 언마운트 시 정리
-    useEffect(() => {
-        return () => {
-            // 컴포넌트 언마운트 시 마커 정리
-            markers.forEach((markerObj) => {
-                if (markerObj.marker) {
-                    markerObj.marker.setMap(null);
-                }
-                if (markerObj.infoWindow) {
-                    markerObj.infoWindow.close();
-                }
-            });
-            mapInitialized.current = false;
-        };
-    }, []);
-
-    // 카카오맵 로딩 상태 확인
-    useEffect(() => {
-        const checkKakaoLoaded = () => {
-            if (window.kakao?.maps?.Map) {
-                console.log("카카오맵 API 로드됨");
-                setKakaoLoaded(true);
-            } else {
-                // 아직 로드 안됨
-                setTimeout(checkKakaoLoaded, 100);
-            }
-        };
-
-        checkKakaoLoaded();
-    }, []);
 
     // 로딩 상태
     if (loading) {
@@ -948,61 +758,30 @@ export default function CourseDetailPage() {
                                     {/* 지도 섹션 */}
                                     <div className="mb-8 rounded-2xl overflow-hidden shadow-lg">
                                         <div className="relative">
-                                            {mapError ? (
-                                                <div className="w-full h-80 bg-gray-100 rounded-2xl flex flex-col items-center justify-center p-6">
-                                                    <div className="text-center">
-                                                        <div className="text-4xl mb-4">⚠️</div>
-                                                        <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                                                            지도를 불러올 수 없습니다
-                                                        </h3>
-                                                        <p className="text-gray-500 text-sm mb-4">{mapError}</p>
-                                                        <button
-                                                            onClick={retryMapLoad}
-                                                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                                                        >
-                                                            다시 시도
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : mapLoading ? (
-                                                <MapFallbackUI places={sortedCoursePlaces} />
-                                            ) : (
-                                                <div
-                                                    ref={mapRef}
+                                            {hasPlaces ? (
+                                                <KakaoMap
+                                                    places={sortedCoursePlaces.map((cp) => ({
+                                                        id: cp.place.id,
+                                                        name: cp.place.name,
+                                                        latitude: cp.place.latitude,
+                                                        longitude: cp.place.longitude,
+                                                        address: cp.place.address,
+                                                        imageUrl: cp.place.image_url,
+                                                        description: cp.place.description,
+                                                    }))}
+                                                    userLocation={null}
+                                                    selectedPlace={selectedPlace}
+                                                    onPlaceClick={handlePlaceClick}
                                                     className="w-full h-80 rounded-2xl"
                                                     style={{ minHeight: "320px" }}
                                                 />
-                                            )}
-
-                                            {!mapError && !mapLoading && (
-                                                <>
-                                                    {/* 지도 오버레이 */}
-                                                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
-                                                        <div className="text-sm font-medium text-gray-800">
-                                                            🗺️ 실시간 코스 지도
-                                                        </div>
-                                                        <div className="text-xs text-gray-600">
-                                                            각 장소를 클릭하면 상세 정보를 확인할 수 있어요
-                                                        </div>
+                                            ) : (
+                                                <div className="w-full h-80 bg-gray-100 rounded-2xl flex items-center justify-center">
+                                                    <div className="text-center">
+                                                        <div className="text-6xl mb-4">🗺️</div>
+                                                        <p className="text-gray-600">등록된 장소가 없습니다</p>
                                                     </div>
-
-                                                    {/* 지도 컨트롤 */}
-                                                    <div className="absolute top-4 right-4 flex gap-2">
-                                                        <button
-                                                            onClick={handleShowFullMap}
-                                                            className="bg-white/90 backdrop-blur-sm border-none text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-white transition-colors shadow-lg"
-                                                            disabled={mapLoading}
-                                                        >
-                                                            전체보기
-                                                        </button>
-                                                        <button
-                                                            onClick={retryMapLoad}
-                                                            className="bg-white/90 backdrop-blur-sm border-none text-gray-700 px-3 py-2 rounded-md text-sm hover:bg-white transition-colors shadow-lg"
-                                                        >
-                                                            새로고침
-                                                        </button>
-                                                    </div>
-                                                </>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -1070,12 +849,19 @@ export default function CourseDetailPage() {
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     <button
-                                                                        onClick={createMapCenterHandler(
-                                                                            coursePlace.place.latitude,
-                                                                            coursePlace.place.longitude
-                                                                        )}
-                                                                        className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
-                                                                        disabled={mapLoading || mapError !== null}
+                                                                        onClick={() =>
+                                                                            setSelectedPlace({
+                                                                                id: coursePlace.place.id,
+                                                                                name: coursePlace.place.name,
+                                                                                latitude: coursePlace.place.latitude,
+                                                                                longitude: coursePlace.place.longitude,
+                                                                                address: coursePlace.place.address,
+                                                                                imageUrl: coursePlace.place.image_url,
+                                                                                description:
+                                                                                    coursePlace.place.description,
+                                                                            })
+                                                                        }
+                                                                        className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
                                                                     >
                                                                         지도에서 보기
                                                                     </button>
@@ -1186,37 +972,12 @@ export default function CourseDetailPage() {
                                 <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                                     <div className="flex justify-between items-center mb-6">
                                         <h2 className="text-2xl md:text-3xl font-bold">이용후기</h2>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const response = await fetch("/api/reviews/test", {
-                                                            method: "POST",
-                                                            headers: { "Content-Type": "application/json" },
-                                                            body: JSON.stringify({ courseId: params.id }),
-                                                        });
-                                                        const data = await response.json();
-                                                        if (response.ok) {
-                                                            alert("테스트 후기가 추가되었습니다!");
-                                                            fetchReviews();
-                                                        } else {
-                                                            alert("테스트 후기 추가 실패: " + data.error);
-                                                        }
-                                                    } catch (error) {
-                                                        alert("테스트 후기 추가 중 오류 발생");
-                                                    }
-                                                }}
-                                                className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-xs"
-                                            >
-                                                테스트 후기 추가
-                                            </button>
-                                            <button
-                                                onClick={() => setShowReviewModal(true)}
-                                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                                            >
-                                                후기 작성하기
-                                            </button>
-                                        </div>
+                                        <button
+                                            onClick={() => setShowReviewModal(true)}
+                                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                                        >
+                                            후기 작성하기
+                                        </button>
                                     </div>
 
                                     {reviewsLoading ? (
