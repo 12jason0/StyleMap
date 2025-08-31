@@ -55,15 +55,43 @@ const AboutPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // 캐시된 데이터 확인
+                const cachedData = sessionStorage.getItem("aboutPageData");
+                const cacheTime = sessionStorage.getItem("aboutPageDataTime");
+                const now = Date.now();
+
+                // 5분 이내 캐시된 데이터가 있으면 사용
+                if (cachedData && cacheTime && now - parseInt(cacheTime) < 5 * 60 * 1000) {
+                    const data = JSON.parse(cachedData);
+                    setCourseCount(data.courseCount);
+                    setCourses(data.courses);
+                    setReviews(data.reviews);
+                    setLoading(false);
+                    return;
+                }
+
                 // 코스 개수, 코스 데이터, 후기 데이터를 병렬로 가져오기
                 const [countResponse, coursesResponse, reviewsResponse] = await Promise.all([
-                    fetch("/api/courses/count"),
-                    fetch("/api/courses?limit=3"),
-                    fetch("/api/reviews?limit=3"),
+                    fetch("/api/courses/count", {
+                        cache: "force-cache",
+                        next: { revalidate: 300 }, // 5분 캐시
+                    }),
+                    fetch("/api/courses?limit=3", {
+                        cache: "force-cache",
+                        next: { revalidate: 300 },
+                    }),
+                    fetch("/api/reviews?limit=9", {
+                        cache: "force-cache",
+                        next: { revalidate: 300 },
+                    }),
                 ]);
 
+                let countData: { count: number } = { count: 0 };
+                let coursesData: any[] = [];
+                let reviewsData: any[] = [];
+
                 if (countResponse.ok) {
-                    const countData = await countResponse.json();
+                    countData = await countResponse.json();
                     setCourseCount(countData.count);
                 } else {
                     console.error("Failed to fetch course count");
@@ -71,7 +99,7 @@ const AboutPage = () => {
                 }
 
                 if (coursesResponse.ok) {
-                    const coursesData = await coursesResponse.json();
+                    coursesData = await coursesResponse.json();
                     setCourses(coursesData);
                 } else {
                     console.error("Failed to fetch courses");
@@ -79,14 +107,22 @@ const AboutPage = () => {
                 }
 
                 if (reviewsResponse.ok) {
-                    const reviewsData = await reviewsResponse.json();
-                    console.log("Reviews data:", reviewsData);
+                    reviewsData = await reviewsResponse.json();
                     // 9개의 후기를 가져와서 3개씩 3페이지로 나누기
                     setReviews(reviewsData.slice(0, 9));
                 } else {
                     console.error("Failed to fetch reviews:", reviewsResponse.status);
                     setReviews([]);
                 }
+
+                // 데이터를 캐시에 저장
+                const dataToCache = {
+                    courseCount: countData.count || 0,
+                    courses: coursesData,
+                    reviews: reviewsData.slice(0, 9),
+                };
+                sessionStorage.setItem("aboutPageData", JSON.stringify(dataToCache));
+                sessionStorage.setItem("aboutPageDataTime", now.toString());
             } catch (error) {
                 console.error("Error fetching data:", error);
                 setCourseCount(0);

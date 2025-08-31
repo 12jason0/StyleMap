@@ -38,9 +38,28 @@ export default function CoursesPage() {
         const fetchCourses = async () => {
             try {
                 setLoading(true);
+
                 const url = concept ? `/api/courses?concept=${encodeURIComponent(concept)}` : "/api/courses";
 
-                const response = await fetch(url);
+                // 캐시된 데이터 확인
+                const cacheKey = `courses_${concept || "all"}`;
+                const cachedData = sessionStorage.getItem(cacheKey);
+                const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
+                const now = Date.now();
+
+                // 3분 이내 캐시된 데이터가 있으면 사용
+                if (cachedData && cacheTime && now - parseInt(cacheTime) < 3 * 60 * 1000) {
+                    const data = JSON.parse(cachedData);
+                    setCourses(data);
+                    setError(null);
+                    setLoading(false);
+                    return;
+                }
+
+                const response = await fetch(url, {
+                    cache: "force-cache",
+                    next: { revalidate: 180 }, // 3분 캐시
+                });
 
                 if (!response.ok) {
                     throw new Error("Failed to fetch courses");
@@ -48,7 +67,12 @@ export default function CoursesPage() {
 
                 const data = await response.json();
                 setCourses(data);
+
                 setError(null);
+
+                // 데이터를 캐시에 저장
+                sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                sessionStorage.setItem(`${cacheKey}_time`, now.toString());
             } catch (err) {
                 console.error("Error fetching courses:", err);
                 setError("코스를 불러오는 중 오류가 발생했습니다.");
@@ -188,7 +212,7 @@ export default function CoursesPage() {
                                 {/* 조회수 표시 */}
                                 <div className="flex items-center text-sm text-gray-500 mb-3">
                                     <span className="mr-2">👁️</span>
-                                    <span>{course.viewCount.toLocaleString()}회 조회</span>
+                                    <span>{(course.viewCount || 0).toLocaleString()}회 조회</span>
                                 </div>
 
                                 <p className="text-gray-600 mb-4">{course.description}</p>
@@ -226,17 +250,35 @@ export default function CoursesPage() {
                     ))}
                 </div>
 
-                {courses.length === 0 && (
+                {courses.length === 0 && concept && (
                     <div className="text-center py-16">
                         <div className="text-6xl mb-4">🚧</div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {concept ? `${concept} 코스 준비중입니다` : "코스를 찾을 수 없습니다"}
-                        </h3>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">{concept} 코스 준비중입니다</h3>
                         <p className="text-gray-600 mb-6">
-                            {concept
-                                ? `${concept} 관련 코스를 준비하고 있습니다. 곧 만나보실 수 있어요!`
-                                : "다른 컨셉의 코스를 찾아보시거나 나중에 다시 확인해보세요."}
+                            {concept} 관련 코스를 준비하고 있습니다. 곧 만나보실 수 있어요!
                         </p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                            <Link
+                                href={`/coming-soon?concept=${encodeURIComponent(concept)}`}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                            >
+                                자세히 보기
+                            </Link>
+                            <Link
+                                href="/courses"
+                                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                            >
+                                다른 코스 둘러보기
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
+                {courses.length === 0 && !concept && (
+                    <div className="text-center py-16">
+                        <div className="text-6xl mb-4">🚧</div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">코스를 찾을 수 없습니다</h3>
+                        <p className="text-gray-600 mb-6">다른 컨셉의 코스를 찾아보시거나 나중에 다시 확인해보세요.</p>
                         <Link
                             href="/"
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"

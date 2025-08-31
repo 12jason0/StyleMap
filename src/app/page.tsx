@@ -631,6 +631,7 @@ export default function Home() {
 function ConceptSection() {
     const [conceptCounts, setConceptCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
+    const [showAll, setShowAll] = useState(false);
 
     useEffect(() => {
         const fetchConceptCounts = async () => {
@@ -651,12 +652,14 @@ function ConceptSection() {
     }, []);
 
     const concepts = [
-        { name: "핫플투어", icon: "🔥", gradient: "from-orange-400 to-red-500" },
-        { name: "로컬맛집", icon: "🍜", gradient: "from-yellow-400 to-orange-500" },
-        { name: "야경명소", icon: "🌃", gradient: "from-purple-500 to-pink-500" },
-        { name: "힐링여행", icon: "🌿", gradient: "from-green-400 to-emerald-500" },
-        { name: "액티비티", icon: "🎯", gradient: "from-blue-400 to-indigo-500" },
-        { name: "가성비", icon: "💎", gradient: "from-gray-600 to-gray-800" },
+        { name: "카페투어", icon: "☕", gradient: "from-brown-400 to-amber-500" },
+        { name: "맛집탐방", icon: "🍜", gradient: "from-red-400 to-orange-500" },
+        { name: "인생샷", icon: "📸", gradient: "from-purple-400 to-pink-500" },
+        { name: "체험", icon: "🎯", gradient: "from-blue-400 to-indigo-500" },
+        { name: "힐링", icon: "🌿", gradient: "from-green-400 to-emerald-500" },
+        { name: "문화", icon: "🏛️", gradient: "from-yellow-400 to-orange-500" },
+        { name: "야경", icon: "🌃", gradient: "from-purple-500 to-pink-500" },
+        { name: "힙스터", icon: "🎨", gradient: "from-pink-400 to-red-500" },
     ];
 
     if (loading) {
@@ -683,15 +686,27 @@ function ConceptSection() {
                     <p className="text-gray-600 text-lg">취향에 맞는 코스를 찾아보세요</p>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    {concepts.map((concept) => {
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {concepts.slice(0, showAll ? concepts.length : 6).map((concept, index) => {
                         const hasCourses = conceptCounts[concept.name] > 0;
 
                         return (
-                            <div key={concept.name} className="relative">
+                            <div
+                                key={concept.name}
+                                className={`relative transition-all duration-500 ${
+                                    index >= 6 && showAll
+                                        ? "animate-fade-in-up opacity-100"
+                                        : index >= 6
+                                        ? "opacity-0 scale-95"
+                                        : "opacity-100"
+                                }`}
+                                style={{
+                                    animationDelay: index >= 6 ? `${(index - 6) * 100}ms` : "0ms",
+                                }}
+                            >
                                 {hasCourses ? (
                                     <Link
-                                        href={`/courses?concept=${concept.name}`}
+                                        href={`/courses?concept=${encodeURIComponent(concept.name)}`}
                                         className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block"
                                     >
                                         <div
@@ -708,8 +723,7 @@ function ConceptSection() {
                                         </div>
                                     </Link>
                                 ) : (
-                                    <div className="group relative p-6 bg-gray-100 rounded-2xl shadow-md transition-all duration-300 cursor-not-allowed">
-                                        <div className="absolute inset-0 bg-gray-200 opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity" />
+                                    <div className="group relative p-6 bg-gray-100 rounded-2xl shadow-md block">
                                         <div className="relative text-center">
                                             <div className="text-4xl mb-3 opacity-50">{concept.icon}</div>
                                             <h3 className="font-bold text-gray-500">{concept.name}</h3>
@@ -721,6 +735,30 @@ function ConceptSection() {
                         );
                     })}
                 </div>
+
+                {/* 더보기 버튼 */}
+                {!showAll && concepts.length > 6 && (
+                    <div className="text-center mt-8">
+                        <button
+                            onClick={() => setShowAll(true)}
+                            className="hover:cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors transform hover:scale-105"
+                        >
+                            더 많은 컨셉 보기 ({concepts.length - 6}개 더)
+                        </button>
+                    </div>
+                )}
+
+                {/* 접기 버튼 */}
+                {showAll && (
+                    <div className="text-center mt-8">
+                        <button
+                            onClick={() => setShowAll(false)}
+                            className="hover:cursor-pointer bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors transform hover:scale-105"
+                        >
+                            접기
+                        </button>
+                    </div>
+                )}
             </div>
         </section>
     );

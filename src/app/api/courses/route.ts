@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
             query += " WHERE concept = ?";
             params.push(concept);
             console.log("API: Filtering by concept:", concept);
+            console.log("API: Query with concept filter:", query);
+            console.log("API: Parameters:", params);
         }
 
         query += " ORDER BY view_count DESC, title ASC";
@@ -50,7 +52,6 @@ export async function GET(request: NextRequest) {
         }>;
 
         console.log("API: Found courses:", coursesArray.length);
-        console.log("API: First course:", coursesArray[0] || "No courses found");
 
         // 데이터 포맷팅
         const formattedCourses = coursesArray.map((course) => ({
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
             status: 200,
             headers: {
                 "Content-Type": "application/json",
+                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", // 5분 캐시, 10분 stale-while-revalidate
             },
         });
     } catch (error) {

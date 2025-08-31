@@ -80,11 +80,26 @@ export default function MapPage() {
         setLoading(true);
         setError(null);
         try {
+            // 캐시된 데이터 확인
+            const cacheKey = `places_${location.lat}_${location.lng}_${keyword || "default"}`;
+            const cachedData = sessionStorage.getItem(cacheKey);
+            const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
+            const now = Date.now();
+
+            // 10분 이내 캐시된 데이터가 있으면 사용
+            if (cachedData && cacheTime && now - parseInt(cacheTime) < 10 * 60 * 1000) {
+                const data = JSON.parse(cachedData);
+                setPlaces(data);
+                setLoading(false);
+                return;
+            }
+
             const keywords = keyword ? [keyword] : ["음식점", "카페", "관광명소"];
             const searchPromises = keywords.map((searchKeyword) =>
-                fetch(`/api/places/search?lat=${location.lat}&lng=${location.lng}&keyword=${searchKeyword}`).then(
-                    (res) => res.json()
-                )
+                fetch(`/api/places/search?lat=${location.lat}&lng=${location.lng}&keyword=${searchKeyword}`, {
+                    cache: "force-cache",
+                    next: { revalidate: 600 }, // 10분 캐시
+                }).then((res) => res.json())
             );
 
             const results = await Promise.all(searchPromises);
@@ -94,6 +109,10 @@ export default function MapPage() {
             const uniquePlaces = Array.from(new Map(newPlaces.map((p) => [p.id, p])).values());
 
             setPlaces(uniquePlaces);
+
+            // 데이터를 캐시에 저장
+            sessionStorage.setItem(cacheKey, JSON.stringify(uniquePlaces));
+            sessionStorage.setItem(`${cacheKey}_time`, now.toString());
         } catch (e) {
             setError("주변 장소를 불러오는 데 실패했습니다.");
         } finally {

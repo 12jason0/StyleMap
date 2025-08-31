@@ -46,7 +46,7 @@ export default function KakaoMap({
                 // 첫 번째 장소를 중심으로 설정
                 centerPosition = new window.kakao.maps.LatLng(places[0].latitude, places[0].longitude);
                 // 장소가 하나면 더 가까운 줌 레벨로 설정
-                zoomLevel = places.length === 1 ? 3 : 5;
+                zoomLevel = places.length === 1 ? 2 : 4;
                 console.log(`첫 번째 장소로 포커스: ${places[0].name} (${places[0].latitude}, ${places[0].longitude})`);
             } else if (userLocation) {
                 centerPosition = new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng);
@@ -90,18 +90,10 @@ export default function KakaoMap({
             const position = new kakao.maps.LatLng(place.latitude, place.longitude);
             const isSelected = selectedPlace?.id === place.id;
 
-            // 마커 이미지 설정 (선택된 장소는 다른 색상)
-            const markerImage = new kakao.maps.MarkerImage(
-                isSelected
-                    ? "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png"
-                    : "https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_black.png",
-                new kakao.maps.Size(31, 35)
-            );
-
+            // 기본 마커 사용 (이미지 없이)
             const marker = new kakao.maps.Marker({
                 position: position,
                 title: place.name,
-                image: markerImage,
             });
 
             marker.setMap(map);
@@ -125,11 +117,16 @@ export default function KakaoMap({
                 const singlePlace = places[0];
                 const position = new kakao.maps.LatLng(singlePlace.latitude, singlePlace.longitude);
                 map.setCenter(position);
-                map.setLevel(3); // 더 가까운 줌 레벨
+                map.setLevel(2); // 더 가까운 줌 레벨로 설정
                 console.log(`단일 장소 포커스: ${singlePlace.name}`);
             } else {
                 // 여러 장소가 있으면 모든 마커가 보이도록 조정
                 map.setBounds(bounds);
+                // 약간의 여백을 위해 줌 레벨 조정
+                const currentLevel = map.getLevel();
+                if (currentLevel > 4) {
+                    map.setLevel(4);
+                }
                 console.log(`${places.length}개 장소 모두 표시`);
             }
         }

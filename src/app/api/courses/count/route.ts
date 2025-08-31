@@ -18,7 +18,14 @@ export async function GET(request: NextRequest) {
 
         console.log("API: Total courses count:", courseCount);
 
-        return NextResponse.json({ count: courseCount });
+        return NextResponse.json(
+            { count: courseCount },
+            {
+                headers: {
+                    "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", // 5분 캐시, 10분 stale-while-revalidate
+                },
+            }
+        );
     } catch (error) {
         console.error("API: Error fetching courses count:", error);
 
