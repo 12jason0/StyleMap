@@ -1,181 +1,103 @@
 import { NextRequest, NextResponse } from "next/server";
-import mysql from "mysql2/promise";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret-key-for-development";
-
-// 후기 목록 가져오기 (인증 불필요)
 export async function GET(request: NextRequest) {
+    let connection;
+
     try {
+        console.log("API: Starting to fetch reviews...");
+
+        // URL 파라미터에서 limit 가져오기
         const { searchParams } = new URL(request.url);
-        const courseId = searchParams.get("courseId");
-        const placeId = searchParams.get("placeId");
+        const limit = searchParams.get("limit");
 
-        console.log("후기 목록 요청:", { courseId, placeId });
+        // 데이터베이스 연결 시도
+        connection = await pool.getConnection();
+        console.log("API: Database connection successful");
 
-        if (!courseId && !placeId) {
-            return NextResponse.json({ error: "courseId 또는 placeId가 필요합니다." }, { status: 400 });
+        // 리뷰와 사용자 정보를 조인해서 가져오기
+        let query = `
+            SELECT r.*, u.nickname, c.title as course_title, c.concept
+            FROM reviews r
+            LEFT JOIN users u ON r.userId = u.id
+            LEFT JOIN courses c ON r.courseId = c.id
+            ORDER BY r.createdAt DESC
+        `;
+        let params: string[] = [];
+
+        if (limit) {
+            query += " LIMIT ?";
+            params.push(limit);
+            console.log("API: Limiting results to:", limit);
         }
 
-        const connection = await pool.getConnection();
-        console.log("데이터베이스 연결 성공");
+        const [reviews] = await connection.execute(query, params);
+        const reviewsArray = reviews as Array<{
+            id: number;
+            userId: number;
+            courseId: number;
+            rating: number;
+            content: string;
+            createdAt: string;
+            nickname: string;
+            course_title: string;
+            concept: string;
+        }>;
 
-        try {
-            // 먼저 reviews 테이블이 존재하는지 확인
-            const [tables] = await connection.execute("SHOW TABLES LIKE 'reviews'");
-            console.log("reviews 테이블 존재 여부:", (tables as any[]).length > 0);
+        console.log("API: Found reviews:", reviewsArray.length);
 
-            if ((tables as any[]).length === 0) {
-                console.log("reviews 테이블이 존재하지 않습니다.");
-                return NextResponse.json({
-                    success: true,
-                    reviews: [],
-                });
-            }
+        // 데이터 포맷팅
+        const formattedReviews = reviewsArray.map((review) => ({
+            id: review.id.toString(),
+            userId: review.userId.toString(),
+            courseId: review.courseId.toString(),
+            rating: review.rating,
+            comment: review.content || "",
+            createdAt: review.createdAt,
+            user: {
+                nickname: review.nickname || "익명",
+                initial: (review.nickname || "익")[0],
+            },
+            course: {
+                title: review.course_title || "알 수 없는 코스",
+                concept: review.concept || "기타",
+            },
+        }));
 
-            // 테이블 구조 확인
-            const [columns] = await connection.execute("DESCRIBE reviews");
-            console.log("reviews 테이블 컬럼:", columns);
+        console.log("API: Returning formatted reviews:", formattedReviews.length);
 
-            // users 테이블도 존재하는지 확인
-            const [userTables] = await connection.execute("SHOW TABLES LIKE 'users'");
-            console.log("users 테이블 존재 여부:", (userTables as any[]).length > 0);
-
-            if ((userTables as any[]).length === 0) {
-                console.log("users 테이블이 존재하지 않습니다.");
-                return NextResponse.json({
-                    success: true,
-                    reviews: [],
-                });
-            }
-
-            // 먼저 단순한 쿼리로 테스트
-            let query = "SELECT * FROM reviews WHERE 1=1";
-            const params: any[] = [];
-
-            if (courseId) {
-                query += " AND courseId = ?";
-                params.push(parseInt(courseId));
-            } else if (placeId) {
-                query += " AND placeId = ?";
-                params.push(parseInt(placeId));
-            }
-
-            query += " ORDER BY createdAt DESC";
-
-            console.log("실행할 쿼리:", query, "파라미터:", params);
-
-            const [reviews] = await connection.execute(query, params);
-
-            console.log("조회된 후기 수:", (reviews as any[]).length);
-
-            // 사용자 정보는 나중에 별도로 조회하거나 기본값 사용
-            const reviewsWithUser = (reviews as any[]).map((review: any) => ({
-                ...review,
-                userName: "익명", // 기본값
-                userEmail: null,
-            }));
-
-            return NextResponse.json({
-                success: true,
-                reviews: reviewsWithUser,
-            });
-        } finally {
-            connection.release();
-        }
+        return NextResponse.json(formattedReviews, {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
     } catch (error) {
-        console.error("후기 목록 조회 오류:", error);
-        console.error("오류 상세:", error instanceof Error ? error.message : error);
-        return NextResponse.json({ error: "후기 목록을 가져오는 중 오류가 발생했습니다." }, { status: 500 });
-    }
-}
+        console.error("API: Error fetching reviews:", error);
 
-// 후기 작성
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { courseId, placeId, rating, content } = body;
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const errorCode = (error as { code?: string })?.code;
 
-        // JWT_SECRET 확인
-        if (!process.env.JWT_SECRET) {
-            console.error("JWT_SECRET이 설정되지 않았습니다.");
-            return NextResponse.json({ error: "서버 설정 오류입니다. 관리자에게 문의하세요." }, { status: 500 });
-        }
-
-        // JWT 토큰에서 사용자 ID 추출
-        const authHeader = request.headers.get("authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return NextResponse.json({ error: "인증 토큰이 필요합니다." }, { status: 401 });
-        }
-
-        const token = authHeader.substring(7);
-        const decoded = jwt.verify(token, process.env.JWT_SECRET) as any;
-        const userId = decoded.userId;
-
-        // 필수 필드 검증
-        if (!rating || !content) {
-            return NextResponse.json({ error: "평점과 내용을 입력해주세요." }, { status: 400 });
-        }
-
-        if (rating < 1 || rating > 5) {
-            return NextResponse.json({ error: "평점은 1-5 사이의 값이어야 합니다." }, { status: 400 });
-        }
-
-        if (content.trim().length < 10) {
-            return NextResponse.json({ error: "후기 내용은 최소 10자 이상 입력해주세요." }, { status: 400 });
-        }
-
-        // courseId 또는 placeId 중 하나는 반드시 있어야 함
-        if (!courseId && !placeId) {
-            return NextResponse.json({ error: "코스 또는 장소 정보가 필요합니다." }, { status: 400 });
-        }
-
-        const connection = await pool.getConnection();
-
-        try {
-            // 기존 후기 확인 (같은 사용자가 같은 코스/장소에 후기를 작성했는지)
-            let existingReview;
-            if (courseId) {
-                [existingReview] = await connection.execute(
-                    "SELECT id FROM reviews WHERE userId = ? AND courseId = ?",
-                    [userId, courseId]
-                );
-            } else if (placeId) {
-                [existingReview] = await connection.execute("SELECT id FROM reviews WHERE userId = ? AND placeId = ?", [
-                    userId,
-                    placeId,
-                ]);
-            }
-
-            if (existingReview && (existingReview as any[]).length > 0) {
-                return NextResponse.json({ error: "이미 후기를 작성하셨습니다." }, { status: 409 });
-            }
-
-            // 새 후기 저장
-            const [result] = await connection.execute(
-                `INSERT INTO reviews (userId, courseId, placeId, rating, content, createdAt, updatedAt) 
-                 VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-                [userId, courseId || null, placeId || null, rating, content.trim()]
+        // 연결 오류인지 쿼리 오류인지 구분
+        if (errorCode === "ECONNREFUSED") {
+            return NextResponse.json(
+                { error: "데이터베이스 연결 실패", details: "DB 서버가 실행중인지 확인해주세요" },
+                { status: 503 }
             );
-
-            const insertResult = result as any;
-
-            return NextResponse.json({
-                success: true,
-                message: "후기가 성공적으로 작성되었습니다.",
-                reviewId: insertResult.insertId,
-            });
-        } finally {
+        } else if (errorCode === "ER_NO_SUCH_TABLE") {
+            return NextResponse.json(
+                { error: "테이블이 존재하지 않음", details: "reviews 테이블을 생성해주세요" },
+                { status: 500 }
+            );
+        } else {
+            return NextResponse.json(
+                { error: "리뷰 데이터를 가져오는 중 오류 발생", details: errorMessage },
+                { status: 500 }
+            );
+        }
+    } finally {
+        if (connection) {
             connection.release();
         }
-    } catch (error) {
-        console.error("후기 작성 오류:", error);
-
-        if (error instanceof jwt.JsonWebTokenError) {
-            return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
-        }
-
-        return NextResponse.json({ error: "후기 작성 중 오류가 발생했습니다." }, { status: 500 });
     }
 }

@@ -45,6 +45,11 @@ export default function MapPage() {
     const searchParams = useSearchParams();
     const searchQuery = searchParams?.get("search");
 
+    // 페이지 로드 시 스크롤을 맨 위로
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     // --- 상태 관리 ---
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const [places, setPlaces] = useState<Place[]>([]);
@@ -142,14 +147,66 @@ export default function MapPage() {
 
         const bounds = new kakao.maps.LatLngBounds();
 
+        // 현재 위치 마커 생성 (파란색 원형 마커)
+        if (userLocation) {
+            const currentPosition = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+
+            // 현재 위치 커스텀 마커 생성
+            const currentLocationMarker = new kakao.maps.Marker({
+                position: currentPosition,
+                title: "현재 위치",
+                // 커스텀 마커 이미지 설정
+                image: new kakao.maps.MarkerImage("/location-pin.svg", new kakao.maps.Size(32, 32), {
+                    offset: new kakao.maps.Point(16, 16),
+                }),
+            });
+            currentLocationMarker.setMap(map);
+
+            // 현재 위치 마커 클릭 이벤트
+            kakao.maps.event.addListener(currentLocationMarker, "click", () => {
+                console.log("현재 위치 핀 클릭됨");
+                showToast("현재 위치입니다.", "info");
+            });
+
+            markers.push(currentLocationMarker);
+            bounds.extend(currentPosition);
+        }
+
         // 장소 마커 생성
         places.forEach((place) => {
             const isSelected = selectedPlace?.id === place.id;
             const position = new kakao.maps.LatLng(place.latitude, place.longitude);
-            // 기본 커스텀 마커 생성
+
+            // 장소별 다른 색상의 마커 생성
+            let markerColor = "#FF6B6B"; // 기본 빨간색
+
+            // 카테고리에 따른 색상 구분
+            if (place.category.includes("음식점")) {
+                markerColor = "#FF6B6B"; // 빨간색
+            } else if (place.category.includes("카페")) {
+                markerColor = "#4ECDC4"; // 청록색
+            } else if (place.category.includes("관광")) {
+                markerColor = "#45B7D1"; // 파란색
+            } else {
+                markerColor = "#96CEB4"; // 초록색
+            }
+
+            // 커스텀 마커 생성
             const marker = new kakao.maps.Marker({
                 position,
                 title: place.name,
+                // 커스텀 마커 이미지 설정
+                image: new kakao.maps.MarkerImage(
+                    "data:image/svg+xml;base64," +
+                        btoa(`
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${markerColor}"/>
+                            <circle cx="12" cy="9" r="2.5" fill="white"/>
+                        </svg>
+                    `),
+                    new kakao.maps.Size(28, 28),
+                    { offset: new kakao.maps.Point(14, 28) }
+                ),
             });
             marker.setMap(map);
 
@@ -178,7 +235,7 @@ export default function MapPage() {
         return () => {
             markers.forEach((marker) => marker.setMap(null));
         };
-    }, [places, selectedPlace]);
+    }, [places, selectedPlace, userLocation]);
 
     // --- 초기 데이터 로드 ---
     useEffect(() => {

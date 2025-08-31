@@ -1,18 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     let connection;
 
     try {
         console.log("API: Starting to fetch courses...");
 
+        // URL 파라미터에서 concept과 limit 가져오기
+        const { searchParams } = new URL(request.url);
+        const concept = searchParams.get("concept");
+        const limit = searchParams.get("limit");
+
         // 데이터베이스 연결 시도
         connection = await pool.getConnection();
         console.log("API: Database connection successful");
 
-        // 쿼리 실행
-        const [courses] = await connection.execute("SELECT * FROM courses ORDER BY id");
+        // 쿼리 실행 (컨셉 필터링 추가)
+        let query = "SELECT *, COALESCE(view_count, 0) as view_count FROM courses";
+        let params: string[] = [];
+
+        if (concept) {
+            query += " WHERE concept = ?";
+            params.push(concept);
+            console.log("API: Filtering by concept:", concept);
+        }
+
+        query += " ORDER BY view_count DESC, title ASC";
+
+        if (limit) {
+            query += " LIMIT ?";
+            params.push(limit);
+            console.log("API: Limiting results to:", limit);
+        }
+
+        const [courses] = await connection.execute(query, params);
         const coursesArray = courses as Array<{
             id: number;
             title: string;
@@ -24,6 +46,7 @@ export async function GET() {
             concept: string;
             rating: number;
             current_participants: number;
+            view_count: number;
         }>;
 
         console.log("API: Found courses:", coursesArray.length);
@@ -37,11 +60,12 @@ export async function GET() {
             duration: course.duration || "",
             location: course.region || "", // region 필드를 location으로 매핑
             price: course.price || "",
-            imageUrl: course.imageUrl || "/images/default-course.jpg",
+            imageUrl: course.imageUrl || "/images/foodtour.png",
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
             reviewCount: 0, // 나중에 리뷰 테이블과 조인
             participants: course.current_participants || 0,
+            viewCount: course.view_count || 0,
         }));
 
         console.log("API: Returning formatted courses:", formattedCourses.length);

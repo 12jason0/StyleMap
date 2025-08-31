@@ -64,8 +64,12 @@ const Header = () => {
         // 커스텀 이벤트 리스너 (같은 탭에서의 변경 감지)
         const handleCustomStorageChange = (event: Event) => {
             const customEvent = event as CustomEvent;
+            console.log("Header: authTokenChange event received, detail:", customEvent.detail);
+
+            // 이벤트에서 토큰을 받아오거나, localStorage에서 직접 확인
             const token = customEvent.detail?.token || localStorage.getItem("authToken");
-            console.log("Header: authTokenChange event received, token:", !!token);
+            console.log("Header: 최종 토큰 확인:", !!token, token ? token.substring(0, 20) + "..." : "없음");
+
             setIsLoggedIn(!!token);
         };
 

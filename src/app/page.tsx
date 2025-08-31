@@ -32,6 +32,94 @@ export default function Home() {
     const [showAiAdModal, setShowAiAdModal] = useState(false);
     const router = useRouter();
 
+    // 페이지 로드 시 스크롤을 맨 위로
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
+    // 홈페이지에 처음 들어갈 때 자동 로그아웃 (로그인 성공 후 일정 시간 제외)
+    useEffect(() => {
+        // 로그인 성공 후 30초 이내에는 자동 로그아웃 하지 않음
+        const loginTime = localStorage.getItem("loginTime");
+        const now = Date.now();
+
+        if (loginTime && now - parseInt(loginTime) < 30000) {
+            console.log("로그인 성공 후 30초 이내: 홈페이지 접속 시 자동 로그아웃 건너뜀");
+            return;
+        }
+
+        // URL 파라미터 확인 (추가 안전장치)
+        const urlParams = new URLSearchParams(window.location.search);
+        const loginSuccess = urlParams.get("login_success");
+        const signupSuccess = urlParams.get("signup_success");
+
+        // 로그인 성공이나 회원가입 성공이 아닌 경우에만 자동 로그아웃
+        if (!loginSuccess && !signupSuccess) {
+            // 로컬 스토리지에서 토큰 제거
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("user");
+
+            // 로그아웃 이벤트 발생
+            window.dispatchEvent(new CustomEvent("authTokenChange"));
+
+            console.log("홈페이지 접속: 자동 로그아웃 완료");
+        } else {
+            console.log("로그인/회원가입 성공으로 인한 접속: 자동 로그아웃 건너뜀");
+        }
+    }, []);
+
+    // 페이지를 나갈 때 자동 로그아웃 (로그인 성공 후 일정 시간 제외)
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            // 로그인 성공 후 30초 이내에는 자동 로그아웃 하지 않음
+            const loginTime = localStorage.getItem("loginTime");
+            const now = Date.now();
+
+            if (loginTime && now - parseInt(loginTime) < 30000) {
+                console.log("로그인 성공 후 30초 이내: 자동 로그아웃 건너뜀");
+                return;
+            }
+
+            // 로컬 스토리지에서 토큰 제거
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("user");
+
+            // 로그아웃 이벤트 발생
+            window.dispatchEvent(new CustomEvent("authTokenChange"));
+
+            console.log("홈페이지 이탈: 자동 로그아웃 완료");
+        };
+
+        // 페이지 언로드 시 이벤트 리스너 추가
+        window.addEventListener("beforeunload", handleBeforeUnload);
+
+        // 페이지 가시성 변경 시에도 로그아웃 (탭 전환 등)
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // 로그인 성공 후 30초 이내에는 자동 로그아웃 하지 않음
+                const loginTime = localStorage.getItem("loginTime");
+                const now = Date.now();
+
+                if (loginTime && now - parseInt(loginTime) < 30000) {
+                    console.log("로그인 성공 후 30초 이내: 페이지 숨김 시 자동 로그아웃 건너뜀");
+                    return;
+                }
+
+                localStorage.removeItem("authToken");
+                localStorage.removeItem("user");
+                window.dispatchEvent(new CustomEvent("authTokenChange"));
+                console.log("페이지 숨김: 자동 로그아웃 완료");
+            }
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, []);
+
     // 코스 데이터 가져오기
     useEffect(() => {
         const fetchCourses = async () => {
@@ -96,6 +184,23 @@ export default function Home() {
         if (loginSuccess === "true") {
             setShowLoginModal(true);
 
+            // 로그인 성공 시에만 토큰 유지 (자동 로그아웃 방지)
+            const token = localStorage.getItem("authToken");
+            if (token) {
+                const authEvent = new CustomEvent("authTokenChange", {
+                    detail: { token },
+                });
+                window.dispatchEvent(authEvent);
+                console.log("홈페이지: 로그인 성공 모달 표시 후 헤더 업데이트", {
+                    token: token.substring(0, 20) + "...",
+                    eventDetail: authEvent.detail,
+                });
+            } else {
+                // 토큰이 없으면 강제로 헤더 상태 업데이트
+                console.log("로그인 성공했지만 토큰이 없음 - 헤더 상태 강제 업데이트");
+                window.dispatchEvent(new CustomEvent("authTokenChange"));
+            }
+
             // URL에서 파라미터 제거
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
@@ -105,26 +210,24 @@ export default function Home() {
             setShowLoginModal(true);
             setIsSignup(true);
 
+            // 회원가입 성공 시에도 로그인 시간 저장 (자동 로그아웃 방지용)
+            localStorage.setItem("loginTime", Date.now().toString());
+
             // URL에서 파라미터 제거
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
         }
     }, []);
 
-    // 로그인 상태 초기화 및 AI 광고 모달 자동 표시 처리
+    // AI 광고 모달 자동 표시 처리 (로그인 성공 시에만)
     useEffect(() => {
-        // 로그인 상태 초기화 (페이지 로드 시 무조건 로그아웃 상태로)
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("user");
-
-        // Header 업데이트를 위한 이벤트 발생
-        window.dispatchEvent(new CustomEvent("authTokenChange"));
-
         // 로그인 상태 변경 감지
-        const handleAuthChange = () => {
-            const token = localStorage.getItem("authToken");
+        const handleAuthChange = (event: Event) => {
+            const customEvent = event as CustomEvent;
+            const token = customEvent.detail?.token || localStorage.getItem("authToken");
+
             if (token) {
-                // 로그인 성공 시 AI 모달 표시
+                // 로그인 성공 시에만 AI 모달 표시
                 const hideUntil = localStorage.getItem("hideAiAdUntil");
                 const now = new Date().getTime();
 
@@ -155,7 +258,7 @@ export default function Home() {
 
             {/* 환영 메시지 */}
             {showWelcome && (
-                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in">
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
                     <div className="flex items-center space-x-2">
                         <span className="text-xl">🎉</span>
                         <span className="font-semibold">카카오 로그인에 성공했습니다!</span>
@@ -215,7 +318,7 @@ export default function Home() {
                                     }
                                 }
                             }}
-                            className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors hover:cursor-pointer"
                         >
                             확인
                         </button>
@@ -225,12 +328,12 @@ export default function Home() {
 
             {/* 광고 모달 */}
             {showAdModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hover:cursor-pointer">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ">
                     <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
                         {/* X 버튼 */}
                         <button
                             onClick={() => setShowAdModal(false)}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
@@ -251,7 +354,7 @@ export default function Home() {
                         </div>
                         <button
                             onClick={() => setShowAdModal(false)}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors hover:cursor-pointer"
                         >
                             확인
                         </button>
@@ -271,7 +374,7 @@ export default function Home() {
                                 const hideUntil = new Date().getTime() + 60 * 60 * 1000; // 1시간
                                 localStorage.setItem("hideAiAdUntil", hideUntil.toString());
                             }}
-                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
@@ -297,7 +400,7 @@ export default function Home() {
                                     setShowAiAdModal(false);
                                     router.push("/personalized-home");
                                 }}
-                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors hover:cursor-pointer"
                             >
                                 AI 코스 시작하기
                             </button>
@@ -309,7 +412,7 @@ export default function Home() {
                                     const hideUntil = new Date().getTime() + 60 * 60 * 1000; // 1시간
                                     localStorage.setItem("hideAiAdUntil", hideUntil.toString());
                                 }}
-                                className="text-gray-500 text-sm hover:text-gray-700 transition-colors"
+                                className="text-gray-500 text-sm hover:text-gray-700 transition-colors hover:cursor-pointer"
                             >
                                 1시간 동안 보지 않기
                             </button>
@@ -349,7 +452,7 @@ export default function Home() {
                                         </div>
                                     </div>
 
-                                    <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">{course.title}</h1>
+                                    <h1 className="text-2xl md:text-4xl font-bold text-white mb-4">{course.title}</h1>
 
                                     <p className="text-xl text-white/90 mb-6">{course.description}</p>
 
@@ -526,6 +629,27 @@ export default function Home() {
 
 // 컨셉 섹션
 function ConceptSection() {
+    const [conceptCounts, setConceptCounts] = useState<Record<string, number>>({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchConceptCounts = async () => {
+            try {
+                const response = await fetch("/api/courses/concept-counts");
+                if (response.ok) {
+                    const data = await response.json();
+                    setConceptCounts(data);
+                }
+            } catch (error) {
+                console.error("Error fetching concept counts:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchConceptCounts();
+    }, []);
+
     const concepts = [
         { name: "핫플투어", icon: "🔥", gradient: "from-orange-400 to-red-500" },
         { name: "로컬맛집", icon: "🍜", gradient: "from-yellow-400 to-orange-500" },
@@ -534,6 +658,22 @@ function ConceptSection() {
         { name: "액티비티", icon: "🎯", gradient: "from-blue-400 to-indigo-500" },
         { name: "가성비", icon: "💎", gradient: "from-gray-600 to-gray-800" },
     ];
+
+    if (loading) {
+        return (
+            <section className="py-16 bg-white">
+                <div className="max-w-7xl mx-auto px-4">
+                    <div className="text-center mb-12">
+                        <h2 className="text-4xl font-bold mb-4 text-black">이런 컨셉은 어때요?</h2>
+                        <p className="text-gray-600 text-lg">취향에 맞는 코스를 찾아보세요</p>
+                    </div>
+                    <div className="flex justify-center">
+                        <div className="text-xl">로딩 중...</div>
+                    </div>
+                </div>
+            </section>
+        );
+    }
 
     return (
         <section className="py-16 bg-white">
@@ -544,23 +684,42 @@ function ConceptSection() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    {concepts.map((concept) => (
-                        <Link
-                            key={concept.name}
-                            href={`/courses?concept=${concept.name}`}
-                            className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-                        >
-                            <div
-                                className={`absolute inset-0 bg-gradient-to-br ${concept.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`}
-                            />
-                            <div className="relative text-center">
-                                <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">
-                                    {concept.icon}
-                                </div>
-                                <h3 className="font-bold text-gray-800">{concept.name}</h3>
+                    {concepts.map((concept) => {
+                        const hasCourses = conceptCounts[concept.name] > 0;
+
+                        return (
+                            <div key={concept.name} className="relative">
+                                {hasCourses ? (
+                                    <Link
+                                        href={`/courses?concept=${concept.name}`}
+                                        className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block"
+                                    >
+                                        <div
+                                            className={`absolute inset-0 bg-gradient-to-br ${concept.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`}
+                                        />
+                                        <div className="relative text-center">
+                                            <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">
+                                                {concept.icon}
+                                            </div>
+                                            <h3 className="font-bold text-gray-800">{concept.name}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                {conceptCounts[concept.name]}개 코스
+                                            </p>
+                                        </div>
+                                    </Link>
+                                ) : (
+                                    <div className="group relative p-6 bg-gray-100 rounded-2xl shadow-md transition-all duration-300 cursor-not-allowed">
+                                        <div className="absolute inset-0 bg-gray-200 opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity" />
+                                        <div className="relative text-center">
+                                            <div className="text-4xl mb-3 opacity-50">{concept.icon}</div>
+                                            <h3 className="font-bold text-gray-500">{concept.name}</h3>
+                                            <p className="text-sm text-gray-400 mt-1">준비중</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </Link>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </section>

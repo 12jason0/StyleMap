@@ -15,6 +15,11 @@ const Login = () => {
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
 
+    // 페이지 로드 시 스크롤을 맨 위로
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     // URL 파라미터에서 메시지 확인
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -56,6 +61,8 @@ const Login = () => {
                 // 토큰을 localStorage에 저장
                 localStorage.setItem("authToken", data.token);
                 localStorage.setItem("user", JSON.stringify(data.user));
+                // 로그인 시간 저장 (자동 로그아웃 방지용)
+                localStorage.setItem("loginTime", Date.now().toString());
 
                 console.log("로그인 성공: 토큰 저장됨", {
                     token: data.token ? data.token.substring(0, 20) + "..." : "없음",
@@ -63,8 +70,14 @@ const Login = () => {
                 });
 
                 // 헤더 상태 업데이트를 위한 이벤트 발생
-                window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
-                console.log("authTokenChange 이벤트 발생됨", { token: data.token ? "있음" : "없음" });
+                const authEvent = new CustomEvent("authTokenChange", {
+                    detail: { token: data.token },
+                });
+                window.dispatchEvent(authEvent);
+                console.log("authTokenChange 이벤트 발생됨", {
+                    token: data.token ? "있음" : "없음",
+                    eventDetail: authEvent.detail,
+                });
 
                 // 홈페이지로 이동 (로그인 성공 모달 표시를 위해 파라미터 추가)
                 router.push("/?login_success=true");
@@ -157,6 +170,8 @@ const Login = () => {
                         console.log("카카오 로그인 최종 성공!", data);
                         localStorage.setItem("authToken", data.token);
                         localStorage.setItem("user", JSON.stringify(data.user));
+                        // 로그인 시간 저장 (자동 로그아웃 방지용)
+                        localStorage.setItem("loginTime", Date.now().toString());
                         window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
                         router.push("/?login_success=true");
                     } catch (err: unknown) {

@@ -15,6 +15,7 @@ interface Course {
     concept: string;
     rating: number;
     reviewCount: number;
+    viewCount: number;
     creator?: {
         id: string;
         name: string;
@@ -27,6 +28,11 @@ export default function CoursesPage() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // 페이지 로드 시 스크롤을 맨 위로
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
 
     useEffect(() => {
         const fetchCourses = async () => {
@@ -142,10 +148,23 @@ export default function CoursesPage() {
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {courses.map((course) => (
-                        <Link
+                        <div
                             key={course.id}
-                            href={`/courses/${course.id}`}
                             className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer block"
+                            onClick={async () => {
+                                try {
+                                    // 조회수 증가
+                                    await fetch(`/api/courses/${course.id}/view`, {
+                                        method: "POST",
+                                    });
+                                    // 코스 상세 페이지로 이동
+                                    window.location.href = `/courses/${course.id}`;
+                                } catch (error) {
+                                    console.error("Error incrementing view count:", error);
+                                    // 에러가 발생해도 페이지 이동은 진행
+                                    window.location.href = `/courses/${course.id}`;
+                                }
+                            }}
                         >
                             {/* 이미지 */}
                             <div className="relative h-48 rounded-t-2xl overflow-hidden">
@@ -164,6 +183,12 @@ export default function CoursesPage() {
                                         <span className="ml-1">{course.rating}</span>
                                         <span className="ml-1">({course.reviewCount})</span>
                                     </div>
+                                </div>
+
+                                {/* 조회수 표시 */}
+                                <div className="flex items-center text-sm text-gray-500 mb-3">
+                                    <span className="mr-2">👁️</span>
+                                    <span>{course.viewCount.toLocaleString()}회 조회</span>
                                 </div>
 
                                 <p className="text-gray-600 mb-4">{course.description}</p>
@@ -197,17 +222,21 @@ export default function CoursesPage() {
                                     </button>
                                 </div>
                             </div>
-                        </Link>
+                        </div>
                     ))}
                 </div>
 
                 {courses.length === 0 && (
                     <div className="text-center py-16">
-                        <div className="text-6xl mb-4">😔</div>
+                        <div className="text-6xl mb-4">🚧</div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {concept ? `${concept} 관련 코스가 없습니다` : "코스를 찾을 수 없습니다"}
+                            {concept ? `${concept} 코스 준비중입니다` : "코스를 찾을 수 없습니다"}
                         </h3>
-                        <p className="text-gray-600 mb-6">다른 컨셉의 코스를 찾아보시거나 나중에 다시 확인해보세요.</p>
+                        <p className="text-gray-600 mb-6">
+                            {concept
+                                ? `${concept} 관련 코스를 준비하고 있습니다. 곧 만나보실 수 있어요!`
+                                : "다른 컨셉의 코스를 찾아보시거나 나중에 다시 확인해보세요."}
+                        </p>
                         <Link
                             href="/"
                             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"

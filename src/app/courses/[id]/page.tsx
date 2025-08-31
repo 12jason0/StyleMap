@@ -310,6 +310,14 @@ export default function CourseDetailPage() {
         []
     );
 
+    // 지도에서 보기 핸들러
+    const createMapViewHandler = useCallback(
+        (name: string, lat: number, lng: number) => () => {
+            router.push(`/map?lat=${lat}&lng=${lng}&name=${encodeURIComponent(name)}`);
+        },
+        [router]
+    );
+
     // 전체 지도 보기 (간소화)
     const handleShowFullMap = useCallback(() => {
         // KakaoMap 컴포넌트에서 자동으로 처리됨
@@ -772,6 +780,7 @@ export default function CourseDetailPage() {
                                                     userLocation={null}
                                                     selectedPlace={selectedPlace}
                                                     onPlaceClick={handlePlaceClick}
+                                                    draggable={false}
                                                     className="w-full h-80 rounded-2xl"
                                                     style={{ minHeight: "320px" }}
                                                 />
@@ -849,18 +858,11 @@ export default function CourseDetailPage() {
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     <button
-                                                                        onClick={() =>
-                                                                            setSelectedPlace({
-                                                                                id: coursePlace.place.id,
-                                                                                name: coursePlace.place.name,
-                                                                                latitude: coursePlace.place.latitude,
-                                                                                longitude: coursePlace.place.longitude,
-                                                                                address: coursePlace.place.address,
-                                                                                imageUrl: coursePlace.place.image_url,
-                                                                                description:
-                                                                                    coursePlace.place.description,
-                                                                            })
-                                                                        }
+                                                                        onClick={createMapViewHandler(
+                                                                            coursePlace.place.name,
+                                                                            coursePlace.place.latitude,
+                                                                            coursePlace.place.longitude
+                                                                        )}
                                                                         className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
                                                                     >
                                                                         지도에서 보기

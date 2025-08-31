@@ -25,6 +25,7 @@ export default function KakaoMap({
     onPlaceClick,
     className = "",
     style = {},
+    draggable = true,
 }: KakaoMapProps) {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
@@ -59,6 +60,7 @@ export default function KakaoMap({
             const mapOptions = {
                 center: centerPosition,
                 level: zoomLevel,
+                draggable: draggable,
             };
 
             // 맵 인스턴스 생성

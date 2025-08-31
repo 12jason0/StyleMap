@@ -20,4 +20,5 @@ export interface KakaoMapProps {
     onPlaceClick: (place: Place) => void;
     className?: string;
     style?: React.CSSProperties;
+    draggable?: boolean;
 }
