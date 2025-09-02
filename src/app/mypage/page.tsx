@@ -69,6 +69,14 @@ const MyPage = () => {
         fetchUserPreferences();
         fetchBookings();
         fetchFavorites();
+        // URL 쿼리에서 tab 파라미터를 읽어 기본 탭 설정
+        try {
+            const url = new URL(window.location.href);
+            const tab = url.searchParams.get("tab");
+            if (tab === "favorites" || tab === "profile" || tab === "preferences" || tab === "bookings") {
+                setActiveTab(tab);
+            }
+        } catch {}
     }, []);
 
     const fetchUserInfo = async () => {

@@ -475,6 +475,8 @@ export default function CourseDetailPage() {
                 if (response.ok) {
                     setIsSaved(false);
                     showToast("찜 목록에서 제거되었습니다.", "success");
+                    // 전역 이벤트로 헤더 동기화
+                    window.dispatchEvent(new CustomEvent("favoritesChanged"));
                 } else {
                     showToast("찜 삭제에 실패했습니다.", "error");
                 }
@@ -491,6 +493,8 @@ export default function CourseDetailPage() {
                 if (response.ok) {
                     setIsSaved(true);
                     showToast("찜 목록에 추가되었습니다.", "success");
+                    // 전역 이벤트로 헤더 동기화
+                    window.dispatchEvent(new CustomEvent("favoritesChanged"));
                 } else {
                     const errorData = await response.json();
                     if (errorData.error === "Already favorited") {
@@ -678,14 +682,8 @@ export default function CourseDetailPage() {
                 {/* Hero Section */}
                 <section className="relative h-96 overflow-hidden">
                     <div className="absolute inset-0">
-                        <Image
-                            src={courseData.imageUrl}
-                            alt={courseData.title}
-                            fill
-                            className="object-cover"
-                            priority
-                            sizes="100vw"
-                        />
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={courseData.imageUrl} alt={courseData.title} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
 
@@ -813,15 +811,14 @@ export default function CourseDetailPage() {
                                                             {/* 장소 이미지 */}
                                                             <div className="w-full sm:w-20 h-48 sm:h-20 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                                                                 {coursePlace.place.image_url ? (
-                                                                    <Image
+                                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                                    <img
                                                                         src={coursePlace.place.image_url}
                                                                         alt={coursePlace.place.name}
                                                                         width={80}
                                                                         height={80}
                                                                         className="w-full h-full object-cover"
                                                                         loading="lazy"
-                                                                        placeholder="blur"
-                                                                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
                                                                         onError={(e) => {
                                                                             const target = e.target as HTMLImageElement;
                                                                             target.style.display = "none";
@@ -831,7 +828,7 @@ export default function CourseDetailPage() {
                                                                         }}
                                                                     />
                                                                 ) : null}
-                                                                <span className="text-2xl">📍</span>
+                                                                <span className="text-2xl hidden">📍</span>
                                                             </div>
 
                                                             {/* 장소 정보 */}
@@ -839,8 +836,43 @@ export default function CourseDetailPage() {
                                                                 <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-2">
                                                                     {coursePlace.place.name}
                                                                 </h3>
-                                                                <div className="text-blue-600 text-sm font-medium mb-3">
-                                                                    {coursePlace.place.category}
+                                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                                    {(() => {
+                                                                        const raw = coursePlace.place.category || "";
+                                                                        const cats = raw
+                                                                            .split(/[\s]*[\,\|\/·]+[\s]*/)
+                                                                            .map((s) => s.trim())
+                                                                            .filter(Boolean);
+                                                                        const getStyle = (c: string) => {
+                                                                            if (/(카페|coffee)/i.test(c))
+                                                                                return "bg-pink-100 text-pink-700";
+                                                                            if (
+                                                                                /(음식|맛집|식당|먹자골목|중국요리|해물|해산물|생선|수산|횟집)/i.test(
+                                                                                    c
+                                                                                )
+                                                                            )
+                                                                                return "bg-orange-100 text-orange-700";
+                                                                            if (/(관광|명소|박물관|전시|문화)/i.test(c))
+                                                                                return "bg-blue-100 text-blue-700";
+                                                                            if (/(공원|자연|산책|하천|강)/i.test(c))
+                                                                                return "bg-green-100 text-green-700";
+                                                                            if (/(쇼핑|몰|마켓)/i.test(c))
+                                                                                return "bg-purple-100 text-purple-700";
+                                                                            return "bg-gray-100 text-gray-700";
+                                                                        };
+                                                                        const items =
+                                                                            cats.length > 0 ? cats : [raw || "기타"];
+                                                                        return items.map((c, i) => (
+                                                                            <span
+                                                                                key={`${c}-${i}`}
+                                                                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStyle(
+                                                                                    c
+                                                                                )}`}
+                                                                            >
+                                                                                {c}
+                                                                            </span>
+                                                                        ));
+                                                                    })()}
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-2">
                                                                     <span>⭐ {coursePlace.place.avg_cost_range}</span>

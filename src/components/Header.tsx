@@ -1,14 +1,18 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+// 상단 import 하단의 컴포넌트 시작부에 추가
 
 const Header = () => {
+    const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [hasFavorites, setHasFavorites] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+    const aiMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         // JWT 토큰 유효성 검증 함수
@@ -16,6 +20,7 @@ const Header = () => {
             const token = localStorage.getItem("authToken");
             if (!token) {
                 setIsLoggedIn(false);
+                setHasFavorites(false);
                 return;
             }
 
@@ -28,22 +33,29 @@ const Header = () => {
 
                 if (response.ok) {
                     setIsLoggedIn(true);
+                    // 로그인 유효 시 찜 상태 동기화
+                    fetchFavoritesSummary();
                 } else {
                     localStorage.removeItem("authToken");
                     localStorage.removeItem("user");
                     setIsLoggedIn(false);
+                    setHasFavorites(false);
                 }
             } catch (error) {
                 console.error("토큰 검증 오류:", error);
                 localStorage.removeItem("authToken");
                 localStorage.removeItem("user");
                 setIsLoggedIn(false);
+                setHasFavorites(false);
             }
         };
 
         // 초기 로그인 상태 확인 - 즉시 localStorage에서 확인
         const token = localStorage.getItem("authToken");
         setIsLoggedIn(!!token);
+        if (token) {
+            fetchFavoritesSummary();
+        }
 
         // 백그라운드에서 토큰 유효성 검증
         if (token) {
@@ -71,14 +83,64 @@ const Header = () => {
             console.log("Header: 최종 토큰 확인:", !!token, token ? token.substring(0, 20) + "..." : "없음");
 
             setIsLoggedIn(!!token);
+            if (token) {
+                fetchFavoritesSummary();
+            } else {
+                setHasFavorites(false);
+            }
+        };
+
+        // 찜 변경 전역 이벤트 리스너
+        const handleFavoritesChanged = () => {
+            fetchFavoritesSummary();
         };
 
         window.addEventListener("storage", handleStorageChange);
         window.addEventListener("authTokenChange", handleCustomStorageChange);
+        window.addEventListener("favoritesChanged", handleFavoritesChanged);
 
         return () => {
             window.removeEventListener("storage", handleStorageChange);
             window.removeEventListener("authTokenChange", handleCustomStorageChange);
+            window.removeEventListener("favoritesChanged", handleFavoritesChanged);
+        };
+    }, []);
+
+    // 사용자의 찜 유무만 빠르게 요약 조회
+    const fetchFavoritesSummary = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                setHasFavorites(false);
+                return;
+            }
+            const res = await fetch("/api/users/favorites", {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+            });
+            if (res.ok) {
+                const favorites = await res.json();
+                setHasFavorites(Array.isArray(favorites) && favorites.length > 0);
+            } else {
+                setHasFavorites(false);
+            }
+        } catch (e) {
+            console.error("Failed to fetch favorites summary", e);
+            setHasFavorites(false);
+        }
+    };
+
+    // AI 추천 드롭다운 외부 클릭 시 닫기
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (aiMenuRef.current && !aiMenuRef.current.contains(event.target as Node)) {
+                setIsAiMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
         };
     }, []);
 
@@ -141,16 +203,36 @@ const Header = () => {
                         >
                             코스
                         </Link>
-                        <Link
-                            href="/personalized-home"
-                            className={`text-sm font-medium transition-colors ${
-                                pathname === "/personalized-home"
-                                    ? "text-blue-600"
-                                    : "text-gray-700 hover:text-blue-600"
-                            }`}
-                        >
-                            🎯 AI 추천
-                        </Link>
+                        <div className="relative" ref={aiMenuRef}>
+                            <button
+                                onClick={() => setIsAiMenuOpen((v) => !v)}
+                                className={`hover:cursor-pointer text-sm font-medium transition-colors ${
+                                    pathname === "/personalized-home" || pathname === "/nearby"
+                                        ? "text-blue-600"
+                                        : "text-gray-700 hover:text-blue-600"
+                                }`}
+                            >
+                                🎯 AI 추천
+                            </button>
+                            {isAiMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 hover:cursor-pointer">
+                                    <Link
+                                        href="/personalized-home"
+                                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                                        onClick={() => setIsAiMenuOpen(false)}
+                                    >
+                                        맞춤형 추천
+                                    </Link>
+                                    <Link
+                                        href="/nearby"
+                                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 "
+                                        onClick={() => setIsAiMenuOpen(false)}
+                                    >
+                                        실시간 주변 추천
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
 
                         <Link
                             href="/map"
@@ -159,6 +241,14 @@ const Header = () => {
                             }`}
                         >
                             지도
+                        </Link>
+                        <Link
+                            href="/tag-courses"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/tag-courses" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+                            }`}
+                        >
+                            태그 코스
                         </Link>
                         <Link
                             href="/popup"
@@ -205,20 +295,56 @@ const Header = () => {
                         )}
                     </div>
 
-                    {/* 모바일 메뉴 버튼 */}
-                    <button
-                        onClick={toggleMenu}
-                        className="md:hidden p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors cursor-pointer"
-                    >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 6h16M4 12h16M4 18h16"
-                            />
-                        </svg>
-                    </button>
+                    {/* 모바일: 찜 버튼 + 햄버거 버튼 */}
+                    <div className="md:hidden flex items-center gap-2">
+                        {/* 찜 버튼 (햄버거 왼쪽) */}
+                        <button
+                            onClick={() => {
+                                const token = localStorage.getItem("authToken");
+                                if (token) {
+                                    router.push("/mypage?tab=favorites");
+                                } else {
+                                    router.push("/login");
+                                }
+                            }}
+                            className={`p-2 rounded-md transition-colors cursor-pointer ${
+                                hasFavorites
+                                    ? "text-pink-600 hover:text-pink-700 hover:bg-pink-50"
+                                    : "text-gray-400 hover:text-pink-600 hover:bg-pink-50"
+                            }`}
+                            aria-label="찜 목록"
+                            title="찜 목록"
+                        >
+                            <svg
+                                className="w-6 h-6"
+                                viewBox="0 0 24 24"
+                                fill={hasFavorites ? "currentColor" : "none"}
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M12 21s-6.716-4.223-9.193-7.246C1.087 11.85 1 9.49 2.343 7.9 3.685 6.31 5.89 6.02 7.5 7.2 8.55 7.98 9.19 9.2 12 11.5c2.81-2.3 3.45-3.52 4.5-4.3 1.61-1.18 3.815-.89 5.157.7 1.343 1.59 1.256 3.95-.464 5.854C18.716 16.777 12 21 12 21z"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                />
+                            </svg>
+                        </button>
+
+                        {/* 햄버거 버튼 */}
+                        <button
+                            onClick={toggleMenu}
+                            className="p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                            aria-label="메뉴"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 6h16M4 12h16M4 18h16"
+                                />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -257,7 +383,18 @@ const Header = () => {
                             }`}
                             onClick={closeMenu}
                         >
-                            🎯 AI 추천
+                            🎯 AI 추천 - 맞춤형
+                        </Link>
+                        <Link
+                            href="/nearby"
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                pathname === "/nearby"
+                                    ? "text-blue-600 bg-blue-50"
+                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            }`}
+                            onClick={closeMenu}
+                        >
+                            🎯 AI 추천 - 주변
                         </Link>
                         <Link
                             href="/map"
@@ -269,6 +406,17 @@ const Header = () => {
                             onClick={closeMenu}
                         >
                             지도
+                        </Link>
+                        <Link
+                            href="/tag-courses"
+                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                pathname === "/tag-courses"
+                                    ? "text-blue-600 bg-blue-50"
+                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            }`}
+                            onClick={closeMenu}
+                        >
+                            태그 코스
                         </Link>
                         <Link
                             href="/popup"

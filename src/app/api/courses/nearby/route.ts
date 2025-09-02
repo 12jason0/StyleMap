@@ -5,7 +5,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const lat = parseFloat(searchParams.get("lat") || "");
     const lng = parseFloat(searchParams.get("lng") || "");
-    const radius = 2000; // 2km 반경
+    // radius(m) 또는 km 파라미터 허용. 기본 2km
+    const radiusParam = searchParams.get("radius");
+    const kmParam = searchParams.get("km");
+    let radius = 2000;
+    if (kmParam && !isNaN(parseFloat(kmParam))) {
+        radius = Math.round(parseFloat(kmParam) * 1000);
+    } else if (radiusParam && !isNaN(parseFloat(radiusParam))) {
+        radius = Math.round(parseFloat(radiusParam));
+    }
+    // 안전 범위 100m ~ 10km
+    radius = Math.min(10000, Math.max(100, radius));
 
     if (isNaN(lat) || isNaN(lng)) {
         return NextResponse.json({ success: false, error: "위치 정보가 필요합니다." }, { status: 400 });

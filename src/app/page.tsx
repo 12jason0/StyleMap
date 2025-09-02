@@ -657,9 +657,13 @@ function ConceptSection() {
         { name: "인생샷", icon: "📸", gradient: "from-purple-400 to-pink-500" },
         { name: "체험", icon: "🎯", gradient: "from-blue-400 to-indigo-500" },
         { name: "힐링", icon: "🌿", gradient: "from-green-400 to-emerald-500" },
-        { name: "문화", icon: "🏛️", gradient: "from-yellow-400 to-orange-500" },
+        { name: "공연·전시", icon: "🏛️", gradient: "from-yellow-400 to-orange-500" },
         { name: "야경", icon: "🌃", gradient: "from-purple-500 to-pink-500" },
         { name: "힙스터", icon: "🎨", gradient: "from-pink-400 to-red-500" },
+        // 추가 컨셉
+        { name: "테마파크", icon: "🎢", gradient: "from-indigo-500 to-sky-500" },
+        { name: "핫플레이스", icon: "🔥", gradient: "from-rose-500 to-pink-500" },
+        { name: "이색데이트", icon: "🧪", gradient: "from-teal-400 to-cyan-500" },
     ];
 
     if (loading) {

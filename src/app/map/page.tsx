@@ -44,6 +44,11 @@ const LoadingSpinner = ({ text = "로딩 중..." }: { text?: string }) => (
 export default function MapPage() {
     const searchParams = useSearchParams();
     const searchQuery = searchParams?.get("search");
+    const hasQueryTarget = useMemo(() => {
+        const lat = searchParams?.get("lat");
+        const lng = searchParams?.get("lng");
+        return !!(lat && lng);
+    }, [searchParams]);
 
     // 페이지 로드 시 스크롤을 맨 위로
     useEffect(() => {
@@ -164,19 +169,33 @@ export default function MapPage() {
         const kakao = window.kakao;
         const markers: any[] = [];
 
+        // 기존 마커 즉시 제거 (보수적 정리)
+        if (markersRef.current.length > 0) {
+            try {
+                markersRef.current.forEach((m) => m.marker && m.marker.setMap(null));
+            } catch (e) {
+                // noop
+            }
+            markersRef.current = [];
+        }
+
         const bounds = new kakao.maps.LatLngBounds();
 
-        // 현재 위치 마커 생성 (파란색 원형 마커)
-        if (userLocation) {
+        // 현재 위치 마커 생성 (선택된 핀이 없을 때만 표시)
+        if (userLocation && !selectedPlace) {
             const currentPosition = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
 
-            // 현재 위치 커스텀 마커 생성
+            // 현재 위치 커스텀 마커 생성 (모든 마커 크기 통일)
+            const markerWidth = 44;
+            const markerHeight = 44;
+
             const currentLocationMarker = new kakao.maps.Marker({
                 position: currentPosition,
                 title: "현재 위치",
                 // 커스텀 마커 이미지 설정
-                image: new kakao.maps.MarkerImage("/location-pin.svg", new kakao.maps.Size(32, 32), {
-                    offset: new kakao.maps.Point(16, 16),
+                image: new kakao.maps.MarkerImage("/images/maker.png", new kakao.maps.Size(markerWidth, markerHeight), {
+                    // 아이콘의 바닥 중앙이 좌표에 오도록 설정
+                    offset: new kakao.maps.Point(Math.floor(markerWidth / 2), markerHeight),
                 }),
             });
             currentLocationMarker.setMap(map);
@@ -191,48 +210,153 @@ export default function MapPage() {
             bounds.extend(currentPosition);
         }
 
-        // 장소 마커 생성
-        places.forEach((place) => {
+        // 장소 마커 생성 (선택된 핀이 있으면 해당 핀만 표시)
+        const placesToRender = selectedPlace ? [selectedPlace] : places;
+        placesToRender.forEach((place) => {
             const isSelected = selectedPlace?.id === place.id;
             const position = new kakao.maps.LatLng(place.latitude, place.longitude);
 
-            // 장소별 다른 색상의 마커 생성
-            let markerColor = "#FF6B6B"; // 기본 빨간색
+            // 카테고리별 마커 이미지 결정
+            let markerImage: any;
+            // 사이즈 정책: 기본(기타) 34x34, 카페/음식점 48x48
+            const defaultSize = new kakao.maps.Size(34, 34);
+            const defaultOffset = new kakao.maps.Point(17, 34);
+            const largeSize = new kakao.maps.Size(48, 48);
+            const largeOffset = new kakao.maps.Point(24, 48);
 
-            // 카테고리에 따른 색상 구분
-            if (place.category.includes("음식점")) {
-                markerColor = "#FF6B6B"; // 빨간색
-            } else if (place.category.includes("카페")) {
-                markerColor = "#4ECDC4"; // 청록색
-            } else if (place.category.includes("관광")) {
-                markerColor = "#45B7D1"; // 파란색
+            // 카테고리/이름 기반 판별 유틸
+            const lowerName = (place.name || "").toLowerCase();
+            const lowerCategory = (place.category || "").toLowerCase();
+            const restaurantKeywords = [
+                "식당",
+                "맛집",
+                "음식",
+                "한식",
+                "중식",
+                "중국요리",
+                "일식",
+                "스시",
+                "라멘",
+                "라면",
+                "카레",
+                "분식",
+                "국수",
+                "찌개",
+                "백반",
+                "먹자골목",
+                "치킨",
+                "피자",
+                "버거",
+                "햄버거",
+                "스테이크",
+                "파스타",
+                "샐러드",
+                "삼겹",
+                "고기",
+                "바베큐",
+                "bbq",
+                "돼지",
+                "소고기",
+                "족발",
+                "보쌈",
+                "막창",
+                "곱창",
+                "김밥",
+                "돈까스",
+                "돈카츠",
+                "카츠",
+                "우동",
+                "회",
+                "초밥",
+                "탕",
+                "전골",
+                "해물",
+                "해산물",
+                "생선",
+                "수산",
+                "횟집",
+            ];
+            const cafeKeywords = [
+                "카페",
+                "커피",
+                "coffee",
+                "스타벅스",
+                "starbucks",
+                "이디야",
+                "ediya",
+                "투썸",
+                "twosome",
+                "할리스",
+                "hollys",
+                "커피빈",
+                "coffeebean",
+                "폴바셋",
+                "paul bassett",
+                "빽다방",
+                "mega coffee",
+                "메가커피",
+                "컴포즈",
+                "compose",
+                "블루보틀",
+                "blue bottle",
+                "탐앤탐스",
+                "tom n toms",
+                "바나프레소",
+                "banapresso",
+                "설빙",
+                "sulbing",
+                "블루샥",
+                "blueshark",
+            ];
+            const isCafe = cafeKeywords.some((k) => lowerName.includes(k) || lowerCategory.includes(k));
+            const isRestaurant =
+                lowerCategory.includes("음식") ||
+                lowerCategory.includes("맛집") ||
+                lowerCategory.includes("식당") ||
+                restaurantKeywords.some((k) => lowerName.includes(k) || lowerCategory.includes(k));
+
+            if (isCafe) {
+                markerImage = new kakao.maps.MarkerImage("/images/cafeMaker.png", largeSize, {
+                    offset: largeOffset,
+                });
+            } else if (isRestaurant) {
+                markerImage = new kakao.maps.MarkerImage("/images/maker1.png", largeSize, {
+                    offset: largeOffset,
+                });
             } else {
-                markerColor = "#96CEB4"; // 초록색
-            }
-
-            // 커스텀 마커 생성
-            const marker = new kakao.maps.Marker({
-                position,
-                title: place.name,
-                // 커스텀 마커 이미지 설정
-                image: new kakao.maps.MarkerImage(
+                // 기본 SVG 마커 (기존 스타일 유지)
+                const markerColor = "#45B7D1";
+                markerImage = new kakao.maps.MarkerImage(
                     "data:image/svg+xml;base64," +
                         btoa(`
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${markerColor}"/>
                             <circle cx="12" cy="9" r="2.5" fill="white"/>
                         </svg>
                     `),
-                    new kakao.maps.Size(28, 28),
-                    { offset: new kakao.maps.Point(14, 28) }
-                ),
+                    defaultSize,
+                    { offset: defaultOffset }
+                );
+            }
+
+            // 마커 생성
+            const marker = new kakao.maps.Marker({
+                position,
+                title: place.name,
+                image: markerImage,
             });
             marker.setMap(map);
 
             // 마커 클릭 이벤트 (지도 위 정보창 없이 왼쪽 패널에만 표시)
             kakao.maps.event.addListener(marker, "click", () => {
                 console.log("핀 클릭됨:", place.name);
-                // 왼쪽 패널에만 선택된 장소 표시 (지도 위 정보창 없음)
+                // 선택된 장소로 상태 설정
+                // 즉시 기존 마커 제거하여 단일 마커만 보이도록 처리
+                try {
+                    markersRef.current.forEach((m) => m.marker && m.marker.setMap(null));
+                } catch (e) {}
+                markersRef.current = [];
+
                 setSelectedPlace(place);
                 console.log("selectedPlace 설정됨:", place.name);
 
@@ -241,8 +365,8 @@ export default function MapPage() {
                     // 검색된 장소의 포커스 제거
                     setSearchedPlace(null);
 
-                    // 클릭한 핀 주변의 관광명소, 음식점, 카페 검색
-                    searchNearbyPlaces({ lat: place.latitude, lng: place.longitude }, "음식점,카페,관광명소");
+                    // 다른 핀 제거 효과를 위해 places를 선택된 것만 남기고 업데이트
+                    setPlaces([place]);
                 }
             });
 
@@ -262,15 +386,54 @@ export default function MapPage() {
             (position) => {
                 const location = { lat: position.coords.latitude, lng: position.coords.longitude };
                 setUserLocation(location);
-                searchNearbyPlaces(location);
+                if (!hasQueryTarget) {
+                    searchNearbyPlaces(location);
+                }
             },
             () => {
                 const defaultLocation = { lat: 37.5665, lng: 126.978 };
                 setUserLocation(defaultLocation);
-                searchNearbyPlaces(defaultLocation);
+                if (!hasQueryTarget) {
+                    searchNearbyPlaces(defaultLocation);
+                }
             }
         );
-    }, [searchNearbyPlaces]);
+    }, [searchNearbyPlaces, hasQueryTarget]);
+
+    // URL로 전달된 특정 장소(lat,lng,name)가 있으면 해당 위치를 핀으로 표시
+    useEffect(() => {
+        const latStr = searchParams?.get("lat");
+        const lngStr = searchParams?.get("lng");
+        if (!latStr || !lngStr) return;
+
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+
+        const name = decodeURIComponent(searchParams?.get("name") || "선택한 장소");
+
+        const placeFromQuery: Place = {
+            id: -1,
+            name,
+            address: "",
+            latitude: lat,
+            longitude: lng,
+            category: "선택한 장소",
+            distance: "0m",
+            description: name,
+            rating: 5.0,
+            imageUrl: "/images/placeholder-location.jpg",
+        };
+
+        setSearchedPlace(placeFromQuery);
+        setPlaces([placeFromQuery]);
+        setSelectedPlace(placeFromQuery);
+        setActiveTab("places");
+
+        if (mapInstance.current && window.kakao) {
+            mapInstance.current.panTo(new window.kakao.maps.LatLng(lat, lng));
+        }
+    }, [searchParams]);
 
     // --- 핸들러 함수들 ---
     const handleSearch = useCallback(async () => {
@@ -364,6 +527,12 @@ export default function MapPage() {
         }
     }, []);
 
+    // 카카오맵에서 장소명으로 검색 열기
+    const handleOpenKakaoSearch = useCallback((place: Place) => {
+        const url = `https://map.kakao.com/link/search/${encodeURIComponent(place.name)}`;
+        window.open(url, "_blank");
+    }, []);
+
     // --- 렌더링 ---
     return (
         <>
@@ -411,7 +580,7 @@ export default function MapPage() {
                                     </div>
                                     <button
                                         onClick={handleSearch}
-                                        className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors"
+                                        className="hover:cursor-pointer absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600 transition-colors"
                                     >
                                         검색
                                     </button>
@@ -422,7 +591,7 @@ export default function MapPage() {
                             <div className="flex border-b border-gray-200 bg-white">
                                 <button
                                     onClick={() => setActiveTab("places")}
-                                    className={`flex-1 py-4 px-6 text-sm font-medium transition-colors ${
+                                    className={`flex-1 py-4 px-6 text-sm font-medium transition-colors hover:cursor-pointer ${
                                         activeTab === "places"
                                             ? "border-b-2 border-blue-500 text-blue-600 bg-blue-50"
                                             : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
@@ -432,7 +601,7 @@ export default function MapPage() {
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("courses")}
-                                    className={`flex-1 py-4 px-6 text-sm font-medium transition-colors ${
+                                    className={`flex-1 py-4 px-6 text-sm font-medium transition-colors hover:cursor-pointer ${
                                         activeTab === "courses"
                                             ? "border-b-2 border-blue-500 text-blue-600 bg-blue-50"
                                             : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
@@ -469,7 +638,7 @@ export default function MapPage() {
                                                     </h3>
                                                     <button
                                                         onClick={() => setSelectedPlace(null)}
-                                                        className="text-gray-400 hover:text-gray-600 text-xl"
+                                                        className="hover:cursor-pointer text-gray-400 hover:text-gray-600 text-xl"
                                                     >
                                                         ×
                                                     </button>
@@ -495,11 +664,14 @@ export default function MapPage() {
                                                         </div>
                                                     )}
                                                     <div className="flex gap-2 pt-2">
-                                                        <button className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                                        <button
+                                                            onClick={() => handleOpenKakaoSearch(selectedPlace)}
+                                                            className="hover:cursor-pointer flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                                                        >
                                                             길찾기
                                                         </button>
                                                         {selectedPlace.phone && (
-                                                            <button className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                                                            <button className="hover:cursor-pointer flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
                                                                 전화
                                                             </button>
                                                         )}
@@ -530,7 +702,10 @@ export default function MapPage() {
                                                                 {place.address}
                                                             </p>
                                                             <div className="flex gap-2 mt-3">
-                                                                <button className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors">
+                                                                <button
+                                                                    onClick={() => handleOpenKakaoSearch(place)}
+                                                                    className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                                                                >
                                                                     길찾기
                                                                 </button>
                                                                 {place.phone && (

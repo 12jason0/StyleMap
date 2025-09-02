@@ -52,6 +52,22 @@ const AboutPage = () => {
         window.scrollTo(0, 0);
     }, []);
 
+    // 코스 개수는 항상 DB에서 직접 최신값을 가져오도록 별도로 요청
+    useEffect(() => {
+        const fetchCourseCount = async () => {
+            try {
+                const res = await fetch("/api/courses/count", { cache: "no-store" });
+                if (res.ok) {
+                    const data: { count: number } = await res.json();
+                    setCourseCount(data.count || 0);
+                }
+            } catch (e) {
+                console.error("Failed to fetch live course count", e);
+            }
+        };
+        fetchCourseCount();
+    }, []);
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -185,11 +201,11 @@ const AboutPage = () => {
                     <div className="max-w-4xl mx-auto text-center">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                             <div className="text-center">
-                                <div className="text-4xl font-bold text-blue-600 mb-2">123+</div>
+                                <div className="text-4xl font-bold text-blue-600 mb-2">213+</div>
                                 <div className="text-gray-600">지금까지 여행을 떠난 사용자</div>
                             </div>
                             <div className="text-center">
-                                <div className="text-4xl font-bold text-purple-600 mb-2">4.8★</div>
+                                <div className="text-4xl font-bold text-purple-600 mb-2">4.7★</div>
                                 <div className="text-gray-600">평균 사용자 만족도</div>
                             </div>
                             <div className="text-center">
