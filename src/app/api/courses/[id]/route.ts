@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id: courseId } = params;
+        const { id: courseId } = await params;
         console.log("API: Fetching course with ID:", courseId);
         console.log("API: Course ID type:", typeof courseId);
         console.log("API: Request URL:", request.url);
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 duration: course.duration || "",
                 location: course.region || "", // region 필드를 location으로 매핑
                 price: course.price || "",
-                imageUrl: course.imageUrl || "/images/default-course.jpg",
+                imageUrl: course.imageUrl || "",
                 concept: course.concept || "",
                 rating: Number(course.rating) || 0,
                 reviewCount: 0,
@@ -73,8 +73,70 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 updatedAt: course.updated_at,
             };
 
-            console.log("API: Returning formatted course:", formattedCourse);
-            return NextResponse.json(formattedCourse);
+            // 추가 데이터(하이라이트/혜택/공지/장소)를 같은 커넥션에서 간소화해 한 번에 반환
+            const [highlightsRows] = await connection.execute(
+                `SELECT id, icon, title, description FROM highlights WHERE course_id = ? ORDER BY id ASC`,
+                [courseId]
+            );
+
+            const [benefitRows] = await connection.execute(
+                `SELECT id, benefit_text, category, display_order FROM benefits WHERE course_id = ? ORDER BY display_order ASC, id ASC`,
+                [courseId]
+            );
+
+            const [noticeRows] = await connection.execute(
+                `SELECT id, notice_text, type, display_order FROM notices WHERE course_id = ? ORDER BY display_order ASC, id ASC`,
+                [courseId]
+            );
+
+            const [placeRows] = await connection.execute(
+                `SELECT 
+                    cp.id, cp.course_id, cp.place_id, cp.order_index, cp.estimated_duration, cp.recommended_time, cp.notes,
+                    p.id as p_id, p.name, p.address, p.description as p_description, p.category, p.avg_cost_range, p.opening_hours,
+                    p.phone, p.parking_available, p.reservation_required, p.latitude, p.longitude, p.imageUrl
+                 FROM course_places cp
+                 JOIN places p ON p.id = cp.place_id
+                 WHERE cp.course_id = ?
+                 ORDER BY cp.order_index ASC`,
+                [courseId]
+            );
+
+            const coursePlaces = (placeRows as any[]).map((r) => ({
+                id: r.id,
+                course_id: r.course_id,
+                place_id: r.place_id,
+                order_index: r.order_index,
+                estimated_duration: r.estimated_duration,
+                recommended_time: r.recommended_time,
+                notes: r.notes,
+                place: {
+                    id: r.p_id,
+                    name: r.name,
+                    address: r.address,
+                    description: r.p_description,
+                    category: r.category,
+                    avg_cost_range: r.avg_cost_range,
+                    opening_hours: r.opening_hours,
+                    phone: r.phone,
+                    parking_available: !!r.parking_available,
+                    reservation_required: !!r.reservation_required,
+                    latitude: Number(r.latitude),
+                    longitude: Number(r.longitude),
+                    image_url: r.imageUrl ?? r.image_url ?? "",
+                    imageUrl: r.imageUrl ?? r.image_url ?? "",
+                },
+            }));
+
+            const payload = {
+                ...formattedCourse,
+                highlights: highlightsRows as any[],
+                benefits: benefitRows as any[],
+                notices: noticeRows as any[],
+                coursePlaces,
+            };
+
+            console.log("API: Returning aggregated course payload");
+            return NextResponse.json(payload);
         } finally {
             connection.release();
         }

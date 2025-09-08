@@ -21,4 +21,6 @@ export interface KakaoMapProps {
     className?: string;
     style?: React.CSSProperties;
     draggable?: boolean;
+    drawPath?: boolean; // 경로 표시 여부 (기본 false)
+    routeMode?: "simple" | "walking" | "foot"; // 경로 모드 (기본 simple)
 }

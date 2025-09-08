@@ -225,6 +225,7 @@ export default function CourseDetailPage() {
     // 지도 관련 상태 (간소화)
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+    const [showPlaceModal, setShowPlaceModal] = useState(false);
 
     // 성능 최적화를 위한 메모이제이션
     const sortedCoursePlaces = useMemo(() => {
@@ -239,6 +240,10 @@ export default function CourseDetailPage() {
     const firstPlace = useMemo(() => {
         return sortedCoursePlaces[0];
     }, [sortedCoursePlaces]);
+
+    const heroImageUrl = useMemo(() => {
+        return courseData?.imageUrl || firstPlace?.place?.image_url || "";
+    }, [courseData?.imageUrl, firstPlace?.place?.image_url]);
 
     // 토스트 표시 함수
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
@@ -299,6 +304,7 @@ export default function CourseDetailPage() {
     const handlePlaceClick = useCallback((place: MapPlace) => {
         console.log("장소 클릭:", place.name);
         setSelectedPlace(place);
+        setShowPlaceModal(true);
     }, []);
 
     // 길찾기 핸들러
@@ -385,67 +391,17 @@ export default function CourseDetailPage() {
             console.log("Cache check for key:", cacheKey);
             console.log("Cached data exists:", !!cachedData);
 
-            // if (cachedData) {
-            //     const parsedData = JSON.parse(cachedData);
-            //     setCourseData(parsedData);
-            //     setLoading(false);
-            //     document.title = `${parsedData.title} - 코스 상세`;
-            //     return;
-            // }
-
-            // API 호출
-            const [courseResponse, highlightsResponse, benefitsResponse, noticesResponse, placesResponse] =
-                await Promise.allSettled([
-                    fetch(`/api/courses/${courseId}`),
-                    fetch(`/api/courses/${courseId}/highlights`),
-                    fetch(`/api/courses/${courseId}/benefits`),
-                    fetch(`/api/courses/${courseId}/notices`),
-                    fetch(`/api/courses/${courseId}/places`),
-                ]);
-
-            if (courseResponse.status === "rejected" || !courseResponse.value.ok) {
+            // API 하나로 통합된 응답 사용
+            const courseRes = await fetch(`/api/courses/${courseId}`, { cache: "no-store" });
+            if (!courseRes.ok) {
                 throw new Error("코스 정보를 가져오는데 실패했습니다.");
             }
-
-            const course = await courseResponse.value.json();
-            console.log("API Response - Course:", course);
-
-            const highlights =
-                highlightsResponse.status === "fulfilled" && highlightsResponse.value.ok
-                    ? await highlightsResponse.value.json()
-                    : [];
-
-            const benefits =
-                benefitsResponse.status === "fulfilled" && benefitsResponse.value.ok
-                    ? await benefitsResponse.value.json()
-                    : [];
-
-            const notices =
-                noticesResponse.status === "fulfilled" && noticesResponse.value.ok
-                    ? await noticesResponse.value.json()
-                    : [];
-
-            const coursePlaces =
-                placesResponse.status === "fulfilled" && placesResponse.value.ok
-                    ? await placesResponse.value.json()
-                    : [];
-            console.log("API Response - Course Places:", coursePlaces);
-
-            const finalCourseData = {
-                ...course,
-                highlights,
-                benefits,
-                notices,
-                coursePlaces,
-            };
-
-            // 캐시 저장 (임시로 비활성화)
-            // sessionStorage.setItem(cacheKey, JSON.stringify(finalCourseData));
-            // setTimeout(() => sessionStorage.removeItem(cacheKey), 5 * 60 * 1000);
+            const finalCourseData = await courseRes.json();
+            console.log("API Response - Aggregated Course:", finalCourseData);
 
             console.log("Final Course Data:", finalCourseData);
             setCourseData(finalCourseData);
-            document.title = `${course.title} - 코스 상세`;
+            document.title = `${finalCourseData.title} - 코스 상세`;
         } catch (err) {
             console.error("Error fetching course data:", err);
             setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -678,12 +634,16 @@ export default function CourseDetailPage() {
             {/* 토스트 알림 */}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            <div className="min-h-screen bg-gray-50 text-black">
+            <div className="min-h-screen bg-gray-50 text-black pt-10">
                 {/* Hero Section */}
                 <section className="relative h-96 overflow-hidden">
                     <div className="absolute inset-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={courseData.imageUrl} alt={courseData.title} className="w-full h-full object-cover" />
+                        {heroImageUrl ? (
+                            <img src={heroImageUrl} alt={courseData.title} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full bg-gray-200" />
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
 
@@ -778,7 +738,8 @@ export default function CourseDetailPage() {
                                                     userLocation={null}
                                                     selectedPlace={selectedPlace}
                                                     onPlaceClick={handlePlaceClick}
-                                                    draggable={false}
+                                                    drawPath={true}
+                                                    routeMode="foot"
                                                     className="w-full h-80 rounded-2xl"
                                                     style={{ minHeight: "320px" }}
                                                 />
@@ -875,8 +836,8 @@ export default function CourseDetailPage() {
                                                                     })()}
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-2">
-                                                                    <span>⭐ {coursePlace.place.avg_cost_range}</span>
-                                                                    <span>💰 {coursePlace.estimated_duration}분</span>
+                                                                    <span>💰 {coursePlace.place.avg_cost_range}</span>
+                                                                    <span>⏱{coursePlace.estimated_duration}분</span>
                                                                     <span>📍 {coursePlace.recommended_time}</span>
                                                                 </div>
                                                                 <div className="text-sm text-gray-500 mb-4">
@@ -957,58 +918,13 @@ export default function CourseDetailPage() {
                                     </div>
                                 </div>
 
-                                {/* 혜택 및 준비물 */}
-                                {courseData.benefits && courseData.benefits.length > 0 && (
-                                    <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-                                        <h2 className="text-2xl md:text-3xl font-bold mb-6">혜택 및 준비물</h2>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {courseData.benefits
-                                                .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-                                                .map((benefit) => (
-                                                    <div
-                                                        key={benefit.id}
-                                                        className="flex items-center gap-3 p-4 bg-green-50 rounded-lg hover:shadow-md transition-shadow"
-                                                    >
-                                                        <span className="text-green-500 text-xl flex-shrink-0">✓</span>
-                                                        <span className="text-gray-700 font-medium">
-                                                            {benefit.benefit_text}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 참고사항 */}
-                                {courseData.notices && courseData.notices.length > 0 && (
-                                    <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-                                        <h2 className="text-2xl md:text-3xl font-bold mb-6">참고사항</h2>
-                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                                            <div className="flex items-start gap-3 mb-4">
-                                                <span className="text-yellow-600 text-2xl flex-shrink-0">⚠️</span>
-                                                <h3 className="font-semibold text-yellow-800">
-                                                    코스 이용 전 반드시 확인해 주세요
-                                                </h3>
-                                            </div>
-                                            <ul className="space-y-3">
-                                                {courseData.notices.map((notice) => (
-                                                    <li key={notice.id} className="flex items-start gap-2">
-                                                        <span className="text-yellow-600 mt-1 flex-shrink-0">•</span>
-                                                        <span className="text-gray-700">{notice.notice_text}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-
                                 {/* 리뷰 섹션 */}
                                 <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                                     <div className="flex justify-between items-center mb-6">
                                         <h2 className="text-2xl md:text-3xl font-bold">이용후기</h2>
                                         <button
                                             onClick={() => setShowReviewModal(true)}
-                                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                                            className="hover:cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
                                         >
                                             후기 작성하기
                                         </button>
@@ -1079,8 +995,8 @@ export default function CourseDetailPage() {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-600">평점</span>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="text-yellow-400">★</span>
+                                                <div className=" flex items-center gap-1">
+                                                    <span className=" text-yellow-400">★</span>
                                                     <span className="font-semibold">{courseData.rating}</span>
                                                 </div>
                                             </div>
@@ -1095,7 +1011,7 @@ export default function CourseDetailPage() {
                                             <div className="border-t pt-4 space-y-3">
                                                 <button
                                                     onClick={handleSaveCourse}
-                                                    className={`w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 ${
+                                                    className={`hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 ${
                                                         isSaved
                                                             ? "bg-red-500 text-white hover:bg-red-600"
                                                             : "bg-pink-500 text-white hover:bg-pink-600"
@@ -1107,7 +1023,7 @@ export default function CourseDetailPage() {
                                                 <button
                                                     onClick={handleShareCourse}
                                                     disabled={isShareLoading}
-                                                    className="w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="hover:cursor-pointer w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     aria-label="코스 공유하기"
                                                 >
                                                     {isShareLoading ? (
@@ -1215,7 +1131,7 @@ export default function CourseDetailPage() {
                             <h3 className="text-xl font-bold text-gray-800">공유하기</h3>
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="text-gray-400 hover:text-gray-600 text-2xl"
+                                className="hover:cursor-pointer text-gray-400 hover:text-gray-600 text-2xl"
                             >
                                 ×
                             </button>
@@ -1224,7 +1140,7 @@ export default function CourseDetailPage() {
                         <div className="space-y-4">
                             <button
                                 onClick={handleKakaoShare}
-                                className="w-full flex items-center gap-4 p-4 bg-yellow-400 text-white rounded-xl hover:bg-yellow-500 transition-colors"
+                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-yellow-400 text-white rounded-xl hover:bg-yellow-500 transition-colors"
                             >
                                 <div className="text-2xl">💬</div>
                                 <div className="text-left">
@@ -1235,7 +1151,7 @@ export default function CourseDetailPage() {
 
                             <button
                                 onClick={handleDMShare}
-                                className="w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-colors"
+                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-colors"
                             >
                                 <div className="text-2xl">📱</div>
                                 <div className="text-left">
@@ -1246,7 +1162,7 @@ export default function CourseDetailPage() {
 
                             <button
                                 onClick={handleCopyLink}
-                                className="w-full flex items-center gap-4 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
                             >
                                 <div className="text-2xl">📋</div>
                                 <div className="text-left">
@@ -1258,7 +1174,7 @@ export default function CourseDetailPage() {
 
                         <button
                             onClick={() => setShowShareModal(false)}
-                            className="w-full mt-6 py-3 text-gray-500 hover:text-gray-700 transition-colors"
+                            className="hover:cursor-pointer w-full mt-6 py-3 text-gray-500 hover:text-gray-700 transition-colors"
                         >
                             취소
                         </button>
@@ -1283,7 +1199,7 @@ export default function CourseDetailPage() {
                         "@type": "TouristTrip",
                         name: courseData.title,
                         description: courseData.description,
-                        image: courseData.imageUrl,
+                        image: heroImageUrl,
                         touristType: courseData.courseType,
                         duration: courseData.duration,
                         offers: {
@@ -1311,6 +1227,56 @@ export default function CourseDetailPage() {
                     }),
                 }}
             />
+            {/* 장소 상세 모달 */}
+            {showPlaceModal && selectedPlace && (
+                <div
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    onClick={() => setShowPlaceModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-2xl max-w-lg w-full overflow-hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="p-4 border-b">
+                            <h3 className="text-xl font-bold text-gray-900">{selectedPlace.name}</h3>
+                            <p className="text-sm text-gray-500 mt-1">{selectedPlace.address}</p>
+                        </div>
+                        {selectedPlace.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={selectedPlace.imageUrl}
+                                alt={selectedPlace.name}
+                                className="w-full object-contain bg-gray-100"
+                                style={{ maxHeight: "70vh" }}
+                            />
+                        ) : (
+                            <div className="w-full h-56 bg-gray-100" />
+                        )}
+                        <div className="p-4">
+                            <p className="text-gray-700 text-sm whitespace-pre-line">
+                                {selectedPlace.description || "설명이 없습니다."}
+                            </p>
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                    className="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
+                                    onClick={() => setShowPlaceModal(false)}
+                                >
+                                    닫기
+                                </button>
+                                <button
+                                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                                    onClick={() => {
+                                        setShowPlaceModal(false);
+                                        // 상세페이지 내이므로 닫기만 하면 원래 화면 유지
+                                    }}
+                                >
+                                    확인
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

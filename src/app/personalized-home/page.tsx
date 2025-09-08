@@ -107,68 +107,15 @@ const questionFlow: Question[] = [
         type: "ai",
         text: "예산은 어느 정도 생각하고 계신가요? 💰",
         options: [
-            { text: "3만원 이하 (가성비)", value: "budget", next: "complete" },
-            { text: "3-5만원 (적당히)", value: "medium", next: "complete" },
-            { text: "5만원 이상 (프리미엄)", value: "premium", next: "complete" },
+            { text: "3-5만원", value: "30-50", next: "complete" },
+            { text: "5-8만원", value: "50-80", next: "complete" },
+            { text: "8만원 이상", value: "80+", next: "complete" },
             { text: "상관없어요", value: "any", next: "complete" },
         ],
     },
 ];
 
-const allCourses: Course[] = [
-    {
-        id: "1",
-        title: "성수 감성 카페투어",
-        description: "성수동의 숨겨진 감성 카페들을 탐방하는 투어",
-        duration: "3시간",
-        location: "성수동",
-        price: "30,000원",
-        tags: ["relaxed", "cafe", "seongsu", "budget"],
-        rating: 4.8,
-        reviewCount: 23,
-        participants: 15,
-        highlights: ["루프탑 카페", "디저트 맛집", "인스타 감성"],
-    },
-    {
-        id: "2",
-        title: "홍대 팝업스토어 투어",
-        description: "홍대의 트렌디한 팝업스토어들을 둘러보는 투어",
-        duration: "4시간",
-        location: "홍대",
-        price: "40,000원",
-        tags: ["energetic", "shopping", "hongdae", "medium"],
-        rating: 4.6,
-        reviewCount: 18,
-        participants: 12,
-        highlights: ["한정판 굿즈", "브랜드 콜라보", "포토존"],
-    },
-    {
-        id: "3",
-        title: "강남 맛집 탐방",
-        description: "강남의 숨겨진 맛집들을 찾아가는 투어",
-        duration: "4시간",
-        location: "강남",
-        price: "45,000원",
-        tags: ["foodie", "gangnam", "medium"],
-        rating: 4.9,
-        reviewCount: 45,
-        participants: 20,
-        highlights: ["미슐랭 맛집", "로컬 맛집", "디저트 카페"],
-    },
-    {
-        id: "4",
-        title: "북촌 한옥마을 문화투어",
-        description: "전통과 현대가 어우러진 북촌의 문화 체험",
-        duration: "3시간",
-        location: "북촌",
-        price: "35,000원",
-        tags: ["adventurous", "culture", "jongno", "medium"],
-        rating: 4.7,
-        reviewCount: 32,
-        participants: 18,
-        highlights: ["한옥 체험", "전통 공예", "한복 대여"],
-    },
-];
+// 더미 allCourses 제거: DB에서 조건에 맞는 코스 추천을 가져옵니다.
 
 const AIRecommender = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -324,27 +271,67 @@ const AIRecommender = () => {
         }, 1000);
     };
 
-    const generateRecommendations = (answers: Record<string, string>) => {
-        const scoredCourses = allCourses.map((course) => {
-            let score = 0;
-            Object.values(answers).forEach((answer) => {
-                if (course.tags.includes(answer)) {
-                    score += 1;
-                }
-            });
-            return { ...course, score };
+    const generateRecommendations = async (answers: Record<string, string>) => {
+        const buildList = (rows: any[]): Course[] =>
+            (rows || []).map((c: any) => ({
+                id: String(c.id),
+                title: c.title,
+                description: c.description || "",
+                duration: c.duration || "",
+                location: c.location || c.region || "",
+                price: c.price || "",
+                tags: [],
+                rating: Number(c.rating) || 0,
+                reviewCount: c.reviewCount || 0,
+                participants: c.participants || 0,
+                highlights: c.highlights || [],
+            }));
+
+        const tryFetch = async (query: Record<string, string>) => {
+            try {
+                const params = new URLSearchParams(query).toString();
+                const res = await fetch(`/api/courses/recommend?${params}`, { cache: "no-store" });
+                const data = await res.json();
+                if (!res.ok || data.success === false) return [] as Course[];
+                return buildList(data.courses || []);
+            } catch {
+                return [] as Course[];
+            }
+        };
+
+        // 1) 원본 조건
+        let list = await tryFetch({
+            mood: answers.mood || "",
+            activity: answers.activity || "",
+            location: answers.location || "",
+            budget: answers.budget || "",
         });
 
-        const topCourses = scoredCourses.sort((a, b) => b.score - a.score).slice(0, 3);
+        // 2) 없으면 예산 제거
+        if (list.length === 0) {
+            list = await tryFetch({
+                mood: answers.mood || "",
+                activity: answers.activity || "",
+                location: answers.location || "",
+            });
+        }
 
-        setRecommendedCourses(topCourses);
+        // 지역은 항상 유지 (활동/예산만 완화). 지역까지 제거하는 폴백은 사용하지 않음.
+
+        // 항상 3개만 표시
+        list = list.slice(0, 3);
+
+        setRecommendedCourses(list);
         setShowRecommendations(true);
 
         setMessages((prev) => [
             ...prev,
             {
                 type: "ai",
-                text: `완벽해요! 🎉 ${userName}님의 취향을 정확히 분석했어요. 98.7% 만족도를 자랑하는 맞춤 코스를 추천드려요!`,
+                text:
+                    list.length > 0
+                        ? `완벽해요! 🎉 ${userName}님의 취향을 분석해 현재 데이터로 최적의 코스를 찾았어요!`
+                        : `현재 조건에 딱 맞는 코스가 없어 인기 코스를 대신 추천드려요.`,
             },
         ]);
     };
@@ -557,7 +544,10 @@ const AIRecommender = () => {
     );
 
     const CourseCard = ({ course }: { course: Course }) => (
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden transform hover:-translate-y-2 transition-transform duration-300">
+        <a
+            href={`/courses/${course.id}`}
+            className="block bg-white rounded-2xl shadow-lg overflow-hidden transform hover:-translate-y-2 transition-transform duration-300"
+        >
             <div className="p-6">
                 <h3 className="text-xl font-bold mb-2">{course.title}</h3>
                 <p className="text-gray-600 text-sm mb-4">{course.description}</p>
@@ -593,11 +583,11 @@ const AIRecommender = () => {
             </div>
             <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
                 <span className="text-xl font-bold text-purple-600">{course.price}</span>
-                <button className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold hover:shadow-md transition-all">
+                <span className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold hover:shadow-md transition-all">
                     자세히 보기
-                </button>
+                </span>
             </div>
-        </div>
+        </a>
     );
 
     return (

@@ -250,14 +250,7 @@ const Header = () => {
                         >
                             태그 코스
                         </Link>
-                        <Link
-                            href="/popup"
-                            className={`text-sm font-medium transition-colors ${
-                                pathname === "/popup" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
-                            }`}
-                        >
-                            🎪 팝업
-                        </Link>
+                        {/* 팝업 메뉴 제거 */}
                     </nav>
 
                     {/* 사용자 메뉴 */}
@@ -418,17 +411,7 @@ const Header = () => {
                         >
                             태그 코스
                         </Link>
-                        <Link
-                            href="/popup"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/popup"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            🎪 팝업
-                        </Link>
+                        {/* 팝업 메뉴 제거 */}
 
                         <div className="pt-4 pb-3 border-t border-gray-200">
                             {isLoggedIn ? (
@@ -475,7 +458,7 @@ const Header = () => {
                 className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 shadow-lg"
                 style={{ bottom: 0 }}
             >
-                <div className="grid grid-cols-6 gap-1 p-2">
+                <div className="grid grid-cols-5 gap-1 p-2">
                     <Link
                         href="/"
                         className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
@@ -552,23 +535,7 @@ const Header = () => {
                         </svg>
                         <span className="text-xs font-medium">지도</span>
                     </Link>
-                    <Link
-                        href="/popup"
-                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                            pathname === "/popup" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
-                        }`}
-                        onClick={closeMenu}
-                    >
-                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                            />
-                        </svg>
-                        <span className="text-xs font-medium">팝업</span>
-                    </Link>
+                    {/* 팝업 탭 제거 */}
                     {isLoggedIn ? (
                         <button
                             onClick={handleLogout}

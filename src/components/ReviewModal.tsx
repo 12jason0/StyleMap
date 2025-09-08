@@ -88,7 +88,12 @@ export default function ReviewModal({ isOpen, onClose, courseId, placeId, course
                             disabled={isSubmitting}
                             className="text-gray-400 hover:text-gray-600 transition-colors"
                         >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg
+                                className="hover:cursor-pointer w-6 h-6"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                            >
                                 <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
@@ -121,7 +126,7 @@ export default function ReviewModal({ isOpen, onClose, courseId, placeId, course
                                         key={star}
                                         type="button"
                                         onClick={() => setRating(star)}
-                                        className={`text-2xl transition-colors ${
+                                        className={`hover:cursor-pointer text-2xl transition-colors ${
                                             star <= rating ? "text-yellow-400" : "text-gray-300"
                                         }`}
                                     >
@@ -145,7 +150,7 @@ export default function ReviewModal({ isOpen, onClose, courseId, placeId, course
                                 minLength={10}
                                 maxLength={500}
                                 rows={4}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                className="text-gray-700 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-none"
                                 placeholder="이 곳에 대한 솔직한 후기를 작성해주세요. (최소 10자)"
                             />
                             <div className="mt-1 text-right">
@@ -161,14 +166,14 @@ export default function ReviewModal({ isOpen, onClose, courseId, placeId, course
                                 type="button"
                                 onClick={handleClose}
                                 disabled={isSubmitting}
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                className="hover:cursor-pointer flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                             >
                                 취소
                             </button>
                             <button
                                 type="submit"
                                 disabled={isSubmitting || content.trim().length < 10}
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="hover:cursor-pointer flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSubmitting ? "작성 중..." : "후기 작성"}
                             </button>

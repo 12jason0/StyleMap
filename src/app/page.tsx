@@ -421,7 +421,7 @@ export default function Home() {
                 </div>
             )}
 
-            <main className="min-h-screen bg-white">
+            <main className="min-h-screen bg-white pt-10">
                 {/* Hero Section - 대형 슬라이드 */}
                 <section className="relative h-[500px] overflow-hidden">
                     {topCourses.map((course, index) => (
@@ -433,7 +433,15 @@ export default function Home() {
                         >
                             {/* 배경 이미지 */}
                             <div className="absolute inset-0">
-                                <img src={course.imageUrl} alt={course.title} className="w-full h-full object-cover" />
+                                {course.imageUrl ? (
+                                    <img
+                                        src={course.imageUrl}
+                                        alt={course.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-white" />
+                                )}
                                 <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                             </div>
 
@@ -454,7 +462,17 @@ export default function Home() {
 
                                     <h1 className="text-2xl md:text-4xl font-bold text-white mb-4">{course.title}</h1>
 
-                                    <p className="text-xl text-white/90 mb-6">{course.description}</p>
+                                    <p
+                                        className="text-xl text-white/90 mb-6"
+                                        style={{
+                                            display: "-webkit-box",
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: "vertical",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                        {course.description}
+                                    </p>
 
                                     <div className="flex items-center gap-4 mb-8">
                                         <div className="flex items-center gap-1">
@@ -512,22 +530,26 @@ export default function Home() {
                                     key={course.id}
                                     href={`/courses/${course.id}`}
                                     className={`
-                                            group relative bg-white rounded-2xl overflow-hidden shadow-xl 
+                                            group relative rounded-2xl overflow-hidden shadow-xl 
                                             hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2
                                             ${index === 0 ? "md:col-span-2 md:row-span-2" : ""}
                                         `}
                                     onMouseEnter={() => setHoveredCard(course.id)}
                                     onMouseLeave={() => setHoveredCard(null)}
                                 >
-                                    <div className={`relative overflow-hidden ${index === 0 ? "h-96" : "h-64"}`}>
-                                        <img
-                                            src={course.imageUrl}
-                                            alt={course.title}
-                                            className={`
+                                    <div className={`relative overflow-hidden ${index === 0 ? "h-[520px]" : "h-61"}`}>
+                                        {course.imageUrl ? (
+                                            <img
+                                                src={course.imageUrl}
+                                                alt={course.title}
+                                                className={`
                                                     w-full h-full object-cover transition-transform duration-700
                                                     ${hoveredCard === course.id ? "scale-110" : "scale-100"}
                                                 `}
-                                        />
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gray-200" />
+                                        )}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
 
                                         {/* 순위 배지 */}
@@ -551,7 +573,7 @@ export default function Home() {
                                         )}
 
                                         {/* 실시간 참여자 */}
-                                        <div className="absolute top-4 right-4">
+                                        <div className="absolute top-4 right-4 text-black">
                                             <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                                                 <span className="text-sm font-bold">{course.participants}명</span>
@@ -598,11 +620,15 @@ export default function Home() {
                                     className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all text-black"
                                 >
                                     <div className="relative h-48 overflow-hidden">
-                                        <img
-                                            src={course.imageUrl}
-                                            alt={course.title}
-                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                        />
+                                        {course.imageUrl ? (
+                                            <img
+                                                src={course.imageUrl}
+                                                alt={course.title}
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-white" />
+                                        )}
                                         <span className="absolute top-4 left-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
                                             NEW
                                         </span>
@@ -664,6 +690,7 @@ function ConceptSection() {
         { name: "테마파크", icon: "🎢", gradient: "from-indigo-500 to-sky-500" },
         { name: "핫플레이스", icon: "🔥", gradient: "from-rose-500 to-pink-500" },
         { name: "이색데이트", icon: "🧪", gradient: "from-teal-400 to-cyan-500" },
+        // { name: "빵지순례", icon: "🍞", gradient: "from-teal-400 to-cyan-500" },
     ];
 
     if (loading) {
@@ -709,6 +736,13 @@ function ConceptSection() {
                                 }}
                             >
                                 {hasCourses ? (
+                                    // <Link
+                                    //     href={
+                                    //         concept.name === "빵지순례"
+                                    //             ? "/bread-tour"
+                                    //             : `/courses?concept=${encodeURIComponent(concept.name)}`
+                                    //     }
+                                    // >
                                     <Link
                                         href={`/courses?concept=${encodeURIComponent(concept.name)}`}
                                         className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block"

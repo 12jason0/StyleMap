@@ -14,29 +14,42 @@ export async function GET(request: NextRequest) {
 
         // 데이터베이스 연결 시도
         connection = await pool.getConnection();
+        await connection.query("SET SESSION max_execution_time=15000");
         console.log("API: Database connection successful");
 
-        // 쿼리 실행 (컨셉 필터링 추가)
-        let query = "SELECT *, COALESCE(view_count, 0) as view_count FROM courses";
-        let params: string[] = [];
+        // 쿼리 실행 (컨셉 필터링 + 장소 이미지 없는 코스 제외)
+        // 일부 환경에서 view_count 컬럼이 없을 수 있으므로 COALESCE를 제거하고 매핑 단계에서 기본값 처리
+        let query = "SELECT * FROM courses";
+        const conditions: string[] = [];
+        const params: (string | number)[] = [];
 
         if (concept) {
-            query += " WHERE concept = ?";
+            conditions.push("concept = ?");
             params.push(concept);
             console.log("API: Filtering by concept:", concept);
-            console.log("API: Query with concept filter:", query);
-            console.log("API: Parameters:", params);
         }
 
-        query += " ORDER BY view_count DESC, title ASC";
+        // 장소 이미지가 없는 개수가 0개 또는 1개인 코스만 포함 (places.imageUrl 기준)
+        conditions.push(
+            "(SELECT COUNT(*) FROM course_places cp JOIN places p ON p.id = cp.place_id WHERE cp.course_id = courses.id AND (p.imageUrl IS NULL OR p.imageUrl = '')) <= 1"
+        );
+
+        if (conditions.length > 0) {
+            query += ` WHERE ${conditions.join(" AND ")}`;
+        }
+
+        query += " ORDER BY id DESC, title ASC";
 
         if (limit) {
             query += " LIMIT ?";
-            params.push(limit);
+            params.push(Number(limit));
             console.log("API: Limiting results to:", limit);
         }
 
         const [courses] = await connection.execute(query, params);
+
+        // MySQL 연결 즉시 반환 (formatted 결과만 반환 예정)
+        connection.release();
         const coursesArray = courses as Array<{
             id: number;
             title: string;
@@ -61,12 +74,12 @@ export async function GET(request: NextRequest) {
             duration: course.duration || "",
             location: course.region || "", // region 필드를 location으로 매핑
             price: course.price || "",
-            imageUrl: course.imageUrl || "/images/foodtour.png",
+            imageUrl: course.imageUrl || "",
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
             reviewCount: 0, // 나중에 리뷰 테이블과 조인
             participants: course.current_participants || 0,
-            viewCount: course.view_count || 0,
+            viewCount: (course as any).view_count || 0,
         }));
 
         console.log("API: Returning formatted courses:", formattedCourses.length);
@@ -109,15 +122,7 @@ export async function GET(request: NextRequest) {
             );
         }
     } finally {
-        // 연결 해제
-        if (connection) {
-            try {
-                connection.release();
-                console.log("API: Database connection released");
-            } catch (releaseError) {
-                console.error("API: Error releasing connection:", releaseError);
-            }
-        }
+        // GET에서는 위에서 release 처리함. 안전 차원 이중 release 방지
     }
 }
 
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
             duration: duration || "",
             location: location || "",
             price: price || "",
-            imageUrl: imageUrl || "/images/default-course.jpg",
+            imageUrl: imageUrl || "",
             concept: concept || "",
             rating: 0,
             reviewCount: 0,

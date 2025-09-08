@@ -192,7 +192,15 @@ export default function CoursesPage() {
                         >
                             {/* 이미지 */}
                             <div className="relative h-48 rounded-t-2xl overflow-hidden">
-                                <img src={course.imageUrl} alt={course.title} className="w-full h-full object-cover" />
+                                {course.imageUrl ? (
+                                    <img
+                                        src={course.imageUrl}
+                                        alt={course.title}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-white" />
+                                )}
                                 <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
                                     {course.concept}
                                 </div>

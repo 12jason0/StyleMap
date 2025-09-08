@@ -499,11 +499,15 @@ const MyPage = () => {
                                 onClick={() => router.push(`/courses/${favorite.course_id}`)}
                             >
                                 <div className="relative">
-                                    <img
-                                        src={favorite.imageUrl || "/images/default-course.jpg"}
-                                        alt={favorite.title}
-                                        className="w-full h-48 object-cover"
-                                    />
+                                    {favorite.imageUrl ? (
+                                        <img
+                                            src={favorite.imageUrl}
+                                            alt={favorite.title}
+                                            className="w-full h-48 object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-48 bg-white" />
+                                    )}
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();

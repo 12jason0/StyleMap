@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
         connection = await pool.getConnection();
 
         // 선택된 태그들(여러개 허용)과 지역 필터를 반영
-        let sql = `SELECT id, name, address, latitude, longitude, category
+        let sql = `SELECT id, name, address, latitude, longitude, category, imageUrl
                    FROM places WHERE latitude IS NOT NULL AND longitude IS NOT NULL`;
         const params: any[] = [];
         if (region) {
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         if (allPlaces.length < placesPerCourse) {
             try {
                 const params2: any[] = [];
-                let sql2 = `SELECT id, name, address, latitude, longitude, category
+                let sql2 = `SELECT id, name, address, latitude, longitude, category, imageUrl
                             FROM places WHERE latitude IS NOT NULL AND longitude IS NOT NULL`;
                 if (region) {
                     sql2 += ` AND address LIKE ?`;
@@ -79,6 +79,11 @@ export async function GET(request: NextRequest) {
                 .map(([, v]) => v);
 
         // 특수 로직: '카페'와 '한식/음식' 동시 선택 시 [한식→카페→한식→카페] 패턴으로 구성
+        const normalizeUrl = (u: any): string | undefined => {
+            if (!u) return undefined;
+            const s = String(u).trim();
+            return s.length > 0 ? s : undefined;
+        };
         const wantsCafe = tags.some((t) => /카페|coffee/i.test(t));
         const wantsKorean = tags.some((t) => /한식|음식|맛집|식당/i.test(t));
         if (wantsCafe && wantsKorean) {
@@ -141,7 +146,7 @@ export async function GET(request: NextRequest) {
                                 latitude: p.latitude,
                                 longitude: p.longitude,
                                 category: p.category as any,
-                                imageUrl: (p as any).imageUrl || (p as any).image_url || undefined,
+                                imageUrl: normalizeUrl((p as any).imageUrl),
                             })),
                         };
                     })
@@ -221,7 +226,7 @@ export async function GET(request: NextRequest) {
                         latitude: p.latitude,
                         longitude: p.longitude,
                         category: p.category as any,
-                        imageUrl: (p as any).imageUrl || (p as any).image_url || undefined,
+                        imageUrl: normalizeUrl((p as any).imageUrl),
                     })),
                 };
             })
@@ -255,7 +260,7 @@ export async function GET(request: NextRequest) {
                         latitude: p.latitude,
                         longitude: p.longitude,
                         category: p.category as any,
-                        imageUrl: (p as any).imageUrl || (p as any).image_url || undefined,
+                        imageUrl: normalizeUrl((p as any).imageUrl),
                     })),
                 },
             ];
@@ -264,7 +269,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: true, courses });
     } catch (error) {
         console.error("GET /api/courses/generate error:", error);
-        return NextResponse.json({ success: false, error: "Failed to generate courses" }, { status: 500 });
+        const message = error instanceof Error ? error.message : String(error);
+        return NextResponse.json({ success: false, error: message }, { status: 500 });
     } finally {
         if (connection) connection.release();
     }

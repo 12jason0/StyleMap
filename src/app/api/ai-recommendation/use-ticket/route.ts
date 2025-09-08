@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { generateMLRecommendations } from "@/lib/ml/deepLearningRecommender";
 
 export async function POST(request: NextRequest) {
     try {
