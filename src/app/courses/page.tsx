@@ -1,6 +1,6 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 
 interface Course {
@@ -22,7 +22,7 @@ interface Course {
     };
 }
 
-export default function CoursesPage() {
+function CoursesPageInner() {
     const searchParams = useSearchParams();
     const concept = searchParams.get("concept");
     const [courses, setCourses] = useState<Course[]>([]);
@@ -299,5 +299,15 @@ export default function CoursesPage() {
             {/* 모바일 하단 네비게이션을 위한 여백 */}
             <div className="md:hidden h-20"></div>
         </div>
+    );
+}
+
+export default function CoursesPage() {
+    return (
+        <Suspense
+            fallback={<div className="min-h-screen flex items-center justify-center text-gray-600">로딩 중...</div>}
+        >
+            <CoursesPageInner />
+        </Suspense>
     );
 }

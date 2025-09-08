@@ -24,6 +24,33 @@ interface TrainingData {
     contextFeatures: number[][]; // 날씨, 시간대, 계절 등
 }
 
+// 입력 데이터 최소 형태 정의 (타입 안전성 강화)
+interface UserInfoShape {
+    age?: number;
+    location?: string;
+    preferences?: {
+        travelStyle?: string[];
+    };
+    behavior?: {
+        viewedCourses?: unknown[];
+        likedCourses?: unknown[];
+        bookedCourses?: unknown[];
+        searchHistory?: unknown[];
+        lastActiveAt?: string | Date;
+        viewedConcepts?: string[];
+    };
+}
+
+interface ItemShape {
+    id: string;
+    concept?: string;
+    price?: string;
+    rating?: number;
+    current_participants?: number;
+    title?: string;
+    description?: string;
+}
+
 class DeepLearningRecommender {
     private model: tf.LayersModel | null = null;
     private userEncoder: tf.LayersModel | null = null;
@@ -144,14 +171,14 @@ class DeepLearningRecommender {
     }
 
     // 특성 벡터 생성
-    private createUserFeatures(user: unknown): UserFeatures {
+    private createUserFeatures(user: UserInfoShape): UserFeatures {
         const preferences = this.encodePreferences(user.preferences);
         const behaviorVector = this.createBehaviorVector(user.behavior);
         const timeFeatures = this.createTimeFeatures();
         const locationEmbedding = this.encodeLocation(user.location);
 
         return {
-            age: (user.age || 25) / 100, // 정규화
+            age: ((user.age ?? 25) as number) / 100, // 정규화
             preferences,
             behaviorVector,
             timeFeatures,
@@ -159,11 +186,11 @@ class DeepLearningRecommender {
         };
     }
 
-    private createItemFeatures(item: unknown): ItemFeatures {
+    private createItemFeatures(item: ItemShape): ItemFeatures {
         return {
             categoryEmbedding: this.encodeConcept(item.concept),
             priceNormalized: this.normalizePrice(item.price),
-            ratingNormalized: (item.rating || 0) / 5,
+            ratingNormalized: ((item.rating ?? 0) as number) / 5,
             popularityScore: this.calculatePopularityScore(item),
             contentFeatures: this.createContentEmbedding(item.title + " " + item.description),
             imageFeatures: this.createImageFeatures(),
@@ -171,7 +198,7 @@ class DeepLearningRecommender {
     }
 
     // 선호도 원-핫 인코딩
-    private encodePreferences(preferences: unknown): number[] {
+    private encodePreferences(preferences: UserInfoShape["preferences"]): number[] {
         const categories = ["힐링여행", "핫플투어", "로컬맛집", "액티비티", "문화시설", "야경명소"];
         const encoded = new Array(categories.length).fill(0);
 
@@ -186,7 +213,7 @@ class DeepLearningRecommender {
     }
 
     // 행동 패턴 벡터 생성
-    private createBehaviorVector(behavior: unknown): number[] {
+    private createBehaviorVector(behavior: UserInfoShape["behavior"]): number[] {
         return [
             (behavior?.viewedCourses?.length || 0) / 100, // 정규화
             (behavior?.likedCourses?.length || 0) / 50,
@@ -213,31 +240,31 @@ class DeepLearningRecommender {
     }
 
     // 위치 임베딩
-    private encodeLocation(location: string): number[] {
+    private encodeLocation(location: string | undefined): number[] {
         const locations = ["강남", "홍대", "명동", "이태원", "성수", "건대", "신촌", "압구정"];
         const embedding = new Array(8).fill(0);
-        const index = locations.indexOf(location);
+        const index = location ? locations.indexOf(location) : -1;
         if (index !== -1) embedding[index] = 1;
         return embedding;
     }
 
     // 컨셉 임베딩
-    private encodeConcept(concept: string): number[] {
+    private encodeConcept(concept: string | undefined): number[] {
         const concepts = ["힐링여행", "핫플투어", "로컬맛집", "액티비티", "문화시설", "야경명소"];
         const embedding = new Array(concepts.length).fill(0);
-        const index = concepts.indexOf(concept);
+        const index = concept ? concepts.indexOf(concept) : -1;
         if (index !== -1) embedding[index] = 1;
         return embedding;
     }
 
     // 가격 정규화
-    private normalizePrice(price: string): number {
-        const numericPrice = parseInt(price?.replace(/[^0-9]/g, "") || "0");
+    private normalizePrice(price: string | undefined): number {
+        const numericPrice = parseInt((price ?? "").replace(/[^0-9]/g, "") || "0");
         return Math.min(numericPrice / 200000, 1); // 최대 20만원으로 정규화
     }
 
     // 인기도 점수 계산
-    private calculatePopularityScore(item: unknown): number {
+    private calculatePopularityScore(item: ItemShape): number {
         const participants = item.current_participants || 0;
         const rating = item.rating || 0;
         return Math.min((participants * 0.1 + rating * 0.2) / 10, 1);
@@ -264,7 +291,7 @@ class DeepLearningRecommender {
     }
 
     // 참여도 점수
-    private calculateEngagementScore(behavior: unknown): number {
+    private calculateEngagementScore(behavior: UserInfoShape["behavior"]): number {
         const views = behavior?.viewedCourses?.length || 0;
         const likes = behavior?.likedCourses?.length || 0;
         const bookings = behavior?.bookedCourses?.length || 0;
@@ -272,13 +299,13 @@ class DeepLearningRecommender {
     }
 
     // 다양성 점수
-    private calculateDiversityScore(behavior: unknown): number {
+    private calculateDiversityScore(behavior: UserInfoShape["behavior"]): number {
         const viewedConcepts = new Set(behavior?.viewedConcepts || []);
         return Math.min(viewedConcepts.size / 6, 1); // 6개 컨셉 중 몇 개나 경험했는지
     }
 
     // 최근성 점수
-    private calculateRecencyScore(behavior: unknown): number {
+    private calculateRecencyScore(behavior: UserInfoShape["behavior"]): number {
         const lastActive = behavior?.lastActiveAt ? new Date(behavior.lastActiveAt) : new Date();
         const daysSinceActive = (Date.now() - lastActive.getTime()) / (1000 * 60 * 60 * 24);
         return Math.max(1 - daysSinceActive / 30, 0); // 30일 기준
@@ -302,8 +329,8 @@ class DeepLearningRecommender {
     // 추천 생성
     public async generateRecommendations(
         userId: string,
-        userInfo: unknown,
-        items: unknown[],
+        userInfo: UserInfoShape,
+        items: ItemShape[],
         limit: number = 20
     ): Promise<{ itemId: string; score: number; confidence: number }[]> {
         if (!this.model) {
@@ -527,7 +554,12 @@ export async function generateMLRecommendations(
     limit: number = 20
 ): Promise<{ itemId: string; score: number; confidence: number; reasons: string[] }[]> {
     try {
-        const mlRecommendations = await deepLearningRecommender.generateRecommendations(userId, userInfo, items, limit);
+        const mlRecommendations = await deepLearningRecommender.generateRecommendations(
+            userId,
+            userInfo as UserInfoShape,
+            items as ItemShape[],
+            limit
+        );
 
         // 추천 이유 생성 (해석가능성 향상)
         return mlRecommendations.map((rec) => ({

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
     let connection;
 
     try {
-        const courseId = params.id;
+        const { id: courseId } = await context.params;
         console.log("API: Incrementing view count for course:", courseId);
 
         connection = await pool.getConnection();

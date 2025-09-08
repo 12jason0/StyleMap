@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 
@@ -41,7 +41,7 @@ const LoadingSpinner = ({ text = "로딩 중..." }: { text?: string }) => (
 );
 
 // --- 메인 페이지 컴포넌트 ---
-export default function MapPage() {
+function MapPageInner() {
     const searchParams = useSearchParams();
     const searchQuery = searchParams?.get("search");
     const hasQueryTarget = useMemo(() => {
@@ -78,6 +78,13 @@ export default function MapPage() {
     // --- 유틸 함수들 ---
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
         setToast({ message, type });
+    }, []);
+
+    // 모바일 최초 진입 시 좌측 패널 닫기 (화면 가로폭이 좁은 경우)
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.innerWidth < 768) {
+            setLeftPanelOpen(false);
+        }
     }, []);
 
     // --- 데이터 로딩 및 검색 로직 (카카오 API 사용) ---
@@ -555,12 +562,15 @@ export default function MapPage() {
                 </div>
             )}
 
-            <div className="h-screen bg-white flex flex-col pt-18 text-black">
+            <div
+                className="min-h-[100dvh] bg-white flex flex-col pt-18 text-black"
+                style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+            >
                 <div className="flex-1 flex relative min-h-0">
                     {/* 왼쪽 패널 */}
                     <div
                         className={`bg-white border-r border-gray-200 transition-all duration-300 ease-in-out ${
-                            leftPanelOpen ? "w-96" : "w-0"
+                            leftPanelOpen ? "sm:w-96 w-full" : "w-0"
                         } overflow-hidden z-20 flex-shrink-0`}
                     >
                         <div className="w-96 h-full flex flex-col">
@@ -852,5 +862,13 @@ export default function MapPage() {
                 </>
             )}
         </>
+    );
+}
+
+export default function MapPage() {
+    return (
+        <Suspense fallback={<div className="h-screen flex items-center justify-center text-gray-600">로딩 중...</div>}>
+            <MapPageInner />
+        </Suspense>
     );
 }

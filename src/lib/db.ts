@@ -10,16 +10,17 @@ declare global {
 const pool: Pool =
     global.__mysqlPool ??
     mysql.createPool({
-        host: process.env.DB_HOST || "localhost",
-        user: process.env.DB_USER || "root",
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME || "stylemap",
+        database: process.env.DB_NAME,
+        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
         connectionLimit: 10,
         waitForConnections: true,
         queueLimit: 0,
         // 추가 옵션
-        multipleStatements: false, // 보안상 false
-        dateStrings: true, // 날짜를 문자열로 반환하여 파싱 오버헤드 감소
+        multipleStatements: false,
+        dateStrings: true,
         supportBigNumbers: true,
         bigNumberStrings: true,
         // 연결 풀 최적화
@@ -39,6 +40,9 @@ pool.getConnection()
     })
     .catch((error) => {
         logger.error("Database connection failed:", { error });
+        if (process.env.NODE_ENV === "production") {
+            process.exit(1);
+        }
     });
 
 export default pool;

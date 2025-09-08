@@ -2,9 +2,12 @@ import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 
 export function getJwtSecret(): string {
-    const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+    const secret = process.env.JWT_SECRET;
     if (!secret) {
-        throw new Error("JWT secret is not configured. Set JWT_SECRET or NEXTAUTH_SECRET.");
+        throw new Error("JWT_SECRET environment variable is required for production");
+    }
+    if (process.env.NODE_ENV === "production" && secret.length < 32) {
+        throw new Error("JWT_SECRET must be at least 32 characters in production");
     }
     return secret;
 }
@@ -33,4 +36,3 @@ export function getUserIdFromRequest(request: NextRequest): string | null {
         return null;
     }
 }
-
