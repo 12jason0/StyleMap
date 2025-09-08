@@ -11,7 +11,7 @@ const Footer = () => {
                             <span className="text-2xl font-bold text-blue-400">StyleMap</span>
                         </div>
                         <p className="text-gray-300 mb-4 max-w-md">
-                            밀키트처럼 꺼내 먹는 여행 코스, StyleMap입니다. AI가 추천하는 완벽한 여행 경험을 제공합니다.
+                            AI가 추천하는 맞춤형 여행 코스. StyleMap과 함께 완벽한 여행 경험을 제공합니다.
                         </p>
                         <div className="flex space-x-4 mb-4">
                             <a href="#" className="text-white hover:text-gray-300 transition-colors">
@@ -82,7 +82,7 @@ const Footer = () => {
                     <div className="flex flex-col md:flex-row justify-between items-center">
                         <div className="text-gray-400 text-sm">
                             <p>© 2025 StyleMap. 모든 권리 보유.</p>
-                            <p className="mt-1">사업자등록번호: | 대표: 오승용</p>
+                            <p className="mt-1">사업자등록: 준비중 • 대표: 오승용</p>
                         </div>
                         <div className="flex space-x-6 mt-4 md:mt-0">
                             <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
@@ -91,10 +91,19 @@ const Footer = () => {
                             <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
                                 이용약관
                             </Link>
+                            <Link href="/business" className="text-gray-400 hover:text-white text-sm transition-colors">
+                                사업자 정보
+                            </Link>
                             <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors">
                                 쿠키 정책
                             </Link>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-4">
+                        <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-medium">BETA</span>
+                    </div>
+                    <div className="text-center mt-4">
+                        <p className="text-gray-500 text-xs">베타 서비스 운영 중 • 사업자등록: 준비중 • 대표: 오승용</p>
                     </div>
                 </div>
             </div>

@@ -86,16 +86,19 @@ function CoursesPageInner() {
 
     const handleBooking = async (courseId: string) => {
         try {
-            // 실제로는 사용자 인증이 필요합니다
-            const userId = "temp-user-id"; // 임시 사용자 ID
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                alert("로그인이 필요합니다.");
+                return;
+            }
 
             const response = await fetch("/api/bookings", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
-                    userId,
                     courseId,
                 }),
             });

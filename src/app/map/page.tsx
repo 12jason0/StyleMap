@@ -57,6 +57,7 @@ function MapPageInner() {
 
     // --- 상태 관리 ---
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const [isKakaoReady, setIsKakaoReady] = useState(false);
     const [places, setPlaces] = useState<Place[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -85,6 +86,22 @@ function MapPageInner() {
         if (typeof window !== "undefined" && window.innerWidth < 768) {
             setLeftPanelOpen(false);
         }
+    }, []);
+
+    // Kakao SDK 로드 대기 (스크립트가 늦게 로드되어도 초기화되도록 보장)
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        let attempts = 0;
+        const timer = setInterval(() => {
+            if (window.kakao?.maps) {
+                setIsKakaoReady(true);
+                clearInterval(timer);
+            } else if (++attempts > 50) {
+                // 최대 ~10초 대기 후 중단
+                clearInterval(timer);
+            }
+        }, 200);
+        return () => clearInterval(timer);
     }, []);
 
     // --- 데이터 로딩 및 검색 로직 (카카오 API 사용) ---
@@ -135,8 +152,11 @@ function MapPageInner() {
     // --- 지도 초기화 및 마커 로직 ---
     useEffect(() => {
         // window.kakao 객체가 로드되었는지, 지도 DOM이 있는지 확인
-        if (window.kakao && mapRef.current) {
+        // isKakaoReady를 함께 의존하여 SDK가 늦게 로드되어도 초기화되도록 함
+
+        if (isKakaoReady && window.kakao && mapRef.current) {
             // kakao.maps.load()를 통해 API가 완전히 준비되도록 보장
+
             window.kakao.maps.load(() => {
                 // 지도의 중심 좌표 설정
                 const centerPosition = userLocation
@@ -166,7 +186,7 @@ function MapPageInner() {
                 });
             });
         }
-    }, [userLocation]); // userLocation이 확정되면 지도를 초기화
+    }, [userLocation, isKakaoReady]); // SDK 준비 또는 위치 확정 시 지도를 초기화
 
     // 마커 업데이트 Hook
     useEffect(() => {
@@ -563,7 +583,7 @@ function MapPageInner() {
             )}
 
             <div
-                className="min-h-[100dvh] bg-white flex flex-col pt-18 text-black"
+                className="h-[100dvh] overflow-hidden bg-white flex flex-col pt-18 text-black"
                 style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
             >
                 <div className="flex-1 flex relative min-h-0">
@@ -571,9 +591,9 @@ function MapPageInner() {
                     <div
                         className={`bg-white border-r border-gray-200 transition-all duration-300 ease-in-out ${
                             leftPanelOpen ? "sm:w-96 w-full" : "w-0"
-                        } overflow-hidden z-20 flex-shrink-0`}
+                        } overflow-hidden z-20 flex-shrink-0 h-full`}
                     >
-                        <div className="w-96 h-full flex flex-col">
+                        <div className="h-full flex flex-col w-full sm:w-96">
                             {/* 검색바 */}
                             <div className="p-4 border-b border-gray-200 bg-gray-50">
                                 <div className="relative">
@@ -792,7 +812,7 @@ function MapPageInner() {
                     </button>
 
                     {/* 지도 영역 */}
-                    <div className="flex-1 h-full relative">
+                    <div className="flex-1 h-full relative min-h-0 overflow-hidden">
                         <div ref={mapRef} className="w-full h-full" />
 
                         {/* 현재 지도 영역 검색 버튼 */}

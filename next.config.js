@@ -17,7 +17,12 @@ const nextConfig = {
         ];
     },
     images: {
-        domains: ["images.unsplash.com", "your-image-domain.com"],
+        domains: [
+            "images.unsplash.com",
+            ...(process.env.NEXT_IMAGE_EXTRA_DOMAINS
+                ? process.env.NEXT_IMAGE_EXTRA_DOMAINS.split(",").map((d) => d.trim())
+                : []),
+        ],
     },
     // experimental 옵션 제거 (빌드 경고 방지)
 };

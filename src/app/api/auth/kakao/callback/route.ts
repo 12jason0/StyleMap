@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
                             type: 'KAKAO_AUTH_ERROR', 
                             error: '${error}',
                             error_description: '${error_description}'
-                        }, '${process.env.NEXT_PUBLIC_APP_URL}');
+                        }, '${process.env.NEXT_PUBLIC_APP_URL || ""}');
                         window.close();
                     </script>
                 </body>
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
                         window.opener?.postMessage({ 
                             type: 'KAKAO_AUTH_ERROR', 
                             error: '인증 코드가 없습니다.' 
-                        }, '${process.env.NEXT_PUBLIC_APP_URL}');
+                        }, '${process.env.NEXT_PUBLIC_APP_URL || ""}');
                         window.close();
                     </script>
                 </body>
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 성공 시 부모 창에 코드 전달
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof location !== "undefined" ? location.origin : "");
     return new Response(
         `
         <html>
