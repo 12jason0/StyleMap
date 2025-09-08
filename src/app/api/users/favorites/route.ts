@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
-import jwt from "jsonwebtoken";
+import { extractBearerToken, verifyJwtAndGetUserId } from "@/lib/auth";
 
 // 찜 목록 조회
 export async function GET(request: NextRequest) {
     try {
-        const authHeader = request.headers.get("authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const token = extractBearerToken(request);
+        if (!token) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-
-        const token = authHeader.substring(7);
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure"
-        ) as { userId: string };
-        const userId = decoded.userId;
+        const userId = verifyJwtAndGetUserId(token);
 
         const connection = await pool.getConnection();
 
@@ -43,17 +37,11 @@ export async function GET(request: NextRequest) {
 // 찜 추가
 export async function POST(request: NextRequest) {
     try {
-        const authHeader = request.headers.get("authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const token = extractBearerToken(request);
+        if (!token) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-
-        const token = authHeader.substring(7);
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure"
-        ) as { userId: string };
-        const userId = decoded.userId;
+        const userId = verifyJwtAndGetUserId(token);
 
         const body = await request.json();
         const { courseId } = body;
@@ -94,17 +82,11 @@ export async function POST(request: NextRequest) {
 // 찜 삭제
 export async function DELETE(request: NextRequest) {
     try {
-        const authHeader = request.headers.get("authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const token = extractBearerToken(request);
+        if (!token) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
-
-        const token = authHeader.substring(7);
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure"
-        ) as { userId: string };
-        const userId = decoded.userId;
+        const userId = verifyJwtAndGetUserId(token);
 
         const { searchParams } = new URL(request.url);
         const courseId = searchParams.get("courseId");

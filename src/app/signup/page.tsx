@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header"; // Header 컴포넌트 경로 확인 필요
+import { saveAuthSession, dispatchAuthChange } from "@/lib/authClient";
 
 const Signup = () => {
     const router = useRouter();
@@ -79,41 +80,96 @@ const Signup = () => {
         setError("");
 
         try {
-            // 카카오 OAuth 팝업 방식으로 변경
-            const kakaoClientId = "833e9f9d0fea3b8c19f979c877cc0b23";
-            const redirectUri = `${window.location.origin}/api/auth/kakao/callback`;
+            if (provider !== "kakao") {
+                setLoading(false);
+                return;
+            }
 
-            const authUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(
-                redirectUri
-            )}&response_type=code`;
+            const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID || "";
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+            const redirectUri = `${appUrl}/api/auth/kakao/callback`;
 
-            const popup = window.open(authUrl, "kakao-login", "width=500,height=600");
+            if (!kakaoClientId) {
+                setError("환경변수 NEXT_PUBLIC_KAKAO_CLIENT_ID가 설정되지 않았습니다.");
+                setLoading(false);
+                return;
+            }
 
-            window.addEventListener("message", async (event) => {
-                if (event.origin !== window.location.origin) return;
+            const authUrl =
+                `https://kauth.kakao.com/oauth/authorize?` +
+                new URLSearchParams({
+                    client_id: kakaoClientId,
+                    redirect_uri: redirectUri,
+                    response_type: "code",
+                    scope: "profile_nickname, profile_image",
+                }).toString();
 
-                if (event.data.type === "KAKAO_AUTH_SUCCESS") {
-                    const { code } = event.data;
+            const width = 500;
+            const height = 700;
+            const left = window.screen.width / 2 - width / 2;
+            const top = window.screen.height / 2 - height / 2;
+            const popup = window.open(
+                authUrl,
+                "kakao-login",
+                `width=${width},height=${height},scrollbars=yes,resizable=yes,left=${left},top=${top}`
+            );
 
-                    const response = await fetch("/api/auth/kakao", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ code }),
-                    });
+            if (!popup) {
+                setError("팝업이 차단되었습니다. 팝업 차단을 해제해주세요.");
+                setLoading(false);
+                return;
+            }
 
-                    const data = await response.json();
+            let intervalId: NodeJS.Timeout | null = null;
+            const cleanup = () => {
+                if (intervalId) clearInterval(intervalId);
+                window.removeEventListener("message", messageHandler as any);
+                if (popup && !popup.closed) popup.close();
+                setLoading(false);
+            };
 
-                    if (data.success) {
-                        // 로그인 성공 시 홈페이지로 이동
-                        router.push("/?signup_success=true");
-                    } else {
-                        setError(data.error || "카카오 회원가입에 실패했습니다.");
+            const messageHandler = async (event: MessageEvent) => {
+                if (event.origin !== appUrl) return;
+
+                const { type, code, error, error_description } = event.data as any;
+                if (type === "KAKAO_AUTH_CODE" && code) {
+                    try {
+                        const response = await fetch("/api/auth/kakao", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ code }),
+                        });
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.details || data.error || "서버 처리 중 오류가 발생했습니다.");
+                        }
+
+                        if (data.token) {
+                            saveAuthSession(data.token, data.user);
+                            dispatchAuthChange(data.token);
+                            router.push("/?login_success=true");
+                        } else {
+                            router.push("/?signup_success=true");
+                        }
+                    } catch (err: unknown) {
+                        setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+                    } finally {
+                        cleanup();
                     }
-
-                    popup?.close();
-                    setLoading(false);
+                } else if (type === "KAKAO_AUTH_ERROR") {
+                    setError(`카카오 인증 실패: ${error_description || error}`);
+                    cleanup();
                 }
-            });
+            };
+
+            intervalId = setInterval(() => {
+                if (popup.closed) {
+                    cleanup();
+                }
+            }, 1000);
+
+            window.addEventListener("message", messageHandler as any);
         } catch (error) {
             console.error("Kakao signup error:", error);
             setError("카카오 회원가입에 실패했습니다.");

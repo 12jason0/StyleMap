@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export async function POST(request: NextRequest) {
     console.log("=== 카카오 로그인 API 시작 ===");
     try {
         const { code } = await request.json();
+        if (!JWT_SECRET) {
+            return NextResponse.json({ error: "서버 설정 오류: JWT_SECRET이 없습니다." }, { status: 500 });
+        }
 
         if (!code) {
             return NextResponse.json({ error: "카카오 인증 코드가 필요합니다." }, { status: 400 });

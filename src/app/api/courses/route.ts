@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
         // URL 파라미터에서 concept과 limit 가져오기
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
-        const limit = searchParams.get("limit");
+        const limitParam = searchParams.get("limit");
+        const effectiveLimit = Math.min(Math.max(Number(limitParam ?? 100), 1), 200);
 
         // 데이터베이스 연결 시도
         connection = await pool.getConnection();
@@ -40,11 +41,10 @@ export async function GET(request: NextRequest) {
 
         query += " ORDER BY id DESC, title ASC";
 
-        if (limit) {
-            query += " LIMIT ?";
-            params.push(Number(limit));
-            console.log("API: Limiting results to:", limit);
-        }
+        // 결과 개수 제한 (기본 100, 최대 200)
+        // 일부 MySQL 환경에서 LIMIT 바인딩이 에러를 유발하므로 안전한 인라인 사용
+        query += ` LIMIT ${effectiveLimit}`;
+        console.log("API: Limiting results to:", effectiveLimit);
 
         const [courses] = await connection.execute(query, params);
 

@@ -154,23 +154,17 @@ const Header = () => {
 
     // 로그아웃 함수
     const handleLogout = () => {
-        // 로컬 스토리지에서 토큰 제거
-        localStorage.removeItem("authToken");
+        try {
+            localStorage.removeItem("authToken");
+            localStorage.removeItem("user");
+            localStorage.removeItem("loginTime");
+        } catch {}
 
-        // 로그인 상태 업데이트
         setIsLoggedIn(false);
-
-        // 커스텀 이벤트 발생 (다른 컴포넌트에서 로그아웃 감지)
         window.dispatchEvent(new CustomEvent("authTokenChange"));
-
-        // 홈페이지로 리다이렉트
-        router.push("/");
-
-        // 로그아웃 완료 메시지
-        alert("로그아웃되었습니다.");
-
-        // 모바일 메뉴 닫기
         closeMenu();
+        router.push("/");
+        alert("로그아웃되었습니다.");
     };
 
     return (

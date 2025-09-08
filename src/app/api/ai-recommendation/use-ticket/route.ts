@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { extractBearerToken, verifyJwtAndGetUserId } from "@/lib/auth";
 import { generateMLRecommendations } from "@/lib/ml/deepLearningRecommender";
 
 export async function POST(request: NextRequest) {
     try {
         // JWT 토큰 검증
-        const authHeader = request.headers.get("authorization");
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const token = extractBearerToken(request);
+        if (!token) {
             return NextResponse.json({ error: "인증 토큰이 필요합니다." }, { status: 401 });
         }
 
-        const token = authHeader.substring(7);
-        const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "your-secret-key";
-
-        let decoded: { userId: string };
+        let userId: string;
         try {
-            decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+            userId = verifyJwtAndGetUserId(token);
         } catch {
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
         }
-
-        const userId = decoded.userId;
         const connection = await pool.getConnection();
 
         try {

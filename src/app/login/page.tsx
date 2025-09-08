@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
+import { saveAuthSession, dispatchAuthChange } from "@/lib/authClient";
 
 const Login = () => {
     const router = useRouter();
@@ -58,11 +59,8 @@ const Login = () => {
             const data = await response.json();
 
             if (response.ok) {
-                // 토큰을 localStorage에 저장
-                localStorage.setItem("authToken", data.token);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                // 로그인 시간 저장 (자동 로그아웃 방지용)
-                localStorage.setItem("loginTime", Date.now().toString());
+                // 공통 세션 저장
+                saveAuthSession(data.token, data.user);
 
                 console.log("로그인 성공: 토큰 저장됨", {
                     token: data.token ? data.token.substring(0, 20) + "..." : "없음",
@@ -70,14 +68,7 @@ const Login = () => {
                 });
 
                 // 헤더 상태 업데이트를 위한 이벤트 발생
-                const authEvent = new CustomEvent("authTokenChange", {
-                    detail: { token: data.token },
-                });
-                window.dispatchEvent(authEvent);
-                console.log("authTokenChange 이벤트 발생됨", {
-                    token: data.token ? "있음" : "없음",
-                    eventDetail: authEvent.detail,
-                });
+                dispatchAuthChange(data.token);
 
                 // 홈페이지로 이동 (로그인 성공 모달 표시를 위해 파라미터 추가)
                 router.push("/?login_success=true");

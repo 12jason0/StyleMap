@@ -1,28 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
-
-// JWT 토큰에서 사용자 ID 추출
-const getUserIdFromToken = (request: NextRequest) => {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return null;
-    }
-
-    const token = authHeader.substring(7);
-    try {
-        const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-        return decoded.userId;
-    } catch {
-        return null;
-    }
-};
+import { getUserIdFromRequest } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
     try {
-        const userId = getUserIdFromToken(request);
+        const userId = getUserIdFromRequest(request);
         if (!userId) {
             return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
         }
@@ -95,7 +77,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     try {
-        const userId = getUserIdFromToken(request);
+        const userId = getUserIdFromRequest(request);
         if (!userId) {
             return NextResponse.json(null);
         }

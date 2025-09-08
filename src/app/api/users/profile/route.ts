@@ -1,27 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
+import { extractBearerToken, verifyJwtAndGetUserId } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
     try {
         console.log("=== 프로필 API 시작 ===");
-        const authHeader = request.headers.get("authorization");
-
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const token = extractBearerToken(request);
+        if (!token) {
             console.log("인증 토큰 없음");
             return NextResponse.json({ error: "인증 토큰이 필요합니다." }, { status: 401 });
         }
-
-        const token = authHeader.substring(7);
         console.log("토큰 확인됨");
 
         try {
             console.log("JWT 토큰 검증 중...");
-            const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-            console.log("JWT 디코딩 결과:", decoded);
-            const userId = decoded.userId;
+            const userId = verifyJwtAndGetUserId(token);
             console.log("사용자 ID:", userId);
 
             const connection = await pool.getConnection();
@@ -74,18 +67,14 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
     try {
-        const authHeader = request.headers.get("authorization");
-
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        const token = extractBearerToken(request);
+        if (!token) {
             return NextResponse.json({ error: "인증 토큰이 필요합니다." }, { status: 401 });
         }
-
-        const token = authHeader.substring(7);
         const { name, email, mbti, age } = await request.json();
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
-            const userId = decoded.userId;
+            const userId = verifyJwtAndGetUserId(token);
 
             const connection = await pool.getConnection();
 

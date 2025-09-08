@@ -37,94 +37,13 @@ export default function Home() {
         window.scrollTo(0, 0);
     }, []);
 
-    // 홈페이지에 처음 들어갈 때 자동 로그아웃 (로그인 성공 후 일정 시간 제외)
-    useEffect(() => {
-        // 로그인 성공 후 30초 이내에는 자동 로그아웃 하지 않음
-        const loginTime = localStorage.getItem("loginTime");
-        const now = Date.now();
-
-        if (loginTime && now - parseInt(loginTime) < 30000) {
-            console.log("로그인 성공 후 30초 이내: 홈페이지 접속 시 자동 로그아웃 건너뜀");
-            return;
-        }
-
-        // URL 파라미터 확인 (추가 안전장치)
-        const urlParams = new URLSearchParams(window.location.search);
-        const loginSuccess = urlParams.get("login_success");
-        const signupSuccess = urlParams.get("signup_success");
-
-        // 로그인 성공이나 회원가입 성공이 아닌 경우에만 자동 로그아웃
-        if (!loginSuccess && !signupSuccess) {
-            // 로컬 스토리지에서 토큰 제거
-            localStorage.removeItem("authToken");
-            localStorage.removeItem("user");
-
-            // 로그아웃 이벤트 발생
-            window.dispatchEvent(new CustomEvent("authTokenChange"));
-
-            console.log("홈페이지 접속: 자동 로그아웃 완료");
-        } else {
-            console.log("로그인/회원가입 성공으로 인한 접속: 자동 로그아웃 건너뜀");
-        }
-    }, []);
-
-    // 페이지를 나갈 때 자동 로그아웃 (로그인 성공 후 일정 시간 제외)
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            // 로그인 성공 후 30초 이내에는 자동 로그아웃 하지 않음
-            const loginTime = localStorage.getItem("loginTime");
-            const now = Date.now();
-
-            if (loginTime && now - parseInt(loginTime) < 30000) {
-                console.log("로그인 성공 후 30초 이내: 자동 로그아웃 건너뜀");
-                return;
-            }
-
-            // 로컬 스토리지에서 토큰 제거
-            localStorage.removeItem("authToken");
-            localStorage.removeItem("user");
-
-            // 로그아웃 이벤트 발생
-            window.dispatchEvent(new CustomEvent("authTokenChange"));
-
-            console.log("홈페이지 이탈: 자동 로그아웃 완료");
-        };
-
-        // 페이지 언로드 시 이벤트 리스너 추가
-        window.addEventListener("beforeunload", handleBeforeUnload);
-
-        // 페이지 가시성 변경 시에도 로그아웃 (탭 전환 등)
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                // 로그인 성공 후 30초 이내에는 자동 로그아웃 하지 않음
-                const loginTime = localStorage.getItem("loginTime");
-                const now = Date.now();
-
-                if (loginTime && now - parseInt(loginTime) < 30000) {
-                    console.log("로그인 성공 후 30초 이내: 페이지 숨김 시 자동 로그아웃 건너뜀");
-                    return;
-                }
-
-                localStorage.removeItem("authToken");
-                localStorage.removeItem("user");
-                window.dispatchEvent(new CustomEvent("authTokenChange"));
-                console.log("페이지 숨김: 자동 로그아웃 완료");
-            }
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-
-        return () => {
-            window.removeEventListener("beforeunload", handleBeforeUnload);
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, []);
+    // 자동 로그아웃 로직 제거: 사용자가 로그아웃할 때까지 세션 유지
 
     // 코스 데이터 가져오기
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await fetch("/api/courses");
+                const response = await fetch("/api/courses?limit=60");
                 const data = await response.json();
 
                 // API 응답이 배열인지 확인하고 에러 객체인지 확인
@@ -438,6 +357,9 @@ export default function Home() {
                                         src={course.imageUrl}
                                         alt={course.title}
                                         className="w-full h-full object-cover"
+                                        loading={index === currentSlide ? "eager" : "lazy"}
+                                        decoding="async"
+                                        sizes="100vw"
                                     />
                                 ) : (
                                     <div className="w-full h-full bg-white" />
@@ -546,6 +468,9 @@ export default function Home() {
                                                     w-full h-full object-cover transition-transform duration-700
                                                     ${hoveredCard === course.id ? "scale-110" : "scale-100"}
                                                 `}
+                                                loading="lazy"
+                                                decoding="async"
+                                                sizes="(max-width: 1024px) 100vw, 50vw"
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-gray-200" />
@@ -625,6 +550,9 @@ export default function Home() {
                                                 src={course.imageUrl}
                                                 alt={course.title}
                                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                loading="lazy"
+                                                decoding="async"
+                                                sizes="(max-width: 768px) 100vw, 33vw"
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-white" />
