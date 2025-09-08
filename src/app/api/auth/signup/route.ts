@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
+import { getJwtSecret } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
     try {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
             const userId = insertResult.insertId;
 
             // JWT 토큰 생성
-            const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "your-secret-key";
+            const JWT_SECRET = getJwtSecret();
             const token = jwt.sign({ userId, email, nickname }, JWT_SECRET, { expiresIn: "7d" });
 
             return NextResponse.json({

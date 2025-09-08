@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
     let connection;
@@ -136,6 +137,12 @@ export async function POST(request: NextRequest) {
         // 입력값 검증
         if (!title) {
             return NextResponse.json({ error: "제목은 필수입니다" }, { status: 400 });
+        }
+
+        // 인증 필요
+        const userId = getUserIdFromRequest(request);
+        if (!userId) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
         }
 
         connection = await pool.getConnection();

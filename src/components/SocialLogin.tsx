@@ -14,8 +14,14 @@ export default function SocialLogin({ onSuccess, onError }: SocialLoginProps) {
         setIsLoading("kakao");
         try {
             // 카카오 OAuth 팝업 방식으로 변경
-            const kakaoClientId = "833e9f9d0fea3b8c19f979c877cc0b23";
+            const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
             const redirectUri = `${window.location.origin}/api/auth/kakao/callback`;
+
+            if (!kakaoClientId) {
+                onError?.("환경변수 NEXT_PUBLIC_KAKAO_CLIENT_ID가 설정되지 않았습니다.");
+                setIsLoading(null);
+                return;
+            }
 
             const authUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${kakaoClientId}&redirect_uri=${encodeURIComponent(
                 redirectUri

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
+import { getJwtSecret } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
     try {
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
                     email: user.email,
                     name: user.nickname,
                 },
-                JWT_SECRET,
+                getJwtSecret(),
                 { expiresIn: "7d" }
             );
             console.log("JWT 토큰 생성 완료");

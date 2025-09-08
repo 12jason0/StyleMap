@@ -93,8 +93,14 @@ const Login = () => {
         setMessage("");
 
         if (provider === "kakao") {
-            const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID || "833e9f9d0fea3b8c19f979c877cc0b23";
-            const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`;
+            const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
+            const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/auth/kakao/callback`;
+
+            if (!kakaoClientId) {
+                setError("환경변수 NEXT_PUBLIC_KAKAO_CLIENT_ID가 설정되지 않았습니다.");
+                setLoading(false);
+                return;
+            }
 
             const kakaoAuthUrl =
                 `https://kauth.kakao.com/oauth/authorize?` +

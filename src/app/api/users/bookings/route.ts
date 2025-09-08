@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import pool from "@/lib/db";
-
-const JWT_SECRET = process.env.JWT_SECRET || "stylemap-secret-key-2024-very-long-and-secure";
+import { getJwtSecret } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
     try {
@@ -18,7 +17,7 @@ export async function GET(request: NextRequest) {
         console.log("토큰 확인됨");
 
         try {
-            const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+            const decoded = jwt.verify(token, getJwtSecret()) as { userId: string };
             const userId = decoded.userId;
             console.log("사용자 ID:", userId);
 

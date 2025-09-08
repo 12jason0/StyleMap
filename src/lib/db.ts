@@ -1,4 +1,5 @@
 import mysql, { Pool } from "mysql2/promise";
+import { logger } from "./logger";
 
 // 글로벌 싱글톤 풀 (Next.js HMR로 인한 다중 생성 방지)
 declare global {
@@ -13,7 +14,7 @@ const pool: Pool =
         user: process.env.DB_USER || "root",
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME || "stylemap",
-        connectionLimit: 3,
+        connectionLimit: 10,
         waitForConnections: true,
         queueLimit: 0,
         // 추가 옵션
@@ -33,11 +34,11 @@ if (!global.__mysqlPool) {
 // 연결 테스트
 pool.getConnection()
     .then((connection) => {
-        console.log("Database connected successfully");
+        logger.info("Database connected successfully");
         connection.release();
     })
     .catch((error) => {
-        console.error("Database connection failed:", error);
+        logger.error("Database connection failed:", { error });
     });
 
 export default pool;

@@ -11,7 +11,7 @@
 DATABASE_URL="mysql://root:password@localhost:3306/stylemap"
 
 # JWT Secret
-JWT_SECRET="stylemap-secret-key-2024"
+JWT_SECRET=""
 
 # Kakao Map API
 NEXT_PUBLIC_KAKAO_MAP_API_KEY="454509cd057a6d814ccd7258302a359c"
@@ -32,9 +32,9 @@ INSTAGRAM_CLIENT_SECRET="your-instagram-client-secret"
 NEXT_PUBLIC_INSTAGRAM_CLIENT_ID="1762397561331881"
 
 # Kakao OAuth
-KAKAO_CLIENT_ID="833e9f9d0fea3b8c19f979c877cc0b23"
-KAKAO_CLIENT_SECRET="your-kakao-client-secret"
-NEXT_PUBLIC_KAKAO_CLIENT_ID="833e9f9d0fea3b8c19f979c877cc0b23"
+KAKAO_CLIENT_ID=""
+KAKAO_CLIENT_SECRET=""
+NEXT_PUBLIC_KAKAO_CLIENT_ID=""
 
 # App URLs
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -90,7 +90,7 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
 ### 3.4 앱 키 복사
 
-REST API 키: `833e9f9d0fea3b8c19f979c877cc0b23` (이미 설정됨)
+REST API 키: `<KAKAO_REST_API_KEY>`
 JavaScript 키를 `.env.local` 파일의 `KAKAO_CLIENT_SECRET`에 설정
 
 ## 4. Instagram Business API 설정
