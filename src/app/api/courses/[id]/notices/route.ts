@@ -5,7 +5,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
         const { id: courseId } = await params;
         console.log("API: Fetching notices for course ID:", courseId);
-        const rows = await (prisma as any).course_notices.findMany({
+        const rows = await (prisma as any).courseNotice.findMany({
             where: { course_id: Number(courseId) },
             orderBy: [{ display_order: "asc" }, { id: "asc" }],
             select: { id: true, notice_text: true, display_order: true },

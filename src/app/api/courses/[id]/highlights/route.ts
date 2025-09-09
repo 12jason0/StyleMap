@@ -5,7 +5,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     try {
         const { id: courseId } = await params;
         console.log("API: Fetching highlights for course ID:", courseId);
-        const rows = await (prisma as any).highlights.findMany({
+        const rows = await (prisma as any).highlight.findMany({
             where: { course_id: Number(courseId) },
             orderBy: [{ id: "asc" }],
             select: { id: true, title: true, description: true, icon: true },

@@ -16,16 +16,22 @@ datasource db {
 model User {
   id              Int      @id @default(autoincrement())
   email           String   @unique @db.VarChar(100)
-  password        String   @db.VarChar(255)
-  nickname        String   @unique @db.VarChar(50)
+  password        String?  @db.VarChar(255)
+  nickname        String   @db.VarChar(50)
   profileImageUrl String?  @db.VarChar(255)
+  socialId        String?  @db.VarChar(255)
   provider        String   @default("local") @db.VarChar(20)
   createdAt       DateTime @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime @updatedAt @db.Timestamp(0)
+  mbti            String?  @db.VarChar(20)
+  age             Int?
 
   // Relations
   courses   Courses[]
   reviews   Review[]
   bookings  Booking[]
+
+  @@index([provider, socialId])
 }
 
 model Courses {
@@ -42,14 +48,20 @@ model Courses {
   rating               Decimal  @default(0.0)
   current_participants Int      @default(0)
   max_participants     Int      @default(0)
+  view_count           Int      @default(0)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
   // Relations
-  creator   User?     @relation(fields: [userId], references: [id])
-  reviews   Review[]
-  bookings  Booking[]
-  tags      CourseTag[]
+  creator        User?         @relation(fields: [userId], references: [id])
+  reviews        Review[]
+  bookings       Booking[]
+  tags           CourseTag[]
+  course_places  CoursePlace[]
+  highlights     Highlight[]
+  benefits       Benefit[]
+  notices        Notice[]
+  course_notices CourseNotice[]
 
   @@map("courses")
 }
@@ -64,8 +76,8 @@ model Review {
   updatedAt DateTime @updatedAt @db.Timestamp(0)
 
   // Relations
-  user   User     @relation(fields: [userId], references: [id])
-  course Courses  @relation(fields: [courseId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  course Courses @relation(fields: [courseId], references: [id])
 }
 
 model Booking {
@@ -160,6 +172,8 @@ model Place {
   created_at           DateTime  @default(now())
   updated_at           DateTime  @updatedAt
 
+  // Relations
+  course_places CoursePlace[]
   @@map("places")
 }
 
@@ -175,6 +189,10 @@ model CoursePlace {
   created_at        DateTime @default(now()) @db.Timestamp(0)
   updated_at        DateTime @updatedAt @db.Timestamp(0)
 
+  // Relations
+  course Courses @relation(fields: [course_id], references: [id])
+  places Place   @relation(fields: [place_id], references: [id])
+
   @@map("course_places")
 }
 
@@ -185,6 +203,9 @@ model Highlight {
   description String?  @db.Text
   icon        String?  @db.VarChar(10)
   created_at  DateTime @default(now()) @db.Timestamp(0)
+
+  // Relations
+  course Courses @relation(fields: [course_id], references: [id])
 
   @@map("highlights")
 }
@@ -197,6 +218,9 @@ model Benefit {
   display_order Int?     @default(0)
   created_at    DateTime @default(now()) @db.Timestamp(0)
 
+  // Relations
+  course Courses @relation(fields: [course_id], references: [id])
+
   @@map("benefits")
 }
 
@@ -207,6 +231,9 @@ model Notice {
   type          String?  @default("info") @db.VarChar(100)
   display_order Int?     @default(0)
   created_at    DateTime @default(now()) @db.Timestamp(0)
+
+  // Relations
+  course Courses @relation(fields: [course_id], references: [id])
 
   @@map("notices")
 }
@@ -219,6 +246,9 @@ model CourseNotice {
   display_order Int?     @default(0)
   created_at    DateTime @default(now()) @db.Timestamp(0)
   updated_at    DateTime @updatedAt @db.Timestamp(0)
+
+  // Relations
+  course Courses @relation(fields: [course_id], references: [id])
 
   @@map("course_notices")
 }

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         console.log("API: Course ID type:", typeof courseId);
         console.log("API: Request URL:", request.url);
 
-        const cps = await (prisma as any).course_places.findMany({
+        const cps = await (prisma as any).coursePlace.findMany({
             where: { course_id: Number(courseId) },
             orderBy: [{ order_index: "asc" }],
             include: {
