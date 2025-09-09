@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
 // --- 인터페이스 및 컴포넌트 정의 ---
@@ -43,6 +43,7 @@ const LoadingSpinner = ({ text = "로딩 중..." }: { text?: string }) => (
 // --- 메인 페이지 컴포넌트 ---
 function MapPageInner() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const searchQuery = searchParams?.get("search");
     const hasQueryTarget = useMemo(() => {
         const lat = searchParams?.get("lat");
@@ -70,6 +71,7 @@ function MapPageInner() {
     const [searchedPlace, setSearchedPlace] = useState<Place | null>(null);
     const [courses, setCourses] = useState<any[]>([]);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
 
     // --- 지도 관련 ref ---
     const mapRef = useRef<HTMLDivElement>(null);
@@ -83,8 +85,15 @@ function MapPageInner() {
 
     // 모바일 최초 진입 시 좌측 패널 닫기 (화면 가로폭이 좁은 경우)
     useEffect(() => {
-        if (typeof window !== "undefined" && window.innerWidth < 768) {
-            setLeftPanelOpen(false);
+        if (typeof window !== "undefined") {
+            const check = () => {
+                const mobile = window.innerWidth < 768;
+                setIsMobile(mobile);
+                if (mobile) setLeftPanelOpen(false);
+            };
+            check();
+            window.addEventListener("resize", check);
+            return () => window.removeEventListener("resize", check);
         }
     }, []);
 
@@ -136,6 +145,21 @@ function MapPageInner() {
             const newPlaces = results.flatMap((result) => result.places || []);
             // 중복 제거
             const uniquePlaces = Array.from(new Map(newPlaces.map((p) => [p.id, p])).values());
+
+            // 폴백: 카카오 검색이 비었으면 DB places API 사용
+            if (uniquePlaces.length === 0) {
+                try {
+                    const dbRes = await fetch(`/api/places?lat=${location.lat}&lng=${location.lng}`);
+                    const dbData = await dbRes.json();
+                    const dbPlaces = (dbData?.places || []) as Place[];
+                    if (dbPlaces.length > 0) {
+                        setPlaces(dbPlaces as any);
+                        sessionStorage.setItem(cacheKey, JSON.stringify(dbPlaces));
+                        sessionStorage.setItem(`${cacheKey}_time`, now.toString());
+                        return;
+                    }
+                } catch {}
+            }
 
             setPlaces(uniquePlaces);
 
@@ -237,8 +261,10 @@ function MapPageInner() {
             bounds.extend(currentPosition);
         }
 
-        // 장소 마커 생성 (선택된 핀이 있으면 해당 핀만 표시)
-        const placesToRender = selectedPlace ? [selectedPlace] : places;
+        // 장소 마커 생성
+        // 모바일: 항상 전체 핀 노출
+        // 데스크탑: 선택 시 해당 핀만 강조 (기존 동작 유지)
+        const placesToRender = isMobile ? places : selectedPlace ? [selectedPlace] : places;
         placesToRender.forEach((place) => {
             const isSelected = selectedPlace?.id === place.id;
             const position = new kakao.maps.LatLng(place.latitude, place.longitude);
@@ -378,22 +404,29 @@ function MapPageInner() {
             kakao.maps.event.addListener(marker, "click", () => {
                 console.log("핀 클릭됨:", place.name);
                 // 선택된 장소로 상태 설정
-                // 즉시 기존 마커 제거하여 단일 마커만 보이도록 처리
-                try {
-                    markersRef.current.forEach((m) => m.marker && m.marker.setMap(null));
-                } catch (e) {}
-                markersRef.current = [];
+                // 데스크탑에서만 단일 마커 강조를 위해 기존 마커 제거
+                if (!isMobile) {
+                    try {
+                        markersRef.current.forEach((m) => m.marker && m.marker.setMap(null));
+                    } catch (e) {}
+                    markersRef.current = [];
+                }
 
                 setSelectedPlace(place);
+                // 모바일에서는 핀 클릭 시 바텀시트 자동 오픈
+                if (isMobile && !leftPanelOpen) {
+                    setLeftPanelOpen(true);
+                }
                 console.log("selectedPlace 설정됨:", place.name);
 
                 // 검색된 장소가 아닌 주변 핀 클릭 시 해당 위치에서 새로운 검색 수행
                 if (searchedPlace && place.id !== searchedPlace.id) {
                     // 검색된 장소의 포커스 제거
                     setSearchedPlace(null);
-
-                    // 다른 핀 제거 효과를 위해 places를 선택된 것만 남기고 업데이트
-                    setPlaces([place]);
+                    // 모바일에서는 목록 축소 금지 (핀 유지)
+                    if (!isMobile) {
+                        setPlaces([place]);
+                    }
                 }
             });
 
@@ -405,7 +438,7 @@ function MapPageInner() {
         return () => {
             markers.forEach((marker) => marker.setMap(null));
         };
-    }, [places, selectedPlace, userLocation]);
+    }, [places, selectedPlace, userLocation, isMobile, leftPanelOpen]);
 
     // --- 초기 데이터 로드 ---
     useEffect(() => {
@@ -461,6 +494,26 @@ function MapPageInner() {
             mapInstance.current.panTo(new window.kakao.maps.LatLng(lat, lng));
         }
     }, [searchParams]);
+
+    // 모바일에서 핀이 비어있을 때 자동 재검색 폴백
+    useEffect(() => {
+        if (isMobile && userLocation && places.length === 0 && !loading) {
+            searchNearbyPlaces(userLocation);
+        }
+    }, [isMobile, userLocation, places.length, loading, searchNearbyPlaces]);
+
+    // 지도 준비 후 places가 비면 지도 중심으로 재검색 (F5 새로고침 대응)
+    useEffect(() => {
+        if (!isMobile || places.length > 0 || loading) return;
+        if (mapInstance.current && (window as any).kakao?.maps) {
+            try {
+                const center = mapInstance.current.getCenter();
+                if (center) {
+                    searchNearbyPlaces({ lat: center.getLat(), lng: center.getLng() });
+                }
+            } catch {}
+        }
+    }, [isMobile, places.length, loading, searchNearbyPlaces]);
 
     // --- 핸들러 함수들 ---
     const handleSearch = useCallback(async () => {
@@ -530,8 +583,10 @@ function MapPageInner() {
         if (mapInstance.current && userLocation) {
             mapInstance.current.panTo(new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng));
             showToast("내 위치로 이동했습니다.", "info");
+            // 1초 뒤 자동으로 토스트 숨기기
+            setTimeout(() => setToast(null), 1000);
         }
-    }, [userLocation, showToast]);
+    }, [userLocation, showToast, setToast]);
 
     const handleZoomIn = useCallback(() => {
         if (mapInstance.current) {
@@ -589,11 +644,33 @@ function MapPageInner() {
                 <div className="flex-1 flex relative min-h-0">
                     {/* 왼쪽 패널 */}
                     <div
-                        className={`bg-white border-r border-gray-200 transition-all duration-300 ease-in-out ${
-                            leftPanelOpen ? "sm:w-96 w-full" : "w-0"
-                        } overflow-hidden z-20 flex-shrink-0 h-full`}
+                        className={
+                            isMobile
+                                ? `fixed inset-x-0 bottom-0 z-[60] transition-transform duration-300 ease-in-out ${
+                                      leftPanelOpen ? "translate-y-0" : "translate-y-full"
+                                  }`
+                                : `bg-white border-r border-gray-200 transition-all duration-300 ease-in-out ${
+                                      leftPanelOpen ? "sm:w-96 w-full" : "w-0"
+                                  } overflow-hidden z-20 flex-shrink-0 h-full`
+                        }
                     >
-                        <div className="h-full flex flex-col w-full sm:w-96">
+                        <div
+                            className={
+                                isMobile
+                                    ? "h-[50dvh] max-h-[50dvh] bg-white rounded-t-2xl shadow-2xl flex flex-col w-full"
+                                    : "h-full flex flex-col w-full sm:w-96"
+                            }
+                        >
+                            {isMobile && (
+                                <div className="w-full flex items-center justify-center py-2">
+                                    <button
+                                        onClick={() => setLeftPanelOpen(false)}
+                                        aria-label="패널 닫기"
+                                        className="w-12 h-1.5 bg-gray-300 rounded-full active:bg-gray-400"
+                                        title="아래로 내리기"
+                                    />
+                                </div>
+                            )}
                             {/* 검색바 */}
                             <div className="p-4 border-b border-gray-200 bg-gray-50">
                                 <div className="relative">
@@ -642,7 +719,7 @@ function MapPageInner() {
                             </div>
 
                             {/* 컨텐츠 */}
-                            <div className="flex-1 overflow-y-auto bg-gray-50">
+                            <div className={`flex-1 overflow-y-auto bg-gray-50 ${isMobile ? "rounded-b-2xl" : ""}`}>
                                 {/* 검색 결과가 있을 때 특별 헤더 표시 */}
                                 {searchedPlace && (
                                     <div className="p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg m-4">
@@ -661,9 +738,21 @@ function MapPageInner() {
                                     <div className="p-4 space-y-4">
                                         {selectedPlace ? (
                                             // 선택된 장소 정보 표시
-                                            <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-md">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <h3 className="text-xl font-bold text-gray-900">
+                                            <div
+                                                className={`bg-white rounded-lg ${
+                                                    isMobile ? "p-4" : "p-6"
+                                                } border border-gray-200 shadow-md`}
+                                            >
+                                                <div
+                                                    className={`flex items-start justify-between ${
+                                                        isMobile ? "mb-3" : "mb-4"
+                                                    }`}
+                                                >
+                                                    <h3
+                                                        className={`${
+                                                            isMobile ? "text-lg" : "text-xl"
+                                                        } font-bold text-gray-900`}
+                                                    >
                                                         {selectedPlace.name}
                                                     </h3>
                                                     <button
@@ -675,28 +764,43 @@ function MapPageInner() {
                                                 </div>
                                                 <div className="space-y-3">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                                        <span
+                                                            className={`${
+                                                                isMobile ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"
+                                                            } bg-blue-100 text-blue-700 rounded-full font-medium`}
+                                                        >
                                                             {selectedPlace.category}
                                                         </span>
-                                                        <span className="text-gray-600">
+                                                        <span
+                                                            className={`${
+                                                                isMobile ? "text-sm" : "text-base"
+                                                            } text-gray-600`}
+                                                        >
                                                             📍 {selectedPlace.distance}
                                                         </span>
-                                                        <span>⭐ {selectedPlace.rating}</span>
+                                                        <span className={`${isMobile ? "text-sm" : "text-base"}`}>
+                                                            ⭐ {selectedPlace.rating}
+                                                        </span>
                                                     </div>
                                                     <div className="text-gray-700">
-                                                        <p className="font-medium mb-1">주소</p>
-                                                        <p className="text-sm">{selectedPlace.address}</p>
+                                                        <p
+                                                            className={`${
+                                                                isMobile ? "text-sm" : "text-base"
+                                                            } font-medium mb-1`}
+                                                        >
+                                                            주소
+                                                        </p>
+                                                        <p className={`${isMobile ? "text-xs" : "text-sm"}`}>
+                                                            {selectedPlace.address}
+                                                        </p>
                                                     </div>
-                                                    {selectedPlace.description && (
-                                                        <div className="text-gray-700">
-                                                            <p className="font-medium mb-1">설명</p>
-                                                            <p className="text-sm">{selectedPlace.description}</p>
-                                                        </div>
-                                                    )}
+
                                                     <div className="flex gap-2 pt-2">
                                                         <button
                                                             onClick={() => handleOpenKakaoSearch(selectedPlace)}
-                                                            className="hover:cursor-pointer flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                                                            className={`hover:cursor-pointer flex-1 bg-blue-600 text-white ${
+                                                                isMobile ? "py-2" : "py-2"
+                                                            } px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors`}
                                                         >
                                                             길찾기
                                                         </button>
@@ -750,7 +854,7 @@ function MapPageInner() {
                                             </div>
                                         )}
                                     </div>
-                                ) : activeTab === "courses" ? (
+                                ) : (
                                     <div className="p-4 space-y-4">
                                         {/* 코스 목록 */}
                                         <div className="space-y-3">
@@ -758,6 +862,7 @@ function MapPageInner() {
                                                 courses.map((course) => (
                                                     <div
                                                         key={course.id}
+                                                        onClick={() => router.push(`/courses/${course.id}`)}
                                                         className="bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-all cursor-pointer"
                                                     >
                                                         <div className="flex-1">
@@ -775,7 +880,13 @@ function MapPageInner() {
                                                                 {course.description || "멋진 코스입니다!"}
                                                             </p>
                                                             <div className="flex gap-2 mt-3">
-                                                                <button className="text-xs bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors text-blue-700">
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        router.push(`/courses/${course.id}`);
+                                                                    }}
+                                                                    className="text-xs bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors text-blue-700"
+                                                                >
                                                                     코스 보기
                                                                 </button>
                                                             </div>
@@ -791,25 +902,21 @@ function MapPageInner() {
                                             )}
                                         </div>
                                     </div>
-                                ) : (
-                                    <div className="text-center p-8 text-gray-500">
-                                        <div className="text-4xl mb-4">🎯</div>
-                                        <p className="text-lg mb-2">빠른 시일 내에</p>
-                                        <p className="text-sm">멋진 코스를 준비하겠습니다!</p>
-                                    </div>
                                 )}
                             </div>
                         </div>
                     </div>
 
                     {/* 패널 토글 버튼 */}
-                    <button
-                        onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-                        className="absolute top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out z-20"
-                        style={{ left: leftPanelOpen ? "24rem" : "0" }}
-                    >
-                        <span className="text-gray-600 text-sm">{leftPanelOpen ? "◀" : "▶"}</span>
-                    </button>
+                    {!isMobile && (
+                        <button
+                            onClick={() => setLeftPanelOpen(!leftPanelOpen)}
+                            className="absolute top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out z-20"
+                            style={{ left: leftPanelOpen ? "24rem" : "0" }}
+                        >
+                            <span className="text-gray-600 text-sm">{leftPanelOpen ? "◀" : "▶"}</span>
+                        </button>
+                    )}
 
                     {/* 지도 영역 */}
                     <div className="flex-1 h-full relative min-h-0 overflow-hidden">
@@ -846,6 +953,18 @@ function MapPageInner() {
                                 </button>
                             </div>
                         )}
+
+                        {/* 모바일 오픈 버튼 복원 */}
+                        {isMobile && !leftPanelOpen && (
+                            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[70]">
+                                <button
+                                    onClick={() => setLeftPanelOpen(true)}
+                                    className="bg-white text-gray-800 border border-gray-300 px-4 py-2 rounded-full shadow-md"
+                                >
+                                    목록 보기
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -856,28 +975,34 @@ function MapPageInner() {
                     {/* 내 위치로 이동 버튼 */}
                     <button
                         onClick={moveToMyLocation}
-                        className="fixed bottom-6 right-6 bg-white border border-gray-300 rounded-lg p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50"
+                        className={`fixed ${
+                            isMobile ? "bottom-28 right-4 p-2" : "bottom-6 right-6 p-3"
+                        } bg-white border border-gray-300 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
                         title="내 위치로 이동"
                     >
-                        <div className="w-6 h-6 text-blue-500">📍</div>
+                        <div className={`${isMobile ? "w-5 h-5" : "w-6 h-6"} text-blue-500`}>📍</div>
                     </button>
 
                     {/* 확대 버튼 */}
                     <button
                         onClick={handleZoomIn}
-                        className="fixed top-25 right-6 bg-white border border-gray-300 rounded-lg p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50"
+                        className={`fixed top-25 right-6 bg-white border border-gray-300 rounded-lg ${
+                            isMobile ? "p-2" : "p-3"
+                        } shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
                         title="확대"
                     >
-                        <div className="w-6 h-6 text-blue-500">➕</div>
+                        <div className={`${isMobile ? "w-5 h-5" : "w-6 h-6"} text-blue-500`}>➕</div>
                     </button>
 
                     {/* 축소 버튼 */}
                     <button
                         onClick={handleZoomOut}
-                        className="fixed top-40 right-6 bg-white border border-gray-300 rounded-lg p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50"
+                        className={`fixed top-40 right-6 bg-white border border-gray-300 rounded-lg ${
+                            isMobile ? "p-2" : "p-3"
+                        } shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
                         title="축소"
                     >
-                        <div className="w-6 h-6 text-blue-500">➖</div>
+                        <div className={`${isMobile ? "w-5 h-5" : "w-6 h-6"} text-blue-500`}>➖</div>
                     </button>
                 </>
             )}

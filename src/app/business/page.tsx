@@ -44,7 +44,7 @@ export default function BusinessPage() {
 
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 mb-2">고객센터</h3>
-                                    <p className="text-gray-700">contact@stylemap.com</p>
+                                    <p className="text-gray-700">12jason@naver.com</p>
                                 </div>
 
                                 <div>

@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
 
         // 쿼리 실행 (컨셉 필터링 + 장소 이미지 없는 코스 제외)
         // 일부 환경에서 view_count 컬럼이 없을 수 있으므로 COALESCE를 제거하고 매핑 단계에서 기본값 처리
-        let query = "SELECT * FROM courses";
+        let query =
+            "SELECT id, title, description, duration, location, price, imageUrl, concept, rating, current_participants, view_count FROM courses";
         const conditions: string[] = [];
         const params: (string | number)[] = [];
 
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
             title: string;
             description: string;
             duration: string;
-            region: string;
+            location: string;
             price: string;
             imageUrl: string;
             concept: string;
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
             title: course.title || "제목 없음",
             description: course.description || "",
             duration: course.duration || "",
-            location: course.region || "", // region 필드를 location으로 매핑
+            location: course.location || "",
             price: course.price || "",
             imageUrl: course.imageUrl || "",
             concept: course.concept || "",

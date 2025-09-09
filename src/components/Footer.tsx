@@ -84,17 +84,29 @@ const Footer = () => {
                             <p>© 2025 StyleMap. 모든 권리 보유.</p>
                             <p className="mt-1">사업자등록: 준비중 • 대표: 오승용</p>
                         </div>
-                        <div className="flex space-x-6 mt-4 md:mt-0">
-                            <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
+                        <div className="flex space-x-4 md:space-x-6 mt-4 md:mt-0 flex-nowrap">
+                            <Link
+                                href="/privacy"
+                                className="text-gray-400 hover:text-white text-xs md:text-sm transition-colors whitespace-nowrap"
+                            >
                                 개인정보처리방침
                             </Link>
-                            <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
+                            <Link
+                                href="/terms"
+                                className="text-gray-400 hover:text-white text-xs md:text-sm transition-colors whitespace-nowrap"
+                            >
                                 이용약관
                             </Link>
-                            <Link href="/business" className="text-gray-400 hover:text-white text-sm transition-colors">
+                            <Link
+                                href="/business"
+                                className="text-gray-400 hover:text-white text-xs md:text-sm transition-colors whitespace-nowrap"
+                            >
                                 사업자 정보
                             </Link>
-                            <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors">
+                            <Link
+                                href="/cookies"
+                                className="text-gray-400 hover:text-white text-xs md:text-sm transition-colors whitespace-nowrap"
+                            >
                                 쿠키 정책
                             </Link>
                         </div>

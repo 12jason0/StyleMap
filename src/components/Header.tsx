@@ -173,9 +173,12 @@ const Header = () => {
                 <div className="flex justify-between items-center h-16">
                     {/* 로고 */}
                     <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                            <span className="text-white font-bold text-sm">S</span>
-                        </div>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logo.png"
+                            alt="StyleMap"
+                            className="w-8 h-8 rounded-lg object-contain"
+                        />
                         <span className="text-xl font-bold text-gray-900">StyleMap</span>
                     </Link>
 

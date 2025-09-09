@@ -636,7 +636,7 @@ export default function CourseDetailPage() {
 
             <div className="min-h-screen bg-gray-50 text-black pt-10">
                 {/* Hero Section */}
-                <section className="relative h-96 overflow-hidden">
+                <section className="relative h-[360px] md:h-[520px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {heroImageUrl ? (
@@ -648,7 +648,7 @@ export default function CourseDetailPage() {
                     </div>
 
                     <div className="relative h-full max-w-7xl mx-auto px-4 flex items-center">
-                        <div className="max-w-2xl">
+                        <div className="max-w-[85%] md:max-w-2xl">
                             <div className="mb-4 flex items-center gap-3 flex-wrap">
                                 {courseData.isPopular && (
                                     <span className="px-4 py-1.5 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
@@ -663,8 +663,16 @@ export default function CourseDetailPage() {
                                 </span>
                             </div>
 
-                            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">{courseData.title}</h1>
-                            <p className="text-lg md:text-xl text-white/90 mb-6 line-clamp-2">
+                            <h3 className="text-lg md:text-s font-bold text-white mb-4">{courseData.title}</h3>
+                            <p
+                                className="text-base md:text-xl text-white/90 mb-6"
+                                style={{
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                }}
+                            >
                                 {courseData.description}
                             </p>
 
@@ -689,7 +697,7 @@ export default function CourseDetailPage() {
                             {/* Main Content */}
                             <div className="lg:col-span-2 space-y-8">
                                 {/* 코스 설명 */}
-                                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                                <div className="bg-white rounded-2xl shadow-lg p-4 md:p-8">
                                     <h2 className="text-2xl md:text-3xl font-bold mb-6">코스 소개</h2>
                                     <p className="text-gray-700 leading-relaxed text-base md:text-lg">
                                         {courseData.description}
@@ -698,7 +706,7 @@ export default function CourseDetailPage() {
 
                                 {/* 코스 특징 */}
                                 {courseData.highlights && courseData.highlights.length > 0 && (
-                                    <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                                    <div className="bg-white rounded-2xl shadow-lg p-4 md:p-8">
                                         <h2 className="text-2xl md:text-3xl font-bold mb-6">코스 특징</h2>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {courseData.highlights.map((highlight) => (
@@ -720,7 +728,7 @@ export default function CourseDetailPage() {
                                 )}
 
                                 {/* 타임라인 + 지도 섹션 */}
-                                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                                <div className="bg-white rounded-2xl shadow-lg p-4 md:p-8">
                                     {/* 지도 섹션 */}
                                     <div className="mb-8 rounded-2xl overflow-hidden shadow-lg">
                                         <div className="relative">
@@ -740,8 +748,8 @@ export default function CourseDetailPage() {
                                                     onPlaceClick={handlePlaceClick}
                                                     drawPath={true}
                                                     routeMode="foot"
-                                                    className="w-full h-80 rounded-2xl"
-                                                    style={{ minHeight: "320px" }}
+                                                    className="w-full h-56 md:h-80 rounded-2xl"
+                                                    style={{ minHeight: "200px" }}
                                                 />
                                             ) : (
                                                 <div className="w-full h-80 bg-gray-100 rounded-2xl flex items-center justify-center">
@@ -755,148 +763,68 @@ export default function CourseDetailPage() {
                                     </div>
 
                                     {/* 타임라인 */}
-                                    <div className="relative pl-8 md:pl-10" style={{ willChange: "transform" }}>
+                                    <div className="relative pl-6 md:pl-10" style={{ willChange: "transform" }}>
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
 
                                         {hasPlaces ? (
                                             sortedCoursePlaces.map((coursePlace) => (
-                                                <div key={coursePlace.id} className="relative mb-8">
+                                                <div key={coursePlace.id} className="relative mb-6 md:mb-8">
                                                     <div className="absolute -left-7 md:-left-8 top-6 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white shadow-lg"></div>
                                                     <div className="absolute -left-10 md:-left-12 top-4 w-8 h-8 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg">
                                                         {coursePlace.order_index}
                                                     </div>
 
                                                     {/* 장소 카드 */}
-                                                    <div className="bg-gray-50 rounded-xl p-4 md:p-6 border border-gray-200 hover:shadow-md transition-shadow">
+                                                    <div className="bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow ">
                                                         <div className="flex flex-col sm:flex-row gap-4">
-                                                            {/* 장소 이미지 */}
-                                                            <div className="w-full sm:w-20 h-48 sm:h-20 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                                                                {coursePlace.place.image_url ? (
-                                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                            {/* 좌: 이미지 / 우: 주요 정보 */}
+                                                            <div className="w-full sm:w-36 flex-shrink-0">
+                                                                <div className="h-32 sm:h-24 bg-gray-200 rounded-lg overflow-hidden">
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                                                     <img
-                                                                        src={coursePlace.place.image_url}
+                                                                        src={
+                                                                            coursePlace.place.image_url ||
+                                                                            "/images/placeholder-location.jpg"
+                                                                        }
                                                                         alt={coursePlace.place.name}
-                                                                        width={80}
-                                                                        height={80}
                                                                         className="w-full h-full object-cover"
                                                                         loading="lazy"
                                                                         onError={(e) => {
-                                                                            const target = e.target as HTMLImageElement;
-                                                                            target.style.display = "none";
-                                                                            target.nextElementSibling?.classList.remove(
-                                                                                "hidden"
-                                                                            );
+                                                                            const target =
+                                                                                e.currentTarget as HTMLImageElement;
+                                                                            target.onerror = null;
+                                                                            target.src =
+                                                                                "/images/placeholder-location.jpg";
                                                                         }}
                                                                     />
-                                                                ) : null}
-                                                                <span className="text-2xl hidden">📍</span>
+                                                                </div>
                                                             </div>
-
-                                                            {/* 장소 정보 */}
-                                                            <div className="flex-1">
-                                                                <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-2">
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="text-base md:text-lg font-bold text-gray-800 mb-1">
                                                                     {coursePlace.place.name}
                                                                 </h3>
-                                                                <div className="flex flex-wrap gap-2 mb-3">
-                                                                    {(() => {
-                                                                        const raw = coursePlace.place.category || "";
-                                                                        const cats = raw
-                                                                            .split(/[\s]*[\,\|\/·]+[\s]*/)
-                                                                            .map((s) => s.trim())
-                                                                            .filter(Boolean);
-                                                                        const getStyle = (c: string) => {
-                                                                            if (/(카페|coffee)/i.test(c))
-                                                                                return "bg-pink-100 text-pink-700";
-                                                                            if (
-                                                                                /(음식|맛집|식당|먹자골목|중국요리|해물|해산물|생선|수산|횟집)/i.test(
-                                                                                    c
-                                                                                )
-                                                                            )
-                                                                                return "bg-orange-100 text-orange-700";
-                                                                            if (/(관광|명소|박물관|전시|문화)/i.test(c))
-                                                                                return "bg-blue-100 text-blue-700";
-                                                                            if (/(공원|자연|산책|하천|강)/i.test(c))
-                                                                                return "bg-green-100 text-green-700";
-                                                                            if (/(쇼핑|몰|마켓)/i.test(c))
-                                                                                return "bg-purple-100 text-purple-700";
-                                                                            return "bg-gray-100 text-gray-700";
-                                                                        };
-                                                                        const items =
-                                                                            cats.length > 0 ? cats : [raw || "기타"];
-                                                                        return items.map((c, i) => (
-                                                                            <span
-                                                                                key={`${c}-${i}`}
-                                                                                className={`px-2 py-1 rounded-full text-xs font-medium ${getStyle(
-                                                                                    c
-                                                                                )}`}
-                                                                            >
-                                                                                {c}
-                                                                            </span>
-                                                                        ));
-                                                                    })()}
+                                                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                                        {coursePlace.place.category || "기타"}
+                                                                    </span>
+                                                                    <span className="text-sm text-gray-600">
+                                                                        💰 {coursePlace.place.avg_cost_range}
+                                                                    </span>
+                                                                    <span className="text-sm text-gray-600">
+                                                                        ⏱ {coursePlace.estimated_duration}분
+                                                                    </span>
+                                                                    <span className="text-sm text-gray-600">
+                                                                        🕒 {coursePlace.recommended_time}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-2">
-                                                                    <span>💰 {coursePlace.place.avg_cost_range}</span>
-                                                                    <span>⏱{coursePlace.estimated_duration}분</span>
-                                                                    <span>📍 {coursePlace.recommended_time}</span>
-                                                                </div>
-                                                                <div className="text-sm text-gray-500 mb-4">
-                                                                    <p className="mb-1">{coursePlace.place.address}</p>
-                                                                    {coursePlace.place.opening_hours && (
-                                                                        <p>🕒 {coursePlace.place.opening_hours}</p>
-                                                                    )}
-                                                                    {coursePlace.place.phone && (
-                                                                        <p>📞 {coursePlace.place.phone}</p>
-                                                                    )}
-                                                                </div>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    <button
-                                                                        onClick={createMapViewHandler(
-                                                                            coursePlace.place.name,
-                                                                            coursePlace.place.latitude,
-                                                                            coursePlace.place.longitude
-                                                                        )}
-                                                                        className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-                                                                    >
-                                                                        지도에서 보기
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={createNavigationHandler(
-                                                                            coursePlace.place.name,
-                                                                            coursePlace.place.latitude,
-                                                                            coursePlace.place.longitude
-                                                                        )}
-                                                                        className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                                                                    >
-                                                                        길찾기
-                                                                    </button>
-                                                                    {coursePlace.place.phone && (
-                                                                        <button
-                                                                            onClick={() =>
-                                                                                window.open(
-                                                                                    `tel:${coursePlace.place.phone}`,
-                                                                                    "_self"
-                                                                                )
-                                                                            }
-                                                                            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                                                                        >
-                                                                            전화걸기
-                                                                        </button>
-                                                                    )}
-                                                                    {coursePlace.place.website && (
-                                                                        <button
-                                                                            onClick={() =>
-                                                                                window.open(
-                                                                                    coursePlace.place.website,
-                                                                                    "_blank"
-                                                                                )
-                                                                            }
-                                                                            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                                                                        >
-                                                                            웹사이트
-                                                                        </button>
-                                                                    )}
-                                                                </div>
+                                                                <p className="text-xs md:text-sm text-gray-500 line-clamp-2 mb-2">
+                                                                    {coursePlace.place.address}
+                                                                </p>
+                                                                {coursePlace.place.opening_hours && (
+                                                                    <p className="text-xs text-gray-500">
+                                                                        🕘 {coursePlace.place.opening_hours}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         {coursePlace.notes && (
@@ -1040,7 +968,7 @@ export default function CourseDetailPage() {
                                     </div>
 
                                     {/* 코스 정보 */}
-                                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                                    <div className="bg-white rounded-2xl shadow-lg p-4 md:p-6">
                                         <h3 className="text-xl font-bold mb-4">코스 정보</h3>
                                         <div className="space-y-4">
                                             <div className="flex items-start gap-3">

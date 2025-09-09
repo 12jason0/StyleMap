@@ -203,11 +203,14 @@ const Login = () => {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
             <Header />
 
-            <main className="max-w-md mx-auto px-4 py-8 pt-24">
-                <div className="bg-white rounded-2xl shadow-lg p-8">
-                    <div className="text-center mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">로그인</h1>
-                        <p className="text-gray-600">StyleMap에 오신 것을 환영합니다</p>
+            <main
+                className="max-w-md mx-auto px-4 pt-20 pb-28 flex items-center"
+                style={{ minHeight: "calc(100dvh - 120px)" }}
+            >
+                <div className="w-full bg-white rounded-2xl shadow-lg p-6">
+                    <div className="text-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-1">로그인</h1>
+                        <p className="text-gray-600 text-sm">StyleMap에 오신 것을 환영합니다</p>
                     </div>
 
                     {/* 성공 메시지 */}
@@ -276,7 +279,7 @@ const Login = () => {
                     </div>
 
                     {/* 소셜 로그인 구분선 */}
-                    <div className="mt-8">
+                    <div className="mt-6">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-gray-300" />
@@ -288,7 +291,7 @@ const Login = () => {
                     </div>
 
                     {/* 소셜 로그인 버튼들 */}
-                    <div className="mt-6 space-y-3 text-black">
+                    <div className="mt-4 space-y-3 text-black">
                         {/* 카카오톡 로그인 버튼 */}
                         <button
                             type="button"

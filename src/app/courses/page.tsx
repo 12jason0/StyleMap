@@ -180,17 +180,13 @@ function CoursesPageInner() {
                             className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer block"
                             onClick={async () => {
                                 try {
-                                    // 조회수 증가
-                                    await fetch(`/api/courses/${course.id}/view`, {
-                                        method: "POST",
-                                    });
-                                    // 코스 상세 페이지로 이동
-                                    window.location.href = `/courses/${course.id}`;
-                                } catch (error) {
-                                    console.error("Error incrementing view count:", error);
-                                    // 에러가 발생해도 페이지 이동은 진행
-                                    window.location.href = `/courses/${course.id}`;
-                                }
+                                    // 조회수 증가 비동기 전송 (내비게이션 비차단)
+                                    fetch(`/api/courses/${course.id}/view`, { method: "POST", keepalive: true }).catch(
+                                        () => {}
+                                    );
+                                } catch {}
+                                // 코스 상세 페이지로 즉시 이동
+                                window.location.href = `/courses/${course.id}`;
                             }}
                         >
                             {/* 이미지 */}

@@ -43,12 +43,12 @@ export default function Home() {
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await fetch("/api/courses?limit=60");
+                const response = await fetch("/api/courses?limit=12");
                 const data = await response.json();
 
                 // API 응답이 배열인지 확인하고 에러 객체인지 확인
                 if (Array.isArray(data)) {
-                    setCourses(data.slice(0, 12));
+                    setCourses(data);
                 } else if (data.error) {
                     console.error("API Error:", data.error, data.details);
                     // 데이터베이스 연결 실패 시 사용자에게 알림
@@ -342,7 +342,7 @@ export default function Home() {
 
             <main className="min-h-screen bg-white pt-10">
                 {/* Hero Section - 대형 슬라이드 */}
-                <section className="relative h-[500px] overflow-hidden">
+                <section className="relative h-[460px] md:h-[520px] overflow-hidden">
                     {topCourses.map((course, index) => (
                         <div
                             key={course.id}
@@ -368,8 +368,8 @@ export default function Home() {
                             </div>
 
                             {/* 콘텐츠 */}
-                            <div className="relative h-full max-w-7xl mx-auto px-4 flex items-center">
-                                <div className="max-w-2xl">
+                            <div className="relative h-full max-w-7xl mx-auto px-4 flex items-center pt-10">
+                                <div className="max-w-[85%] md:max-w-2xl">
                                     <div className="mb-4 flex items-center gap-3">
                                         <span className="px-4 py-1.5 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
                                             🔥 실시간 HOT #{index + 1}
@@ -382,10 +382,10 @@ export default function Home() {
                                         </div>
                                     </div>
 
-                                    <h1 className="text-2xl md:text-4xl font-bold text-white mb-4">{course.title}</h1>
+                                    <h3 className="text-2xl md:text-4xl font-bold text-white mb-4">{course.title}</h3>
 
                                     <p
-                                        className="text-xl text-white/90 mb-6"
+                                        className="text-base md:text-xl text-white/90 mb-6"
                                         style={{
                                             display: "-webkit-box",
                                             WebkitLineClamp: 2,
@@ -396,7 +396,7 @@ export default function Home() {
                                         {course.description}
                                     </p>
 
-                                    <div className="flex items-center gap-4 mb-8">
+                                    <div className="flex items-center gap-2 md:gap-4 mb-6 md:mb-8">
                                         <div className="flex items-center gap-1">
                                             <span className="text-yellow-400 text-2xl">★</span>
                                             <span className="text-white font-bold text-lg">{course.rating}</span>
@@ -410,7 +410,7 @@ export default function Home() {
 
                                     <button
                                         onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="hover:cursor-pointer px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300"
+                                        className="hover:cursor-pointer px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
                                     >
                                         코스 시작하기 →
                                     </button>
@@ -420,7 +420,7 @@ export default function Home() {
                     ))}
 
                     {/* 슬라이드 인디케이터 */}
-                    <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-30">
+                    <div className="absolute bottom-4 md:bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-30">
                         {topCourses.map((_, index) => (
                             <button
                                 key={index}
@@ -441,9 +441,11 @@ export default function Home() {
                 {/* 실시간 인기 코스 */}
                 <section className="py-16 bg-gradient-to-br from-gray-50 to-white">
                     <div className="max-w-7xl mx-auto px-4">
-                        <div className="text-center mb-12">
-                            <h2 className="text-4xl font-bold mb-4 text-black">🔥 지금 가장 핫한 코스</h2>
-                            <p className="text-gray-600 text-lg">실시간으로 많은 사람들이 참여중인 코스</p>
+                        <div className="text-center mb-8 md:mb-12">
+                            <h2 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4 text-black">
+                                🔥 지금 가장 핫한 코스
+                            </h2>
+                            <p className="text-gray-600 text-base md:text-lg">실시간으로 많은 사람들이 참여중인 코스</p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -459,7 +461,11 @@ export default function Home() {
                                     onMouseEnter={() => setHoveredCard(course.id)}
                                     onMouseLeave={() => setHoveredCard(null)}
                                 >
-                                    <div className={`relative overflow-hidden ${index === 0 ? "h-[520px]" : "h-61"}`}>
+                                    <div
+                                        className={`relative overflow-hidden ${
+                                            index === 0 ? "h-[360px] md:h-[520px]" : "h-61"
+                                        }`}
+                                    >
                                         {course.imageUrl ? (
                                             <img
                                                 src={course.imageUrl}
@@ -506,10 +512,10 @@ export default function Home() {
                                         </div>
 
                                         {/* 하단 정보 */}
-                                        <div className="absolute bottom-0 left-0 right-0 p-6">
+                                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
                                             <h3
                                                 className={`font-bold text-white mb-2 ${
-                                                    index === 0 ? "text-2xl" : "text-xl"
+                                                    index === 0 ? "text-xl md:text-2xl" : "text-lg md:text-xl"
                                                 }`}
                                             >
                                                 {course.title}
