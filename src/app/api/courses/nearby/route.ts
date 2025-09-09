@@ -25,20 +25,29 @@ export async function GET(request: NextRequest) {
     try {
         connection = await pool.getConnection();
 
-        // 코스의 시작 장소(order_index=1)를 기준으로 거리를 계산하는 쿼리
+        // 코스의 시작 장소(order_index=1)를 기준으로 거리를 계산하면서,
+        // 코스에 이미지가 2개 이상 있는 경우만 반환
         const query = `
             SELECT 
-                c.*,
-                p.name as start_place_name,
-                ST_Distance_Sphere(POINT(p.longitude, p.latitude), POINT(?, ?)) AS distance
+                c.*, 
+                p.name AS start_place_name,
+                ST_Distance_Sphere(POINT(p.longitude, p.latitude), POINT(?, ?)) AS distance,
+                COALESCE(img.images_count, 0) AS images_count
             FROM 
                 courses c
             JOIN 
                 course_places cp ON c.id = cp.course_id AND cp.order_index = 1
             JOIN 
                 places p ON cp.place_id = p.id
+            LEFT JOIN (
+                SELECT cp2.course_id, COUNT(p2.imageUrl) AS images_count
+                FROM course_places cp2
+                JOIN places p2 ON cp2.place_id = p2.id
+                WHERE p2.imageUrl IS NOT NULL AND p2.imageUrl <> ''
+                GROUP BY cp2.course_id
+            ) img ON img.course_id = c.id
             HAVING 
-                distance <= ?
+                distance <= ? AND images_count >= 2
             ORDER BY 
                 distance
             LIMIT 5;

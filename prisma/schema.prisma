@@ -69,16 +69,18 @@ model Review {
 }
 
 model Booking {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  courseId  Int
-  status    String   @default("pending") @db.VarChar(45)
-  createdAt DateTime @default(now()) @db.Timestamp(0)
-  updatedAt DateTime @updatedAt @db.Timestamp(0)
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  courseId      String   @db.VarChar(100) @map("course_id")
+  courseTitle   String   @db.VarChar(255) @map("course_title")
+  bookingDate   DateTime @map("booking_date")
+  status        String   @db.VarChar(45)
+  price         String   @db.VarChar(50)
+  participants  Int
+  createdAt     DateTime @default(now()) @db.Timestamp(0) @map("created_at")
+  updatedAt     DateTime @updatedAt @db.Timestamp(0) @map("updated_at")
 
-  // Relations
-  user   User     @relation(fields: [userId], references: [id])
-  course Courses  @relation(fields: [courseId], references: [id])
+  @@map("bookings")
 }
 
 // AI 추천 시스템을 위한 테이블들
@@ -137,4 +139,109 @@ model CourseTag {
   courses Courses[]
 
   @@map("course_tags")
+}
+
+/// Places table
+model Place {
+  id                   Int       @id @default(autoincrement())
+  name                 String    @db.VarChar(255)
+  address              String?   @db.VarChar(500)
+  description          String?   @db.Text
+  category             String?   @db.VarChar(100)
+  avg_cost_range       String?   @db.VarChar(100)
+  opening_hours        String?   @db.VarChar(200)
+  phone                String?   @db.VarChar(50)
+  website              String?   @db.VarChar(500)
+  parking_available    Boolean?  @default(false)
+  reservation_required Boolean?  @default(false)
+  latitude             Decimal?  @db.Decimal(10, 8)
+  longitude            Decimal?  @db.Decimal(11, 8)
+  image_url            String?   @db.VarChar(500)
+  created_at           DateTime  @default(now()) @db.Timestamp(0)
+  updated_at           DateTime  @updatedAt @db.Timestamp(0)
+
+  @@map("places")
+}
+
+/// Courses - Places pivot
+model CoursePlace {
+  id                Int      @id @default(autoincrement())
+  course_id         Int
+  place_id          Int
+  order_index       Int
+  estimated_duration Int?
+  recommended_time  String?  @db.VarChar(100)
+  notes             String?  @db.Text
+  created_at        DateTime @default(now()) @db.Timestamp(0)
+  updated_at        DateTime @updatedAt @db.Timestamp(0)
+
+  @@map("course_places")
+}
+
+model Highlight {
+  id          Int      @id @default(autoincrement())
+  course_id   Int
+  title       String   @db.VarChar(255)
+  description String?  @db.Text
+  icon        String?  @db.VarChar(10)
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+
+  @@map("highlights")
+}
+
+model Benefit {
+  id            Int      @id @default(autoincrement())
+  course_id     Int
+  benefit_text  String   @db.Text
+  category      String?  @db.VarChar(100)
+  display_order Int?     @default(0)
+  created_at    DateTime @default(now()) @db.Timestamp(0)
+
+  @@map("benefits")
+}
+
+model Notice {
+  id            Int      @id @default(autoincrement())
+  course_id     Int
+  notice_text   String   @db.Text
+  type          String?  @default("info") @db.VarChar(100)
+  display_order Int?     @default(0)
+  created_at    DateTime @default(now()) @db.Timestamp(0)
+
+  @@map("notices")
+}
+
+model CourseNotice {
+  id            Int      @id @default(autoincrement())
+  course_id     Int
+  notice_text   String   @db.Text
+  type          String?  @default("info") @db.VarChar(100)
+  display_order Int?     @default(0)
+  created_at    DateTime @default(now()) @db.Timestamp(0)
+  updated_at    DateTime @updatedAt @db.Timestamp(0)
+
+  @@map("course_notices")
+}
+
+model Contact {
+  id          Int      @id @default(autoincrement())
+  course_id   Int
+  type        String?  @db.VarChar(100)
+  icon        String?  @db.VarChar(10)
+  label       String?  @db.VarChar(255)
+  value       String?  @db.VarChar(500)
+  description String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+
+  @@map("contacts")
+}
+
+model UserFavorite {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  course_id  Int
+  created_at DateTime @default(now()) @db.Timestamp(0)
+
+  @@unique([user_id, course_id])
+  @@map("user_favorites")
 }

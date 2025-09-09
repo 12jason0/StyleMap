@@ -86,6 +86,29 @@ export async function GET(request: NextRequest) {
         };
         const wantsCafe = tags.some((t) => /카페|coffee/i.test(t));
         const wantsKorean = tags.some((t) => /한식|음식|맛집|식당/i.test(t));
+        // 단일 코스 병합 유틸
+        const mergeSingletonCourses = (list: any[]) => {
+            const result: any[] = [];
+            for (const course of list) {
+                if (course.places && course.places.length === 1 && result.length > 0) {
+                    const last = result[result.length - 1];
+                    const existingIds = new Set((last.places || []).map((p: any) => p.id));
+                    if (!existingIds.has(course.places[0].id) && (last.places?.length || 0) < placesPerCourse) {
+                        last.places.push({ ...course.places[0], order: last.places.length + 1 });
+                        continue; // current course absorbed
+                    }
+                    // 만약 이전 코스에 추가할 수 없다면: 현재 코스가 1개뿐이면 제거
+                    if ((course.places || []).length <= 1) {
+                        continue;
+                    }
+                }
+                // order 재정렬 보장
+                course.places = (course.places || []).map((p: any, idx: number) => ({ ...p, order: idx + 1 }));
+                result.push(course);
+            }
+            return result;
+        };
+
         if (wantsCafe && wantsKorean) {
             const inText = (p: Place) => `${p.category || ""} ${p.name || ""}`;
             const isCafe = (p: Place) => /카페|coffee/i.test(inText(p));
@@ -164,7 +187,8 @@ export async function GET(request: NextRequest) {
                     return true;
                 });
 
-                return NextResponse.json({ success: true, courses: patternCourses.slice(0, courseCount) });
+                const merged = mergeSingletonCourses(patternCourses).slice(0, courseCount);
+                return NextResponse.json({ success: true, courses: merged });
             }
         }
 
@@ -266,7 +290,8 @@ export async function GET(request: NextRequest) {
             ];
         }
 
-        return NextResponse.json({ success: true, courses });
+        const merged = mergeSingletonCourses(courses);
+        return NextResponse.json({ success: true, courses: merged });
     } catch (error) {
         console.error("GET /api/courses/generate error:", error);
         const message = error instanceof Error ? error.message : String(error);

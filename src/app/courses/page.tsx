@@ -222,7 +222,17 @@ function CoursesPageInner() {
                                     <span>{(course.viewCount || 0).toLocaleString()}회 조회</span>
                                 </div>
 
-                                <p className="text-gray-600 mb-4">{course.description}</p>
+                                <p
+                                    className="text-gray-600 mb-4"
+                                    style={{
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                    }}
+                                >
+                                    {course.description}
+                                </p>
 
                                 {/* 정보 태그 */}
                                 <div className="flex flex-wrap gap-2 mb-4">

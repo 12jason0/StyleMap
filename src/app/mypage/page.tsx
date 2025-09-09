@@ -570,14 +570,14 @@ const MyPage = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 typography-smooth">
             <Header />
 
             <main className="max-w-4xl mx-auto px-4 py-8 pt-24">
                 {/* 헤더 섹션 */}
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-4">마이페이지</h1>
-                    <p className="text-xl text-gray-600">내 정보와 활동을 관리해보세요</p>
+                    <h1 className="text-4xl font-bold text-gray-900 mb-2 tracking-tight">마이페이지</h1>
+                    <p className="text-[17px] text-gray-600">내 정보와 활동을 관리해보세요</p>
                 </div>
 
                 {/* 탭 네비게이션 */}

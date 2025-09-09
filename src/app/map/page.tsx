@@ -77,6 +77,7 @@ function MapPageInner() {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
+    const lastCenterRef = useRef<any>(null);
 
     // --- 유틸 함수들 ---
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
@@ -194,6 +195,7 @@ function MapPageInner() {
 
                 // 맵 인스턴스 생성 또는 업데이트
                 mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOptions);
+                lastCenterRef.current = mapInstance.current.getCenter();
 
                 // 지도 움직임 감지 이벤트 추가
                 window.kakao.maps.event.addListener(mapInstance.current, "dragend", () => {
@@ -201,6 +203,21 @@ function MapPageInner() {
                 });
                 window.kakao.maps.event.addListener(mapInstance.current, "zoom_changed", () => {
                     setShowMapSearchButton(true);
+                });
+                // idle 시 중심 좌표 변화 감지하여 버튼 노출 (모바일 드래그/터치 대응)
+                window.kakao.maps.event.addListener(mapInstance.current, "idle", () => {
+                    try {
+                        const current = mapInstance.current.getCenter();
+                        if (lastCenterRef.current) {
+                            const prev = lastCenterRef.current;
+                            const dLat = Math.abs(current.getLat() - prev.getLat());
+                            const dLng = Math.abs(current.getLng() - prev.getLng());
+                            if (dLat > 0.00005 || dLng > 0.00005) {
+                                setShowMapSearchButton(true);
+                            }
+                        }
+                        lastCenterRef.current = current;
+                    } catch {}
                 });
 
                 // 지도 클릭 시 정보창 닫기
@@ -579,6 +596,21 @@ function MapPageInner() {
         }
     }, [searchInput]);
 
+    // 바텀시트(목록 패널) 상태 초기화
+    const resetPanelState = useCallback(
+        (closePanel: boolean = false) => {
+            setSelectedPlace(null);
+            setSearchedPlace(null);
+            setActiveTab("places");
+            setCourses([]);
+            setSearchInput("");
+            if (isMobile && closePanel) {
+                setLeftPanelOpen(false);
+            }
+        },
+        [isMobile]
+    );
+
     const moveToMyLocation = useCallback(() => {
         if (mapInstance.current && userLocation) {
             mapInstance.current.panTo(new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng));
@@ -602,12 +634,18 @@ function MapPageInner() {
         }
     }, []);
 
-    const handlePlaceClick = useCallback((place: Place) => {
-        setSelectedPlace(place);
-        if (mapInstance.current) {
-            mapInstance.current.panTo(new window.kakao.maps.LatLng(place.latitude, place.longitude));
-        }
-    }, []);
+    const handlePlaceClick = useCallback(
+        (place: Place) => {
+            setSelectedPlace(place);
+            if (mapInstance.current) {
+                const latlng = new window.kakao.maps.LatLng(place.latitude, place.longitude);
+                mapInstance.current.panTo(latlng);
+            }
+            // 모바일에서 목록 클릭 시에도 정보 패널이 보이도록 열기
+            if (isMobile && !leftPanelOpen) setLeftPanelOpen(true);
+        },
+        [isMobile, leftPanelOpen]
+    );
 
     // 카카오맵에서 장소명으로 검색 열기
     const handleOpenKakaoSearch = useCallback((place: Place) => {
@@ -664,7 +702,7 @@ function MapPageInner() {
                             {isMobile && (
                                 <div className="w-full flex items-center justify-center py-2">
                                     <button
-                                        onClick={() => setLeftPanelOpen(false)}
+                                        onClick={() => resetPanelState(true)}
                                         aria-label="패널 닫기"
                                         className="w-12 h-1.5 bg-gray-300 rounded-full active:bg-gray-400"
                                         title="아래로 내리기"
@@ -756,7 +794,7 @@ function MapPageInner() {
                                                         {selectedPlace.name}
                                                     </h3>
                                                     <button
-                                                        onClick={() => setSelectedPlace(null)}
+                                                        onClick={() => resetPanelState(false)}
                                                         className="hover:cursor-pointer text-gray-400 hover:text-gray-600 text-xl"
                                                     >
                                                         ×
@@ -876,7 +914,15 @@ function MapPageInner() {
                                                                 <span>📍 {Math.round(course.distance)}m</span>
                                                                 <span>🚶‍♂️ {course.start_place_name}</span>
                                                             </div>
-                                                            <p className="text-sm text-gray-500 line-clamp-2">
+                                                            <p
+                                                                className="text-sm text-gray-500"
+                                                                style={{
+                                                                    display: "-webkit-box",
+                                                                    WebkitLineClamp: 2,
+                                                                    WebkitBoxOrient: "vertical",
+                                                                    overflow: "hidden",
+                                                                }}
+                                                            >
                                                                 {course.description || "멋진 코스입니다!"}
                                                             </p>
                                                             <div className="flex gap-2 mt-3">
@@ -923,40 +969,52 @@ function MapPageInner() {
                         <div ref={mapRef} className="w-full h-full" />
 
                         {/* 현재 지도 영역 검색 버튼 */}
-                        {showMapSearchButton && !loading && !error && (
-                            <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-10">
-                                <button
-                                    onClick={() => {
-                                        if (mapInstance.current) {
-                                            const center = mapInstance.current.getCenter();
-                                            const currentLocation = {
-                                                lat: center.getLat(),
-                                                lng: center.getLng(),
-                                            };
-                                            searchNearbyPlaces(currentLocation);
-                                            setShowMapSearchButton(false);
-                                        }
-                                    }}
-                                    disabled={isSearchingMapArea}
-                                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-full shadow-lg transition-all duration-200 flex items-center gap-1 text-sm"
+                        {!loading &&
+                            !error &&
+                            ((isMobile && !leftPanelOpen && showMapSearchButton) ||
+                                (!isMobile && showMapSearchButton)) && (
+                                <div
+                                    className={`absolute ${
+                                        isMobile ? "bottom-24" : "bottom-6"
+                                    } left-1/2 transform -translate-x-1/2 z-[80]`}
                                 >
-                                    {isSearchingMapArea ? (
-                                        <>
-                                            <LoadingSpinner text="검색 중..." />
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>🔍</span>
-                                            <span>현재 지도에서 검색</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        )}
+                                    <button
+                                        onClick={async () => {
+                                            if (mapInstance.current) {
+                                                const center = mapInstance.current.getCenter();
+                                                const currentLocation = {
+                                                    lat: center.getLat(),
+                                                    lng: center.getLng(),
+                                                };
+                                                try {
+                                                    setIsSearchingMapArea(true);
+                                                    await searchNearbyPlaces(currentLocation);
+                                                } finally {
+                                                    setIsSearchingMapArea(false);
+                                                    setShowMapSearchButton(false);
+                                                }
+                                            }
+                                        }}
+                                        disabled={isSearchingMapArea}
+                                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-full shadow-lg transition-all duration-200 flex items-center gap-1 text-sm"
+                                    >
+                                        {isSearchingMapArea ? (
+                                            <>
+                                                <LoadingSpinner text="검색 중..." />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>🔍</span>
+                                                <span>현재 지도에서 검색</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
 
                         {/* 모바일 오픈 버튼 복원 */}
-                        {isMobile && !leftPanelOpen && (
-                            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[70]">
+                        {isMobile && !leftPanelOpen && !showMapSearchButton && (
+                            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[60]">
                                 <button
                                     onClick={() => setLeftPanelOpen(true)}
                                     className="bg-white text-gray-800 border border-gray-300 px-4 py-2 rounded-full shadow-md"

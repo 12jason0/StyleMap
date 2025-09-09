@@ -133,21 +133,32 @@ export default function KakaoMap({
 
                 kakao.maps.event.addListener(marker, "click", () => {
                     onPlaceClick(place);
+                    try {
+                        // 즉시 해당 핀으로 부드럽게 이동 및 살짝 확대
+                        map.panTo(position);
+                        const cur = map.getLevel();
+                        if (cur > 3) map.setLevel(3);
+                    } catch {}
                 });
 
                 markersRef.current.push(marker);
                 bounds.extend(position);
             });
 
-            // 지도 범위 조정 (코스 장소들만 고려)
+            // 지도 범위/중심 조정
             if (places.length > 0) {
-                if (places.length === 1) {
-                    map.setCenter(positions[0]);
-                    map.setLevel(2);
+                if (!selectedPlace) {
+                    // 최초에는 전체 보기
+                    if (places.length === 1) {
+                        map.setCenter(positions[0]);
+                        map.setLevel(2);
+                    } else {
+                        map.setBounds(bounds);
+                    }
                 } else {
-                    map.setBounds(bounds);
-                    const currentLevel = map.getLevel();
-                    if (currentLevel > 4) map.setLevel(4);
+                    const pos = resolvedPositionsRef.current[selectedPlace.id] || positions[0];
+                    map.setCenter(pos);
+                    map.setLevel(3);
                 }
             }
 
@@ -160,32 +171,12 @@ export default function KakaoMap({
                     return aOrder - bOrder;
                 });
 
-                // OSRM walking/foot 경로 시도 (보정된 좌표 사용)
                 try {
                     const coords = sortedForPath.map((p) => {
                         const pos = resolvedPositionsRef.current[p.id];
                         return [pos.getLng(), pos.getLat()];
                     });
                     const coordStr = coords.map((c) => `${c[0]},${c[1]}`).join(";");
-                    // 가까운 구간(총 거리 1km 미만)은 단순 직선 경로가 보기도 자연스럽고 오류가 적음
-                    const toRad = (v: number) => (v * Math.PI) / 180;
-                    const haversine = (lon1: number, lat1: number, lon2: number, lat2: number) => {
-                        const R = 6371000;
-                        const dLat = toRad(lat2 - lat1);
-                        const dLon = toRad(lon2 - lon1);
-                        const a =
-                            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                        return R * c;
-                    };
-                    let straightTotal = 0;
-                    for (let i = 1; i < coords.length; i++) {
-                        const [prevLon, prevLat] = coords[i - 1];
-                        const [lon, lat] = coords[i];
-                        straightTotal += haversine(prevLon, prevLat, lon, lat);
-                    }
-                    // simple 모드일 때만 직선 연결 사용. walking/driving은 항상 도로를 따라 라우팅
                     if (routeMode === "simple") {
                         const simplePath = coords.map(([lon, lat]) => new kakao.maps.LatLng(lat, lon));
                         const simpleLine = new kakao.maps.Polyline({
@@ -199,33 +190,14 @@ export default function KakaoMap({
                         polylineRef.current = simpleLine;
                         return;
                     }
-                    // 골목 최단: foot 사용, 대안 경로 비활성화해서 한 개만 받기
-                    let osrmUrl = `https://router.project-osrm.org/route/v1/foot/${coordStr}?alternatives=false&overview=full&geometries=geojson`;
-                    const res = await fetch(osrmUrl, { cache: "no-store" });
+                    const res = await fetch(`/api/maps?coords=${encodeURIComponent(coordStr)}&mode=foot`, {
+                        cache: "no-store",
+                    });
                     const data = await res.json();
-                    if (data?.routes?.[0]?.geometry?.coordinates) {
-                        const geoCoords: [number, number][] = data.routes[0].geometry.coordinates;
-                        const path = geoCoords.map(([lon, lat]) => new kakao.maps.LatLng(lat, lon));
-                        const polyline = new kakao.maps.Polyline({
-                            path,
-                            strokeWeight: 4,
-                            strokeColor: "#60a5fa", // 연한 파랑
-                            strokeOpacity: 0.9,
-                            strokeStyle: "solid",
-                        });
-                        polyline.setMap(map);
-                        polylineRef.current = polyline;
-                        return;
-                    }
-                    // 실패 시 walking으로 재시도(대체경로 비활성화)
-                    const res2 = await fetch(
-                        `https://router.project-osrm.org/route/v1/walking/${coordStr}?alternatives=false&overview=full&geometries=geojson`,
-                        { cache: "no-store" }
-                    );
-                    const data2 = await res2.json();
-                    if (data2?.routes?.[0]?.geometry?.coordinates) {
-                        const geoCoords: [number, number][] = data2.routes[0].geometry.coordinates;
-                        const path = geoCoords.map(([lon, lat]) => new kakao.maps.LatLng(lat, lon));
+                    if (data?.success && Array.isArray(data.coordinates)) {
+                        const path = data.coordinates.map(
+                            ([lon, lat]: [number, number]) => new kakao.maps.LatLng(lat, lon)
+                        );
                         const polyline = new kakao.maps.Polyline({
                             path,
                             strokeWeight: 4,
@@ -260,22 +232,19 @@ export default function KakaoMap({
 
         // 지도 범위 조정 (코스 장소들만 고려)
         if (places.length > 0) {
-            if (places.length === 1) {
-                // 장소가 하나면 해당 장소에 포커스
+            if (selectedPlace) {
+                const pos = resolvedPositionsRef.current[selectedPlace.id];
+                if (pos) {
+                    map.setCenter(pos);
+                    map.setLevel(3);
+                }
+            } else if (places.length === 1) {
                 const singlePlace = places[0];
                 const position = new kakao.maps.LatLng(singlePlace.latitude, singlePlace.longitude);
                 map.setCenter(position);
-                map.setLevel(2); // 더 가까운 줌 레벨로 설정
-                console.log(`단일 장소 포커스: ${singlePlace.name}`);
+                map.setLevel(2);
             } else {
-                // 여러 장소가 있으면 모든 마커가 보이도록 조정
                 map.setBounds(bounds);
-                // 약간의 여백을 위해 줌 레벨 조정
-                const currentLevel = map.getLevel();
-                if (currentLevel > 4) {
-                    map.setLevel(4);
-                }
-                console.log(`${places.length}개 장소 모두 표시`);
             }
         }
 
@@ -289,8 +258,8 @@ export default function KakaoMap({
             const map = mapInstance.current;
             const resolved = resolvedPositionsRef.current[selectedPlace.id];
             const center = resolved || new window.kakao.maps.LatLng(selectedPlace.latitude, selectedPlace.longitude);
-            map.setCenter(center);
-            // 살짝 확대
+            // 부드럽게 이동 + 적당히 확대
+            map.panTo(center);
             const current = map.getLevel();
             if (current > 3) map.setLevel(3);
         } catch {}
@@ -308,6 +277,8 @@ export default function KakaoMap({
 
     return (
         <div className={`relative ${className}`} style={style}>
+            {/* 경로 API 경고 배너 (프로덕션 주의) */}
+            {/* 안내 배너 제거 요청에 따라 출력하지 않습니다. */}
             <div ref={mapRef} className="w-full h-full" style={{ minHeight: "300px" }} />
             {/* window.kakao가 준비되지 않았을 때만 로딩 스피너 표시 */}
             {!window.kakao && (

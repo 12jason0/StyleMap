@@ -396,16 +396,41 @@ export default function Home() {
                                         {course.description}
                                     </p>
 
-                                    <div className="flex items-center gap-2 md:gap-4 mb-6 md:mb-8">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-yellow-400 text-2xl">★</span>
-                                            <span className="text-white font-bold text-lg">{course.rating}</span>
-                                            <span className="text-white/70">({course.reviewCount})</span>
+                                    <div
+                                        className="flex items-center gap-6 mb-6 md:mb-8"
+                                        aria-label="StyleMap Hero Stats"
+                                    >
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-yellow-400 text-2xl leading-none pb-3" aria-hidden>
+                                                ★
+                                            </span>
+                                            <span className="text-white font-bold text-sm leading-none">
+                                                {course.rating}
+                                            </span>
                                         </div>
-                                        <span className="text-white/70">|</span>
-                                        <span className="text-white">📍 {course.location}</span>
-                                        <span className="text-white">⏱ {course.duration}</span>
-                                        <span className="text-white">💰 {course.price}</span>
+                                        <div className="flex flex-col md:flex-row items-center">
+                                            <span
+                                                className="text-white text-xl leading-none pb-2 md:pb-0 md:pr-2"
+                                                aria-hidden
+                                            >
+                                                📍
+                                            </span>
+                                            <span className="text-white text-xs md:text-sm leading-none">
+                                                {course.location}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-white text-xl leading-none pb-3" aria-hidden>
+                                                ⏱
+                                            </span>
+                                            <span className="text-white text-xs leading-none">{course.duration}</span>
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-white text-xl leading-none pb-3" aria-hidden>
+                                                💰
+                                            </span>
+                                            <span className="text-white text-xs leading-none">{course.price}</span>
+                                        </div>
                                     </div>
 
                                     <button

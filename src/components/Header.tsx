@@ -10,6 +10,7 @@ const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [hasFavorites, setHasFavorites] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
     const aiMenuRef = useRef<HTMLDivElement | null>(null);
@@ -166,6 +167,12 @@ const Header = () => {
         router.push("/");
         alert("로그아웃되었습니다.");
     };
+    const openLogoutConfirm = () => {
+        setShowLogoutConfirm(true);
+    };
+    const closeLogoutConfirm = () => {
+        setShowLogoutConfirm(false);
+    };
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-white">
@@ -261,7 +268,7 @@ const Header = () => {
                                     마이페이지
                                 </Link>
                                 <button
-                                    onClick={handleLogout}
+                                    onClick={openLogoutConfirm}
                                     className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors active:scale-95 transform hover:cursor-pointer"
                                 >
                                     로그아웃
@@ -421,7 +428,7 @@ const Header = () => {
                                         마이페이지
                                     </Link>
                                     <button
-                                        onClick={handleLogout}
+                                        onClick={openLogoutConfirm}
                                         className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors active:scale-95 transform"
                                     >
                                         로그아웃
@@ -535,7 +542,7 @@ const Header = () => {
                     {/* 팝업 탭 제거 */}
                     {isLoggedIn ? (
                         <button
-                            onClick={handleLogout}
+                            onClick={openLogoutConfirm}
                             className="flex flex-col items-center py-2 px-1 rounded-lg transition-colors text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                             <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -567,6 +574,32 @@ const Header = () => {
                     )}
                 </div>
             </div>
+            {/* 로그아웃 확인 모달 */}
+            {showLogoutConfirm && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-80">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">로그아웃</h3>
+                        <p className="text-gray-600 mb-6">로그아웃 하시겠습니까?</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={closeLogoutConfirm}
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={() => {
+                                    closeLogoutConfirm();
+                                    handleLogout();
+                                }}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                            >
+                                로그아웃
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </header>
     );
 };

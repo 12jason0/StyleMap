@@ -401,7 +401,7 @@ export default function CourseDetailPage() {
 
             console.log("Final Course Data:", finalCourseData);
             setCourseData(finalCourseData);
-            document.title = `${finalCourseData.title} - 코스 상세`;
+            document.title = `StyleMap | ${finalCourseData.title}`;
         } catch (err) {
             console.error("Error fetching course data:", err);
             setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -472,23 +472,64 @@ export default function CourseDetailPage() {
         setShowShareModal(true);
     };
 
-    const handleKakaoShare = () => {
+    const handleKakaoShare = async () => {
+        const url = typeof window !== "undefined" ? window.location.href : "";
         try {
-            const shareUrl = `https://story.kakao.com/share?url=${encodeURIComponent(
-                window.location.href
-            )}&text=${encodeURIComponent(courseData?.title || "")}`;
+            // 1) Kakao JS SDK 로드 및 초기화
+            const ensureKakao = () =>
+                new Promise<void>((resolve, reject) => {
+                    const w = window as any;
+                    if (w.Kakao) return resolve();
+                    const s = document.createElement("script");
+                    s.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
+                    s.async = true;
+                    s.onload = () => resolve();
+                    s.onerror = () => reject(new Error("Kakao SDK load failed"));
+                    document.head.appendChild(s);
+                });
 
-            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                window.location.href = shareUrl;
-            } else {
-                window.open(shareUrl, "_blank", "width=600,height=600");
+            await ensureKakao();
+            const w = window as any;
+            const Kakao = w.Kakao;
+            const jsKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined;
+            if (!Kakao) throw new Error("Kakao SDK not available");
+            if (!Kakao.isInitialized()) {
+                if (!jsKey) throw new Error("NEXT_PUBLIC_KAKAO_JS_KEY missing");
+                Kakao.init(jsKey);
             }
 
+            const shareImage = heroImageUrl || courseData?.imageUrl || "/images/placeholder-location.jpg";
+            const title = courseData?.title || "StyleMap 코스";
+            const desc = courseData?.description || "StyleMap에서 코스를 확인해 보세요";
+
+            Kakao.Share.sendDefault({
+                objectType: "feed",
+                content: {
+                    title,
+                    description: desc,
+                    imageUrl: shareImage,
+                    link: { mobileWebUrl: url, webUrl: url },
+                },
+                buttons: [
+                    {
+                        title: "코스 보러가기",
+                        link: { mobileWebUrl: url, webUrl: url },
+                    },
+                ],
+            });
+
+            // 링크도 복사 (사용자 편의)
+            try {
+                await navigator.clipboard.writeText(url);
+            } catch {}
             setShowShareModal(false);
-            showToast("카카오톡으로 공유되었습니다.", "success");
         } catch (error) {
-            console.error("Error sharing to KakaoTalk:", error);
-            showToast("카카오톡 공유에 실패했습니다.", "error");
+            console.error("Kakao share error:", error);
+            // 폴백: 링크 복사만 수행
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast("링크가 복사되었습니다.", "success");
+            } catch {}
         }
     };
 
@@ -638,9 +679,15 @@ export default function CourseDetailPage() {
                 {/* Hero Section */}
                 <section className="relative h-[360px] md:h-[520px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         {heroImageUrl ? (
-                            <img src={heroImageUrl} alt={courseData.title} className="w-full h-full object-cover" />
+                            <Image
+                                src={heroImageUrl}
+                                alt={courseData.title}
+                                fill
+                                priority
+                                sizes="100vw"
+                                className="object-cover"
+                            />
                         ) : (
                             <div className="w-full h-full bg-gray-200" />
                         )}
@@ -767,7 +814,7 @@ export default function CourseDetailPage() {
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
 
                                         {hasPlaces ? (
-                                            sortedCoursePlaces.map((coursePlace) => (
+                                            sortedCoursePlaces.map((coursePlace, idx) => (
                                                 <div key={coursePlace.id} className="relative mb-6 md:mb-8">
                                                     <div className="absolute -left-7 md:-left-8 top-6 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white shadow-lg"></div>
                                                     <div className="absolute -left-10 md:-left-12 top-4 w-8 h-8 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg">
@@ -775,34 +822,49 @@ export default function CourseDetailPage() {
                                                     </div>
 
                                                     {/* 장소 카드 */}
-                                                    <div className="bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow ">
+                                                    <div
+                                                        className="bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow "
+                                                        onClick={() => {
+                                                            setSelectedPlace({
+                                                                id: coursePlace.place.id,
+                                                                name: coursePlace.place.name,
+                                                                latitude: coursePlace.place.latitude,
+                                                                longitude: coursePlace.place.longitude,
+                                                                address: coursePlace.place.address,
+                                                                imageUrl: coursePlace.place.image_url,
+                                                                description: coursePlace.place.description,
+                                                            });
+                                                            setShowPlaceModal(true);
+                                                        }}
+                                                    >
                                                         <div className="flex flex-col sm:flex-row gap-4">
                                                             {/* 좌: 이미지 / 우: 주요 정보 */}
                                                             <div className="w-full sm:w-36 flex-shrink-0">
-                                                                <div className="h-32 sm:h-24 bg-gray-200 rounded-lg overflow-hidden">
-                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                    <img
-                                                                        src={
-                                                                            coursePlace.place.image_url ||
-                                                                            "/images/placeholder-location.jpg"
-                                                                        }
-                                                                        alt={coursePlace.place.name}
-                                                                        className="w-full h-full object-cover"
-                                                                        loading="lazy"
-                                                                        onError={(e) => {
-                                                                            const target =
-                                                                                e.currentTarget as HTMLImageElement;
-                                                                            target.onerror = null;
-                                                                            target.src =
-                                                                                "/images/placeholder-location.jpg";
-                                                                        }}
-                                                                    />
+                                                                <div className="relative h-32 sm:h-24 bg-gray-200 rounded-lg overflow-hidden">
+                                                                    {coursePlace.place.image_url ? (
+                                                                        <Image
+                                                                            src={coursePlace.place.image_url}
+                                                                            alt={coursePlace.place.name}
+                                                                            fill
+                                                                            sizes="(max-width: 640px) 100vw, 144px"
+                                                                            className="object-cover"
+                                                                            priority={idx === 0}
+                                                                        />
+                                                                    ) : null}
                                                                 </div>
                                                             </div>
                                                             <div className="flex-1 min-w-0">
                                                                 <h3 className="text-base md:text-lg font-bold text-gray-800 mb-1">
                                                                     {coursePlace.place.name}
                                                                 </h3>
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <div className="flex flex-col items-center leading-none">
+                                                                        <span className="text-pink-500">📍</span>
+                                                                    </div>
+                                                                    <span className="text-sm md:text-base text-gray-700 font-medium line-clamp-1">
+                                                                        {coursePlace.place.address}
+                                                                    </span>
+                                                                </div>
                                                                 <div className="flex flex-wrap items-center gap-2 mb-2">
                                                                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                                                                         {coursePlace.place.category || "기타"}
@@ -817,14 +879,23 @@ export default function CourseDetailPage() {
                                                                         🕒 {coursePlace.recommended_time}
                                                                     </span>
                                                                 </div>
-                                                                <p className="text-xs md:text-sm text-gray-500 line-clamp-2 mb-2">
-                                                                    {coursePlace.place.address}
-                                                                </p>
-                                                                {coursePlace.place.opening_hours && (
-                                                                    <p className="text-xs text-gray-500">
-                                                                        🕘 {coursePlace.place.opening_hours}
-                                                                    </p>
-                                                                )}
+                                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                                    <button
+                                                                        onClick={createNavigationHandler(
+                                                                            coursePlace.place.name,
+                                                                            coursePlace.place.latitude,
+                                                                            coursePlace.place.longitude
+                                                                        )}
+                                                                        className="bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-600 transition-colors"
+                                                                    >
+                                                                        길찾기
+                                                                    </button>
+                                                                    {coursePlace.place.opening_hours && (
+                                                                        <span className="text-xs text-gray-500">
+                                                                            🕘 {coursePlace.place.opening_hours}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         {coursePlace.notes && (
@@ -1170,15 +1241,17 @@ export default function CourseDetailPage() {
                             <p className="text-sm text-gray-500 mt-1">{selectedPlace.address}</p>
                         </div>
                         {selectedPlace.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                                src={selectedPlace.imageUrl}
-                                alt={selectedPlace.name}
-                                className="w-full object-contain bg-gray-100"
-                                style={{ maxHeight: "70vh" }}
-                            />
+                            <div className="w-full max-h-64 md:max-h-96 bg-gray-100 overflow-hidden flex items-center justify-center">
+                                <Image
+                                    src={selectedPlace.imageUrl}
+                                    alt={selectedPlace.name}
+                                    width={1200}
+                                    height={800}
+                                    className="w-full h-auto object-contain"
+                                />
+                            </div>
                         ) : (
-                            <div className="w-full h-56 bg-gray-100" />
+                            <div className="w-full h-32 md:h-48 bg-gray-100" />
                         )}
                         <div className="p-4">
                             <p className="text-gray-700 text-sm whitespace-pre-line">

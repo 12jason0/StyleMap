@@ -321,6 +321,17 @@ const AIRecommender = () => {
         // 항상 3개만 표시
         list = list.slice(0, 3);
 
+        // 결과가 없으면 쿠폰 환불
+        if (list.length === 0) {
+            setCoupons((prev) => {
+                const restored = prev + 1;
+                try {
+                    localStorage.setItem("userCoupons", restored.toString());
+                } catch {}
+                return restored;
+            });
+        }
+
         setRecommendedCourses(list);
         setShowRecommendations(true);
 
@@ -331,7 +342,7 @@ const AIRecommender = () => {
                 text:
                     list.length > 0
                         ? `완벽해요! 🎉 ${userName}님의 취향을 분석해 현재 데이터로 최적의 코스를 찾았어요!`
-                        : `현재 조건에 딱 맞는 코스가 없어 인기 코스를 대신 추천드려요.`,
+                        : `조건에 맞는 코스를 찾지 못했어요. 사용하신 쿠폰은 바로 복구해드렸습니다. 다른 조건으로 다시 시도해볼까요?`,
             },
         ]);
     };
@@ -550,7 +561,17 @@ const AIRecommender = () => {
         >
             <div className="p-6">
                 <h3 className="text-xl font-bold mb-2">{course.title}</h3>
-                <p className="text-gray-600 text-sm mb-4">{course.description}</p>
+                <p
+                    className="text-gray-600 text-sm mb-4"
+                    style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                    }}
+                >
+                    {course.description}
+                </p>
                 <div className="flex flex-wrap gap-2 mb-4">
                     {course.highlights.map((highlight) => (
                         <span

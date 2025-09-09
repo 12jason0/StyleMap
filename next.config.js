@@ -19,6 +19,7 @@ const nextConfig = {
     images: {
         domains: [
             "images.unsplash.com",
+            "stylemap-images.s3.ap-southeast-2.amazonaws.com",
             ...(process.env.NEXT_IMAGE_EXTRA_DOMAINS
                 ? process.env.NEXT_IMAGE_EXTRA_DOMAINS.split(",").map((d) => d.trim())
                 : []),

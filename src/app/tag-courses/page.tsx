@@ -236,7 +236,7 @@ export default function TagCoursesPage() {
     return (
         <div className="min-h-screen bg-white text-black pt-24 px-4">
             <div className="max-w-6xl mx-auto">
-                <h1 className="text-3xl font-bold mb-4">카테고리 기반 즉석 코스</h1>
+                <h1 className="text-3xl font-bold mb-4">여행 맞춤 제작소</h1>
                 <p className="text-gray-600 mb-6">
                     지역 · 컨셉(태그) · 그 외로 나눠 선택하세요. 선택한 지역 중심으로 코스를 생성합니다.
                 </p>
@@ -264,6 +264,11 @@ export default function TagCoursesPage() {
 
                 {/* 컨셉(태그) */}
                 <h2 className="font-semibold mb-2">컨셉</h2>
+                {notice === "limit" && (
+                    <div className="mb-3 p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm border border-yellow-200">
+                        태그는 최대 3개까지 선택 가능합니다.
+                    </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2 mb-4">
                     {(showAll ? tags : tags.slice(0, 12)).map((tag) => {
                         const isSelected = selectedTags.includes(tag);
@@ -278,7 +283,7 @@ export default function TagCoursesPage() {
                                         const exists = prev.includes(tag);
                                         if (exists) return prev.filter((t) => t !== tag);
                                         if (prev.length >= 3) {
-                                            setNotice("태그는 최대 3개까지 선택 가능합니다.");
+                                            setNotice("limit");
                                             return prev;
                                         }
                                         return [...prev, tag];
@@ -308,7 +313,7 @@ export default function TagCoursesPage() {
                         </button>
                     )}
                     <div className="text-sm text-gray-600">선택: {selectedTags.length}/3</div>
-                    {notice && <div className="text-sm text-red-500">{notice}</div>}
+                    {notice && notice !== "limit" && <div className="text-sm text-red-500">{notice}</div>}
                 </div>
 
                 {(selectedRegion || selectedTags.length > 0) && (
@@ -414,6 +419,7 @@ export default function TagCoursesPage() {
                                     className="border border-gray-200 rounded-2xl overflow-hidden shadow-sm mb-20 hover:cursor-pointer hover:shadow-md transition-shadow"
                                     onClick={() => {
                                         setPreviewPlaces(grp.map((p, idx) => ({ ...p, order: idx + 1 })));
+                                        setSelectedPlace(null);
                                         setPreviewOpen(true);
                                     }}
                                 >
@@ -473,9 +479,9 @@ export default function TagCoursesPage() {
                 {previewOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center">
                         <div className="absolute inset-0 bg-black/50" onClick={() => setPreviewOpen(false)} />
-                        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4">
-                            <div className="flex items-center justify-between p-4 border-b">
-                                <h3 className="font-bold text-lg">코스 미리보기</h3>
+                        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4">
+                            <div className="flex items-center justify-between p-3 border-b">
+                                <h3 className="font-bold text-base">코스 미리보기</h3>
                                 <button
                                     className="text-gray-500 hover:text-gray-700"
                                     onClick={() => setPreviewOpen(false)}
@@ -483,7 +489,7 @@ export default function TagCoursesPage() {
                                     ×
                                 </button>
                             </div>
-                            <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                            <div className="p-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
                                 <div className="lg:col-span-2">
                                     <KakaoMap
                                         places={
@@ -499,16 +505,18 @@ export default function TagCoursesPage() {
                                         }
                                         userLocation={null as any}
                                         selectedPlace={selectedPlace as any}
-                                        onPlaceClick={() => {}}
+                                        onPlaceClick={(place: any) => setSelectedPlace(place as any)}
                                         draggable={false}
-                                        className="w-full h-96 rounded-xl"
+                                        drawPath={true}
+                                        routeMode="foot"
+                                        className="w-full h-80 md:h-96 rounded-xl"
                                     />
                                 </div>
-                                <div className="lg:col-span-1 space-y-3 max-h-[28rem] overflow-y-auto">
+                                <div className="lg:col-span-1 space-y-2 max-h-[24rem] overflow-y-auto">
                                     {previewPlaces.map((p) => (
                                         <div
                                             key={p.id}
-                                            className="flex gap-3 items-center border rounded-xl p-3 hover:cursor-pointer"
+                                            className="flex gap-2 items-center border rounded-xl p-2 hover:cursor-pointer"
                                             onClick={() =>
                                                 setSelectedPlace({
                                                     id: p.id,
@@ -521,10 +529,10 @@ export default function TagCoursesPage() {
                                                 } as any)
                                             }
                                         >
-                                            <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                                            <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
                                                 {p.order}
                                             </div>
-                                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
                                                 {p.imageUrl ? (
                                                     // eslint-disable-next-line @next/next/no-img-element
                                                     <img
@@ -539,16 +547,16 @@ export default function TagCoursesPage() {
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="font-semibold truncate">{p.name}</div>
-                                                <div className="text-sm text-gray-500 truncate">{p.address}</div>
+                                                <div className="font-semibold text-sm truncate">{p.name}</div>
+                                                <div className="text-xs text-gray-500 truncate">{p.address}</div>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                            <div className="p-4 border-t flex justify-end">
+                            <div className="p-3 border-t flex justify-end">
                                 <button
-                                    className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 hover:cursor-pointer"
+                                    className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 hover:cursor-pointer"
                                     onClick={() => setPreviewOpen(false)}
                                 >
                                     닫기
