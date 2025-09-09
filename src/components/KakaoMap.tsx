@@ -190,7 +190,7 @@ export default function KakaoMap({
                         polylineRef.current = simpleLine;
                         return;
                     }
-                    const res = await fetch(`/api/maps?coords=${encodeURIComponent(coordStr)}&mode=foot`, {
+                    const res = await fetch(`/api/directions?coords=${encodeURIComponent(coordStr)}&mode=foot`, {
                         cache: "no-store",
                     });
                     const data = await res.json();

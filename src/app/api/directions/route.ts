@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Kakao Mobility Directions API proxy
+// Kakao Mobility Directions API proxy (inline)
 // Query:
 //   coords: "lng,lat;lng,lat;..." (at least origin and destination)
 //   mode: "car" | "foot" (default: foot)
