@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -8,114 +8,58 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         console.log("API: Course ID type:", typeof courseId);
         console.log("API: Request URL:", request.url);
 
-        const connection = await pool.getConnection();
-
-        try {
-            // 1단계: 데이터베이스 연결 확인
-            console.log("API: Database connection successful");
-
-            // 2단계: course_places 테이블 확인
-            console.log("API: Checking course_places table for course ID:", courseId);
-            const [coursePlacesCheck] = await connection.execute("SELECT * FROM course_places WHERE course_id = ?", [
-                courseId,
-            ]);
-            console.log("API: course_places check result:", coursePlacesCheck);
-
-            // 3단계: places 테이블 확인
-            console.log("API: Checking places table");
-            const [placesCheck] = await connection.execute("SELECT * FROM places LIMIT 3");
-            console.log("API: places check result:", placesCheck);
-
-            // 4단계: 조인 쿼리 실행
-            console.log("API: Executing join query for course ID:", courseId);
-            const [coursePlaces] = await connection.execute(
-                `SELECT 
-                    cp.id,
-                    cp.course_id,
-                    cp.place_id,
-                    cp.order_index,
-                    cp.estimated_duration,
-                    cp.recommended_time,
-                    cp.notes,
-                    p.name,
-                    p.address,
-                    p.description,
-                    p.category,
-                    p.avg_cost_range,
-                    p.opening_hours,
-                    p.phone,
-                    p.website,
-                    p.parking_available,
-                    p.reservation_required,
-                    p.latitude,
-                    p.longitude,
-                    p.imageUrl
-                FROM course_places cp
-                JOIN places p ON cp.place_id = p.id
-                WHERE cp.course_id = ?
-                ORDER BY cp.order_index`,
-                [courseId]
-            );
-            console.log("API: SQL query executed with courseId:", courseId);
-            console.log("API: Raw course places result:", coursePlaces);
-
-            const coursePlacesArray = coursePlaces as Array<{
-                id: number;
-                course_id: number;
-                place_id: number;
-                order_index: number;
-                estimated_duration: string;
-                recommended_time: string;
-                notes: string;
-                name: string;
-                address: string;
-                description: string;
-                category: string;
-                avg_cost_range: string;
-                opening_hours: string;
-                phone: string;
-                website: string;
-                parking_available: boolean;
-                reservation_required: boolean;
-                latitude: number;
-                longitude: number;
-                imageUrl: string;
-            }>;
-            console.log("API: Found course places:", coursePlacesArray.length);
-            console.log("API: Course places raw data:", coursePlacesArray);
-
-            // 5단계: 데이터 포맷팅
-            const formattedCoursePlaces = coursePlacesArray.map((cp) => ({
-                id: cp.id,
-                course_id: cp.course_id,
-                place_id: cp.place_id,
-                order_index: cp.order_index,
-                estimated_duration: cp.estimated_duration,
-                recommended_time: cp.recommended_time,
-                notes: cp.notes,
-                place: {
-                    id: cp.place_id,
-                    name: cp.name,
-                    address: cp.address,
-                    description: cp.description,
-                    category: cp.category,
-                    avg_cost_range: cp.avg_cost_range,
-                    opening_hours: cp.opening_hours,
-                    phone: cp.phone,
-                    website: cp.website,
-                    parking_available: Boolean(cp.parking_available),
-                    reservation_required: Boolean(cp.reservation_required),
-                    latitude: Number(cp.latitude),
-                    longitude: Number(cp.longitude),
-                    image_url: cp.imageUrl,
+        const cps = await (prisma as any).course_places.findMany({
+            where: { course_id: Number(courseId) },
+            orderBy: [{ order_index: "asc" }],
+            include: {
+                places: {
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                        description: true,
+                        category: true,
+                        avg_cost_range: true,
+                        opening_hours: true,
+                        phone: true,
+                        website: true,
+                        parking_available: true,
+                        reservation_required: true,
+                        latitude: true,
+                        longitude: true,
+                        imageUrl: true,
+                    },
                 },
-            }));
+            },
+        });
 
-            console.log("API: Formatted course places:", formattedCoursePlaces);
-            return NextResponse.json(formattedCoursePlaces);
-        } finally {
-            connection.release();
-        }
+        const formatted = cps.map((cp: any) => ({
+            id: cp.id,
+            course_id: cp.course_id,
+            place_id: cp.place_id,
+            order_index: cp.order_index,
+            estimated_duration: cp.estimated_duration,
+            recommended_time: cp.recommended_time,
+            notes: cp.notes,
+            place: {
+                id: cp.place_id,
+                name: cp.places?.name ?? "",
+                address: cp.places?.address ?? "",
+                description: cp.places?.description ?? "",
+                category: cp.places?.category ?? "",
+                avg_cost_range: cp.places?.avg_cost_range ?? "",
+                opening_hours: cp.places?.opening_hours ?? "",
+                phone: cp.places?.phone ?? "",
+                website: cp.places?.website ?? "",
+                parking_available: Boolean(cp.places?.parking_available),
+                reservation_required: Boolean(cp.places?.reservation_required),
+                latitude: Number(cp.places?.latitude),
+                longitude: Number(cp.places?.longitude),
+                image_url: cp.places?.imageUrl ?? "",
+            },
+        }));
+
+        return NextResponse.json(formatted);
     } catch (error) {
         console.error("API: Error fetching course places:", error);
         console.error("API: Error details:", {

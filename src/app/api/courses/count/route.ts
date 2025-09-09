@@ -1,20 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 export async function GET(request: NextRequest) {
-    let connection;
-
     try {
         console.log("API: Starting to fetch courses count...");
 
-        // 데이터베이스 연결 시도
-        connection = await pool.getConnection();
-        console.log("API: Database connection successful");
-
-        // 코스 개수 조회
-        const [result] = await connection.execute("SELECT COUNT(*) as count FROM courses");
-        const countResult = result as Array<{ count: number }>;
-        const courseCount = countResult[0]?.count || 0;
+        const courseCount = await (prisma as any).courses.count();
 
         console.log("API: Total courses count:", courseCount);
 
@@ -48,10 +39,6 @@ export async function GET(request: NextRequest) {
                 { error: "코스 개수를 가져오는 중 오류 발생", details: errorMessage },
                 { status: 500 }
             );
-        }
-    } finally {
-        if (connection) {
-            connection.release();
         }
     }
 }

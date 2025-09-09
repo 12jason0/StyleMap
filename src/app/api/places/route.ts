@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 export async function GET(request: NextRequest) {
     try {
@@ -12,48 +12,41 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "위도와 경도가 필요합니다." }, { status: 400 });
         }
 
-        // 데이터베이스에서 해당 지역의 장소들을 가져오기
-        const connection = await pool.getConnection();
-        let places: Array<{
+        // 데이터베이스에서 해당 지역의 장소들을 가져오기 (Prisma)
+        const places = (await (prisma as any).place.findMany({
+            take: 20,
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                description: true,
+                category: true,
+                avg_cost_range: true,
+                opening_hours: true,
+                phone: true,
+                website: true,
+                parking_available: true,
+                reservation_required: true,
+                latitude: true,
+                longitude: true,
+                imageUrl: true,
+            },
+        })) as Array<{
             id: number;
             name: string;
-            address: string;
-            description: string;
-            category: string;
-            avg_cost_range: string;
-            opening_hours: string;
-            phone?: string;
-            website?: string;
-            parking_available: boolean;
-            reservation_required: boolean;
-            latitude: number;
-            longitude: number;
-            imageUrl?: string;
+            address: string | null;
+            description: string | null;
+            category: string | null;
+            avg_cost_range: string | null;
+            opening_hours: string | null;
+            phone?: string | null;
+            website?: string | null;
+            parking_available: boolean | null;
+            reservation_required: boolean | null;
+            latitude: any;
+            longitude: any;
+            imageUrl?: string | null;
         }>;
-        try {
-            // places 테이블에서 실제 데이터 조회
-            const [result] = await connection.execute(
-                "SELECT id, name, address, description, category, avg_cost_range, opening_hours, phone, website, parking_available, reservation_required, latitude, longitude, imageUrl FROM places LIMIT 20"
-            );
-            places = result as Array<{
-                id: number;
-                name: string;
-                address: string;
-                description: string;
-                category: string;
-                avg_cost_range: string;
-                opening_hours: string;
-                phone?: string;
-                website?: string;
-                parking_available: boolean;
-                reservation_required: boolean;
-                latitude: number;
-                longitude: number;
-                imageUrl?: string;
-            }>;
-        } finally {
-            connection.release();
-        }
 
         // 장소 데이터를 Place 인터페이스에 맞게 변환
         const transformedPlaces = places.map((place) => {
@@ -77,8 +70,8 @@ export async function GET(request: NextRequest) {
                 rating: Math.floor(Math.random() * 5) + 1, // 1-5 랜덤 평점
                 participants: `${Math.floor(Math.random() * 50) + 1}/${Math.floor(Math.random() * 100) + 50}`, // 랜덤 참가자 수
                 imageUrl: place.imageUrl || "/images/SeongsuFood-001.png",
-                latitude: place.latitude,
-                longitude: place.longitude,
+                latitude: Number(place.latitude),
+                longitude: Number(place.longitude),
             };
         });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 import { getJwtSecret } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -71,55 +71,49 @@ export async function POST(request: NextRequest) {
         // [수정된 부분] email이 undefined일 경우를 대비해 null을 할당합니다.
         const email = kakao_account?.email || null;
 
-        const connection = await pool.getConnection();
+        const existing = await (prisma as any).user.findFirst({
+            where: { provider: "kakao", socialId },
+            select: { id: true, email: true, nickname: true },
+        });
 
-        try {
-            const [existingUsers] = await connection.execute(
-                "SELECT id, email, nickname FROM users WHERE provider = ? AND socialId = ?",
-                ["kakao", socialId]
+        if (existing) {
+            const token = jwt.sign(
+                { userId: existing.id, email: existing.email, name: existing.nickname },
+                JWT_SECRET,
+                {
+                    expiresIn: "7d",
+                }
             );
-
-            const usersArray = existingUsers as Array<{ id: number; email: string; nickname: string }>;
-
-            if (usersArray.length > 0) {
-                const user = usersArray[0];
-                console.log("기존 사용자 로그인:", user);
-
-                const token = jwt.sign({ userId: user.id, email: user.email, name: user.nickname }, JWT_SECRET, {
-                    expiresIn: "7d",
-                });
-
-                return NextResponse.json({
-                    success: true,
-                    message: "카카오 로그인이 완료되었습니다.",
-                    token,
-                    user: { id: user.id, email: user.email, name: user.nickname },
-                });
-            } else {
-                console.log("신규 사용자 회원가입");
-
-                const [result] = await connection.execute(
-                    "INSERT INTO users (email, nickname, socialId, profileImageUrl, provider, createdAt) VALUES (?, ?, ?, ?, 'kakao', NOW())",
-                    [email, nickname || `user_${socialId}`, socialId, profileImageUrl]
-                );
-
-                const insertResult = result as { insertId: number };
-                const userId = insertResult.insertId;
-
-                const token = jwt.sign({ userId, email, name: nickname || `user_${socialId}` }, JWT_SECRET, {
-                    expiresIn: "7d",
-                });
-
-                return NextResponse.json({
-                    success: true,
-                    message: "카카오 회원가입이 완료되었습니다.",
-                    token,
-                    user: { id: userId, email, name: nickname || `user_${socialId}` },
-                });
-            }
-        } finally {
-            connection.release();
+            return NextResponse.json({
+                success: true,
+                message: "카카오 로그인이 완료되었습니다.",
+                token,
+                user: { id: existing.id, email: existing.email, name: existing.nickname },
+            });
         }
+
+        const created = await (prisma as any).user.create({
+            data: {
+                email,
+                nickname: nickname || `user_${socialId}`,
+                socialId,
+                profileImageUrl,
+                provider: "kakao",
+                createdAt: new Date(),
+            },
+            select: { id: true, email: true, nickname: true },
+        });
+
+        const token = jwt.sign({ userId: created.id, email: created.email, name: created.nickname }, JWT_SECRET, {
+            expiresIn: "7d",
+        });
+
+        return NextResponse.json({
+            success: true,
+            message: "카카오 회원가입이 완료되었습니다.",
+            token,
+            user: { id: created.id, email: created.email, name: created.nickname },
+        });
     } catch (error) {
         console.error("카카오 로그인 API 전체 오류:", error);
         return NextResponse.json(

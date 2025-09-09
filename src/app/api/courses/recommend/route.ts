@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 const locationMap: Record<string, string> = {
     gangnam: "강남",
@@ -26,10 +26,7 @@ export async function GET(request: NextRequest) {
     const loc = (searchParams.get("location") || "").trim();
     const budget = (searchParams.get("budget") || "").trim();
 
-    let connection: any;
     try {
-        connection = await pool.getConnection();
-
         const where: string[] = [];
         const params: any[] = [];
 
@@ -67,14 +64,50 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
-        const sql = `SELECT id, title, description, duration, location, price, imageUrl, concept, IFNULL(rating,0) AS rating
-                     FROM courses ${whereSql}
-                     ORDER BY IFNULL(rating,0) DESC, id DESC
-                     LIMIT 3`;
+        // Prisma 기반 1차 후보 조회 (예산 필터는 문자열이므로 이후 JS로 후처리)
+        const prismaWhere: any = {};
+        if (loc && locationMap[loc]) {
+            prismaWhere.location = { contains: locationMap[loc] };
+        }
+        if (allKeywords.length > 0) {
+            prismaWhere.OR = allKeywords.map((kw) => ({
+                OR: [{ title: { contains: kw } }, { description: { contains: kw } }, { concept: { contains: kw } }],
+            }));
+        }
 
-        const [rows] = await connection.execute(sql, params);
-        const courses = (rows as any[]).map((c) => ({
+        const rows = (await (prisma as any).courses.findMany({
+            where: prismaWhere,
+            orderBy: [{ rating: "desc" }, { id: "desc" }],
+            take: 50,
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                duration: true,
+                location: true,
+                price: true,
+                imageUrl: true,
+                concept: true,
+                rating: true,
+            },
+        })) as any[];
+
+        // 예산 필터 JS 후처리
+        const parsePrice = (v?: string | null) => {
+            if (!v) return 0;
+            const n = String(v).replace(/[^0-9]/g, "");
+            return Number(n || 0);
+        };
+        let filtered = rows;
+        if (budget) {
+            if (budget === "30-50")
+                filtered = rows.filter((r) => parsePrice(r.price) >= 30000 && parsePrice(r.price) <= 50000);
+            else if (budget === "50-80")
+                filtered = rows.filter((r) => parsePrice(r.price) >= 50000 && parsePrice(r.price) <= 80000);
+            else if (budget === "80+") filtered = rows.filter((r) => parsePrice(r.price) >= 80000);
+        }
+
+        const courses = filtered.slice(0, 3).map((c) => ({
             id: String(c.id),
             title: c.title,
             description: c.description || "",
@@ -93,7 +126,5 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error("GET /api/courses/recommend error:", error);
         return NextResponse.json({ success: false, error: "Failed to recommend courses" }, { status: 500 });
-    } finally {
-        if (connection) connection.release();
     }
 }

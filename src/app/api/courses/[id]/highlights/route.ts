@@ -1,31 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const { id: courseId } = await params;
         console.log("API: Fetching highlights for course ID:", courseId);
-
-        const connection = await pool.getConnection();
-
-        try {
-            const [highlights] = await connection.execute(
-                "SELECT id, title, description, icon FROM highlights WHERE course_id = ? ORDER BY id",
-                [courseId]
-            );
-
-            const highlightsArray = highlights as Array<{
-                id: number;
-                title: string;
-                description: string;
-                icon: string;
-            }>;
-            console.log("API: Found highlights:", highlightsArray.length);
-
-            return NextResponse.json(highlightsArray);
-        } finally {
-            connection.release();
-        }
+        const rows = await (prisma as any).highlights.findMany({
+            where: { course_id: Number(courseId) },
+            orderBy: [{ id: "asc" }],
+            select: { id: true, title: true, description: true, icon: true },
+        });
+        console.log("API: Found highlights:", rows.length);
+        return NextResponse.json(rows);
     } catch (error) {
         console.error("API: Error fetching highlights:", error);
         return NextResponse.json(

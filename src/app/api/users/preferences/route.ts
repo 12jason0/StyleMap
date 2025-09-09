@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 import { getUserIdFromRequest } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -12,63 +12,40 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { preferences } = body;
 
-        const connection = await pool.getConnection();
+        // upsert: 있으면 업데이트, 없으면 생성
+        await (prisma as any).user_preferences.upsert({
+            where: { userId: String(userId) },
+            update: {
+                preferences: {
+                    travelStyle: preferences.travelStyle || [],
+                    budgetRange: preferences.budgetRange || null,
+                    timePreference: preferences.timePreference || [],
+                    foodPreference: preferences.foodPreference || [],
+                    activityLevel: preferences.activityLevel || null,
+                    groupSize: preferences.groupSize || null,
+                    interests: preferences.interests || [],
+                    locationPreferences: preferences.locationPreferences || [],
+                },
+            },
+            create: {
+                userId: String(userId),
+                preferences: {
+                    travelStyle: preferences.travelStyle || [],
+                    budgetRange: preferences.budgetRange || null,
+                    timePreference: preferences.timePreference || [],
+                    foodPreference: preferences.foodPreference || [],
+                    activityLevel: preferences.activityLevel || null,
+                    groupSize: preferences.groupSize || null,
+                    interests: preferences.interests || [],
+                    locationPreferences: preferences.locationPreferences || [],
+                },
+            },
+        });
 
-        try {
-            // 기존 선호도 확인
-            const [existingPreferences] = await connection.execute(
-                "SELECT id FROM user_preferences WHERE user_id = ?",
-                [userId]
-            );
-
-            if (Array.isArray(existingPreferences) && existingPreferences.length > 0) {
-                // 기존 선호도 업데이트
-                await connection.execute(
-                    `UPDATE user_preferences SET 
-                    travel_style = ?, budget_range = ?, time_preference = ?, 
-                    food_preference = ?, activity_level = ?, group_size = ?, 
-                    interests = ?, location_preferences = ?, updated_at = CURRENT_TIMESTAMP 
-                    WHERE user_id = ?`,
-                    [
-                        JSON.stringify(preferences.travelStyle || []),
-                        preferences.budgetRange || null,
-                        JSON.stringify(preferences.timePreference || []),
-                        JSON.stringify(preferences.foodPreference || []),
-                        preferences.activityLevel || null,
-                        preferences.groupSize || null,
-                        JSON.stringify(preferences.interests || []),
-                        JSON.stringify(preferences.locationPreferences || []),
-                        userId,
-                    ]
-                );
-            } else {
-                // 새로운 선호도 생성
-                await connection.execute(
-                    `INSERT INTO user_preferences 
-                    (user_id, travel_style, budget_range, time_preference, food_preference, 
-                     activity_level, group_size, interests, location_preferences) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                        userId,
-                        JSON.stringify(preferences.travelStyle || []),
-                        preferences.budgetRange || null,
-                        JSON.stringify(preferences.timePreference || []),
-                        JSON.stringify(preferences.foodPreference || []),
-                        preferences.activityLevel || null,
-                        preferences.groupSize || null,
-                        JSON.stringify(preferences.interests || []),
-                        JSON.stringify(preferences.locationPreferences || []),
-                    ]
-                );
-            }
-
-            return NextResponse.json({
-                success: true,
-                message: "선호도가 저장되었습니다.",
-            });
-        } finally {
-            connection.release();
-        }
+        return NextResponse.json({
+            success: true,
+            message: "선호도가 저장되었습니다.",
+        });
     } catch (error) {
         console.error("Error saving preferences:", error);
         return NextResponse.json({ error: "선호도 저장 중 오류가 발생했습니다." }, { status: 500 });
@@ -82,43 +59,19 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(null);
         }
 
-        const connection = await pool.getConnection();
-
-        try {
-            const [preferences] = await connection.execute("SELECT * FROM user_preferences WHERE user_id = ?", [
-                userId,
-            ]);
-
-            const preferencesArray = preferences as Array<{
-                travel_style: string;
-                budget_range: string;
-                time_preference: string;
-                food_preference: string;
-                activity_level: string;
-                group_size: string;
-                interests: string;
-                location_preferences: string;
-            }>;
-
-            if (preferencesArray.length === 0) {
-                return NextResponse.json(null);
-            }
-
-            const userPrefs = preferencesArray[0];
-
-            return NextResponse.json({
-                travelStyle: userPrefs.travel_style ? JSON.parse(userPrefs.travel_style) : [],
-                budgetRange: userPrefs.budget_range,
-                timePreference: userPrefs.time_preference ? JSON.parse(userPrefs.time_preference) : [],
-                foodPreference: userPrefs.food_preference ? JSON.parse(userPrefs.food_preference) : [],
-                activityLevel: userPrefs.activity_level,
-                groupSize: userPrefs.group_size,
-                interests: userPrefs.interests ? JSON.parse(userPrefs.interests) : [],
-                locationPreferences: userPrefs.location_preferences ? JSON.parse(userPrefs.location_preferences) : [],
-            });
-        } finally {
-            connection.release();
-        }
+        const row = await (prisma as any).user_preferences.findUnique({ where: { userId: String(userId) } });
+        if (!row) return NextResponse.json(null);
+        const prefs = row.preferences as any;
+        return NextResponse.json({
+            travelStyle: prefs?.travelStyle ?? [],
+            budgetRange: prefs?.budgetRange ?? null,
+            timePreference: prefs?.timePreference ?? [],
+            foodPreference: prefs?.foodPreference ?? [],
+            activityLevel: prefs?.activityLevel ?? null,
+            groupSize: prefs?.groupSize ?? null,
+            interests: prefs?.interests ?? [],
+            locationPreferences: prefs?.locationPreferences ?? [],
+        });
     } catch (error) {
         console.error("Error fetching preferences:", error);
         return NextResponse.json({ error: "선호도 조회 중 오류가 발생했습니다." }, { status: 500 });

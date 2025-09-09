@@ -1,25 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-    let connection;
-
     try {
         const { id: courseId } = await context.params;
         console.log("API: Incrementing view count for course:", courseId);
 
-        connection = await pool.getConnection();
-        console.log("API: Database connection successful");
+        const updated = await (prisma as any).courses.update({
+            where: { id: Number(courseId) },
+            data: { view_count: { increment: 1 } },
+            select: { id: true },
+        });
 
-        // 조회수 증가 (view_count 필드가 없으면 0으로 초기화 후 증가)
-        const [result] = await connection.execute(
-            "UPDATE courses SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?",
-            [courseId]
-        );
-
-        const updateResult = result as { affectedRows: number };
-
-        if (updateResult.affectedRows === 0) {
+        if (!updated) {
             return NextResponse.json({ error: "코스를 찾을 수 없습니다" }, { status: 404 });
         }
 
@@ -31,9 +24,5 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
 
         return NextResponse.json({ error: "조회수 증가 실패", details: errorMessage }, { status: 500 });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
     }
 }
