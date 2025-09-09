@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 import { getJwtSecret } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
@@ -21,61 +21,37 @@ export async function GET(request: NextRequest) {
             const userId = decoded.userId;
             console.log("사용자 ID:", userId);
 
-            const connection = await pool.getConnection();
-            console.log("DB 연결 성공");
+            const bookingsArray = (await (prisma as any).booking.findMany({
+                where: { userId: Number(userId) },
+                orderBy: { bookingDate: "desc" },
+                select: {
+                    id: true,
+                    courseTitle: true,
+                    bookingDate: true,
+                    status: true,
+                    price: true,
+                    participants: true,
+                },
+            })) as any[];
+            console.log("조회된 예약 내역:", bookingsArray);
 
-            try {
-                // bookings 테이블이 존재하는지 확인
-                console.log("bookings 테이블 확인 중...");
-                const [tables] = await connection.execute("SHOW TABLES LIKE 'bookings'");
-                const tablesArray = tables as Array<{ Tables_in_stylemap: string }>;
-                console.log("테이블 확인 결과:", tablesArray);
+            // 예약 내역이 없어도 정상적으로 처리
+            const formattedBookings = bookingsArray.map((b) => ({
+                id: b.id,
+                courseTitle: (b as any).courseTitle || "알 수 없는 코스",
+                date: new Date((b as any).bookingDate as any).toLocaleDateString("ko-KR"),
+                status: b.status,
+                price: b.price,
+                participants: b.participants,
+            }));
 
-                if (tablesArray.length === 0) {
-                    // bookings 테이블이 없으면 빈 배열 반환
-                    console.log("bookings 테이블이 존재하지 않음, 빈 배열 반환");
-                    return NextResponse.json({
-                        success: true,
-                        bookings: [],
-                    });
-                }
+            console.log("포맷된 예약 내역:", formattedBookings);
 
-                console.log("bookings 테이블이 존재함, 예약 내역 조회 중...");
-                const [bookings] = await connection.execute(
-                    "SELECT b.id, b.course_title, b.booking_date, b.status, b.price, b.participants FROM bookings b WHERE b.user_id = ? ORDER BY b.booking_date DESC",
-                    [userId]
-                );
-
-                const bookingsArray = bookings as Array<{
-                    id: number;
-                    course_title: string;
-                    booking_date: string;
-                    status: string;
-                    price: number;
-                    participants: number;
-                }>;
-                console.log("조회된 예약 내역:", bookingsArray);
-
-                // 예약 내역이 없어도 정상적으로 처리
-                const formattedBookings = bookingsArray.map((booking) => ({
-                    id: booking.id,
-                    courseTitle: booking.course_title || "알 수 없는 코스",
-                    date: new Date(booking.booking_date).toLocaleDateString("ko-KR"),
-                    status: booking.status,
-                    price: booking.price,
-                    participants: booking.participants,
-                }));
-
-                console.log("포맷된 예약 내역:", formattedBookings);
-
-                // 예약 내역이 없어도 성공 응답 반환
-                return NextResponse.json({
-                    success: true,
-                    bookings: formattedBookings,
-                });
-            } finally {
-                connection.release();
-            }
+            // 예약 내역이 없어도 성공 응답 반환
+            return NextResponse.json({
+                success: true,
+                bookings: formattedBookings,
+            });
         } catch {
             console.error("JWT 토큰 검증 실패");
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });

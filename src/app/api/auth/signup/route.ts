@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 import { getJwtSecret } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
@@ -25,54 +25,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "비밀번호는 최소 6자 이상이어야 합니다." }, { status: 400 });
         }
 
-        const connection = await pool.getConnection();
-        console.log("DB 연결 성공");
+        // 이메일 중복 확인
+        const existing = await (prisma as any).user.findFirst({ where: { email }, select: { id: true } });
+        if (existing) return NextResponse.json({ error: "이미 사용 중인 이메일입니다." }, { status: 409 });
 
-        try {
-            // 이메일 중복 확인 (닉네임은 중복 허용)
-            console.log("이메일 중복 확인 시작");
-            const [existingUsers] = await connection.execute("SELECT id FROM users WHERE email = ?", [email]);
+        const hashedPassword = await bcrypt.hash(password, 12);
+        const created = await (prisma as any).user.create({
+            data: { email, password: hashedPassword, nickname, provider: "local" },
+            select: { id: true, email: true, nickname: true },
+        });
 
-            if (Array.isArray(existingUsers) && existingUsers.length > 0) {
-                console.log("이미 사용 중인 이메일:", email);
-                return NextResponse.json({ error: "이미 사용 중인 이메일입니다." }, { status: 409 });
-            }
+        const JWT_SECRET = getJwtSecret();
+        const token = jwt.sign({ userId: created.id, email, nickname }, JWT_SECRET, { expiresIn: "7d" });
 
-            console.log("이메일 중복 없음, 회원가입 진행 (닉네임 중복 허용)");
-
-            // 비밀번호 해시화
-            console.log("비밀번호 해시화 시작");
-            const hashedPassword = await bcrypt.hash(password, 12);
-            console.log("비밀번호 해시화 완료");
-
-            // 사용자 생성
-            console.log("사용자 생성 시작");
-            const [result] = await connection.execute(
-                "INSERT INTO users (email, password, nickname, provider) VALUES (?, ?, ?, ?)",
-                [email, hashedPassword, nickname, "local"]
-            );
-            console.log("사용자 생성 완료:", result);
-
-            const insertResult = result as { insertId: number };
-            const userId = insertResult.insertId;
-
-            // JWT 토큰 생성
-            const JWT_SECRET = getJwtSecret();
-            const token = jwt.sign({ userId, email, nickname }, JWT_SECRET, { expiresIn: "7d" });
-
-            return NextResponse.json({
-                success: true,
-                message: "회원가입이 완료되었습니다.",
-                token,
-                user: {
-                    id: userId,
-                    email,
-                    nickname,
-                },
-            });
-        } finally {
-            connection.release();
-        }
+        return NextResponse.json({
+            success: true,
+            message: "회원가입이 완료되었습니다.",
+            token,
+            user: { id: created.id, email, nickname },
+        });
     } catch (error) {
         console.error("회원가입 오류:", error);
         console.error("에러 상세:", {
