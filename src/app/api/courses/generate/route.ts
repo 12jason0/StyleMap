@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
+import prisma from "@/lib/db";
 
 // 쿼리: ?tag=coffee&count=3&places=4
 // places 테이블에서 tag/category/name에 tag가 포함된 장소를 랜덤 샘플링해
@@ -14,29 +14,28 @@ export async function GET(request: NextRequest) {
     const tags: string[] = (tagsCsv ? tagsCsv.split(",") : []).map((t) => t.trim()).filter(Boolean);
     if (tag && !tags.length) tags.push(tag);
 
-    let connection;
     try {
-        connection = await pool.getConnection();
-
-        // 선택된 태그들(여러개 허용)과 지역 필터를 반영
-        let sql = `SELECT id, name, address, latitude, longitude, category, imageUrl
-                   FROM places WHERE latitude IS NOT NULL AND longitude IS NOT NULL`;
-        const params: any[] = [];
-        if (region) {
-            sql += ` AND address LIKE ?`;
-            params.push(`%${region}%`);
-        }
+        // Prisma로 장소 조회
+        const where: any = { AND: [{ latitude: { not: null } }, { longitude: { not: null } }] };
+        if (region) (where.AND as any[]).push({ address: { contains: region } });
         if (tags.length > 0) {
-            const orBlocks = tags.map(() => `(category LIKE ? OR name LIKE ? )`).join(" OR ");
-            sql += ` AND (${orBlocks})`;
-            tags.forEach((t) => {
-                const lk = `%${t}%`;
-                params.push(lk, lk);
+            (where.AND as any[]).push({
+                OR: tags.map((t) => ({ OR: [{ category: { contains: t } }, { name: { contains: t } }] })),
             });
         }
-        sql += ` LIMIT 500`;
-
-        let [rows] = await connection.execute(sql, params);
+        let rows = (await (prisma as any).place.findMany({
+            where,
+            take: 500,
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                latitude: true,
+                longitude: true,
+                category: true,
+                imageUrl: true,
+            },
+        } as any)) as any[];
 
         type Place = {
             id: number;
@@ -52,15 +51,25 @@ export async function GET(request: NextRequest) {
         // Fallback: 선택 조합으로 장소가 부족하면 지역만 기준으로 다시 시도
         if (allPlaces.length < placesPerCourse) {
             try {
-                const params2: any[] = [];
-                let sql2 = `SELECT id, name, address, latitude, longitude, category, imageUrl
-                            FROM places WHERE latitude IS NOT NULL AND longitude IS NOT NULL`;
-                if (region) {
-                    sql2 += ` AND address LIKE ?`;
-                    params2.push(`%${region}%`);
-                }
-                sql2 += ` LIMIT 500`;
-                const [rows2] = await connection.execute(sql2, params2);
+                const rows2 = (await (prisma as any).place.findMany({
+                    where: {
+                        AND: [
+                            { latitude: { not: null } },
+                            { longitude: { not: null } },
+                            ...(region ? [{ address: { contains: region } }] : []),
+                        ],
+                    },
+                    take: 500,
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                        latitude: true,
+                        longitude: true,
+                        category: true,
+                        imageUrl: true,
+                    },
+                } as any)) as any[];
                 const alt = rows2 as Place[];
                 if (alt.length >= placesPerCourse) {
                     allPlaces = alt;
@@ -297,6 +306,5 @@ export async function GET(request: NextRequest) {
         const message = error instanceof Error ? error.message : String(error);
         return NextResponse.json({ success: false, error: message }, { status: 500 });
     } finally {
-        if (connection) connection.release();
     }
 }

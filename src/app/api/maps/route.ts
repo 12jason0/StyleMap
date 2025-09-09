@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
 
         const apiKey = process.env.KAKAO_MOBILITY_REST_KEY || process.env.KAKAO_REST_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ success: false, error: "Kakao Mobility key not configured" }, { status: 500 });
+            return NextResponse.json(
+                { success: false, error: "Kakao Mobility key not configured" },
+                { status: 500, headers: { "Cache-Control": "no-store" } }
+            );
         }
 
         const endpoint =
@@ -80,8 +83,14 @@ export async function GET(request: NextRequest) {
             parts.forEach((p) => coordinates.push([p[0], p[1]]));
         }
 
-        return NextResponse.json({ success: true, coordinates });
+        return NextResponse.json(
+            { success: true, coordinates },
+            { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } }
+        );
     } catch (error) {
-        return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+        return NextResponse.json(
+            { success: false, error: (error as Error).message },
+            { status: 500, headers: { "Cache-Control": "no-store" } }
+        );
     }
 }

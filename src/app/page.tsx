@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/Header";
 
 type Course = {
@@ -353,13 +354,13 @@ export default function Home() {
                             {/* 배경 이미지 */}
                             <div className="absolute inset-0">
                                 {course.imageUrl ? (
-                                    <img
+                                    <Image
                                         src={course.imageUrl}
                                         alt={course.title}
-                                        className="w-full h-full object-cover"
-                                        loading={index === currentSlide ? "eager" : "lazy"}
-                                        decoding="async"
+                                        fill
+                                        priority={index === currentSlide}
                                         sizes="100vw"
+                                        className="object-cover"
                                     />
                                 ) : (
                                     <div className="w-full h-full bg-white" />
@@ -492,16 +493,14 @@ export default function Home() {
                                         }`}
                                     >
                                         {course.imageUrl ? (
-                                            <img
+                                            <Image
                                                 src={course.imageUrl}
                                                 alt={course.title}
-                                                className={`
-                                                    w-full h-full object-cover transition-transform duration-700
-                                                    ${hoveredCard === course.id ? "scale-110" : "scale-100"}
-                                                `}
-                                                loading="lazy"
-                                                decoding="async"
+                                                fill
                                                 sizes="(max-width: 1024px) 100vw, 50vw"
+                                                className={`object-cover transition-transform duration-700 ${
+                                                    hoveredCard === course.id ? "scale-110" : "scale-100"
+                                                }`}
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-gray-200" />
@@ -577,13 +576,12 @@ export default function Home() {
                                 >
                                     <div className="relative h-48 overflow-hidden">
                                         {course.imageUrl ? (
-                                            <img
+                                            <Image
                                                 src={course.imageUrl}
                                                 alt={course.title}
-                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                                loading="lazy"
-                                                decoding="async"
+                                                fill
                                                 sizes="(max-width: 768px) 100vw, 33vw"
+                                                className="object-cover group-hover:scale-110 transition-transform duration-500"
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-white" />

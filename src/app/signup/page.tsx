@@ -6,7 +6,6 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header"; // Header 컴포넌트 경로 확인 필요
-import { saveAuthSession, dispatchAuthChange } from "@/lib/authClient";
 
 const Signup = () => {
     const router = useRouter();
@@ -145,13 +144,8 @@ const Signup = () => {
                             throw new Error(data.details || data.error || "서버 처리 중 오류가 발생했습니다.");
                         }
 
-                        if (data.token) {
-                            saveAuthSession(data.token, data.user);
-                            dispatchAuthChange(data.token);
-                            router.push("/?login_success=true");
-                        } else {
-                            router.push("/?signup_success=true");
-                        }
+                        // 서버 쿠키 기반이므로 토큰 저장 불필요
+                        router.push(data.token ? "/?login_success=true" : "/?signup_success=true");
                     } catch (err: unknown) {
                         setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
                     } finally {

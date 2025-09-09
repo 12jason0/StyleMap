@@ -2,6 +2,7 @@
 import { useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface Course {
     id: string;
@@ -192,10 +193,12 @@ function CoursesPageInner() {
                             {/* 이미지 */}
                             <div className="relative h-48 rounded-t-2xl overflow-hidden">
                                 {course.imageUrl ? (
-                                    <img
+                                    <Image
                                         src={course.imageUrl}
                                         alt={course.title}
-                                        className="w-full h-full object-cover"
+                                        fill
+                                        sizes="(max-width: 1024px) 100vw, 33vw"
+                                        className="object-cover"
                                     />
                                 ) : (
                                     <div className="w-full h-full bg-white" />

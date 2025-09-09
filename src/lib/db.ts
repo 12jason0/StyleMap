@@ -1,48 +1,29 @@
-import mysql, { Pool } from "mysql2/promise";
+import { PrismaClient } from "@prisma/client";
 import { logger } from "./logger";
 
-// 글로벌 싱글톤 풀 (Next.js HMR로 인한 다중 생성 방지)
+// Prisma 클라이언트 싱글톤 (HMR 대응)
 declare global {
     // eslint-disable-next-line no-var
-    var __mysqlPool: Pool | undefined;
+    var __prisma: PrismaClient | undefined;
 }
 
-const pool: Pool =
-    global.__mysqlPool ??
-    mysql.createPool({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined,
-        connectionLimit: 10,
-        waitForConnections: true,
-        queueLimit: 0,
-        // 추가 옵션
-        multipleStatements: false,
-        dateStrings: true,
-        supportBigNumbers: true,
-        bigNumberStrings: true,
-        // 연결 풀 최적화
-        enableKeepAlive: true,
-        keepAliveInitialDelay: 0,
+export const prisma: PrismaClient =
+    global.__prisma ??
+    new PrismaClient({
+        log: process.env.NODE_ENV === "production" ? ["error"] : ["query", "error", "warn"],
     });
 
-if (!global.__mysqlPool) {
-    global.__mysqlPool = pool;
+if (!global.__prisma) {
+    global.__prisma = prisma;
 }
 
-// 연결 테스트
-pool.getConnection()
-    .then((connection) => {
-        logger.info("Database connected successfully");
-        connection.release();
-    })
+// 연결 확인
+prisma
+    .$connect()
+    .then(() => logger.info("Prisma connected successfully"))
     .catch((error) => {
-        logger.error("Database connection failed:", { error });
-        if (process.env.NODE_ENV === "production") {
-            process.exit(1);
-        }
+        logger.error("Prisma connection failed", { error });
+        if (process.env.NODE_ENV === "production") process.exit(1);
     });
 
-export default pool;
+export default prisma;

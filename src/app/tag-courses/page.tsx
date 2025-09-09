@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import KakaoMap from "@/components/KakaoMap";
+import Image from "next/image";
 
 type TagCoursePlace = {
     order: number;
@@ -439,15 +440,15 @@ export default function TagCoursesPage() {
                                                 </div>
                                                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                                                     {p.imageUrl ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img
+                                                        <Image
                                                             src={encodeURI(p.imageUrl.trim())}
                                                             alt={p.name}
-                                                            className="w-full h-full object-cover"
-                                                            onError={(e) => {
-                                                                const target = e.currentTarget as HTMLImageElement;
-                                                                target.onerror = null;
-                                                                target.src = "/images/placeholder-location.jpg";
+                                                            fill
+                                                            sizes="(max-width: 768px) 100vw, 200px"
+                                                            className="object-cover"
+                                                            onError={(e: any) => {
+                                                                e.currentTarget.src =
+                                                                    "/images/placeholder-location.jpg";
                                                             }}
                                                         />
                                                     ) : (
@@ -534,11 +535,12 @@ export default function TagCoursesPage() {
                                             </div>
                                             <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-100">
                                                 {p.imageUrl ? (
-                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                    <img
+                                                    <Image
                                                         src={p.imageUrl}
                                                         alt={p.name}
-                                                        className="w-full h-full object-cover"
+                                                        fill
+                                                        sizes="100px"
+                                                        className="object-cover"
                                                     />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center">
