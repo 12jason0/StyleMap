@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
+export const dynamic = "force-dynamic";
 // Kakao Mobility Directions API proxy (inline)
 // Query:
 //   coords: "lng,lat;lng,lat;..." (at least origin and destination)

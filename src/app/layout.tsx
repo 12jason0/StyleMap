@@ -1,13 +1,22 @@
+import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { metadata } from "./metadata";
 import LayoutContent from "@/components/LayoutContent";
 
 const inter = Inter({
     variable: "--font-geist-sans",
     subsets: ["latin"],
 });
+
+export const metadata: Metadata = {
+    title: "StyleMap",
+    description: "AI가 추천하는 나만의 여행 코스, 스타일맵",
+    verification: {
+        other: { "naver-site-verification": "04bc95b70771b389d02d3cd52d52c76dfe9b85c3" },
+    },
+};
+
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -15,30 +24,9 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="ko">
-            <meta name="naver-site-verification" content="04bc95b70771b389d02d3cd52d52c76dfe9b85c3" />
-
             <body className={`${inter.variable} antialiased min-h-screen flex flex-col`}>
                 <LayoutContent>{children}</LayoutContent>
-                {/* Kakao Map 스크립트: 프로덕션에서 키가 없거나 브라우저가 아닐 때 주입 안함 */}
-                {process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY ? (
-                    <Script
-                        src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY}&libraries=services,clusterer&autoload=false`}
-                        strategy="beforeInteractive"
-                        onError={(e) => {
-                            // eslint-disable-next-line no-console
-                            console.error("Kakao script failed to load", e);
-                        }}
-                    />
-                ) : (
-                    <script
-                        dangerouslySetInnerHTML={{
-                            __html: "console.warn('Kakao Map key not provided; skipping script injection');",
-                        }}
-                    />
-                )}
             </body>
         </html>
     );
 }
-
-export { metadata };

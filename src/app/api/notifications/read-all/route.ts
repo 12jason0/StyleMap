@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-
+export const dynamic = "force-dynamic";
 export async function PUT() {
     try {
         // 실제로는 데이터베이스에서 모든 알림을 읽음 처리

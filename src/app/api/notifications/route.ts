@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-
+export const dynamic = "force-dynamic";
 export async function GET() {
     try {
         // 실제로는 데이터베이스에서 알림 데이터를 가져옴

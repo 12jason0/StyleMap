@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/db";
 import { getJwtSecret } from "@/lib/auth";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
     console.log("=== 카카오 로그인 API 시작 ===");

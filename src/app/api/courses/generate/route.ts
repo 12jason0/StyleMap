@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-
+export const dynamic = "force-dynamic";
 // 쿼리: ?tag=coffee&count=3&places=4
 // places 테이블에서 tag/category/name에 tag가 포함된 장소를 랜덤 샘플링해
 // 코스 count개를 생성하여 반환. DB에는 저장하지 않고 즉시 응답만.

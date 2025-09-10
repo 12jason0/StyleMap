@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { extractBearerToken, verifyJwtAndGetUserId } from "@/lib/auth";
 import { generateMLRecommendations } from "@/lib/ml/deepLearningRecommender";
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
     try {

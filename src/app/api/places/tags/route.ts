@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-
+export const dynamic = "force-dynamic";
 // places.tags 컬럼에서 태그 목록을 수집해 unique로 반환
 // tags 컬럼이 없거나 비어있으면 category를 fallback으로 사용
 export async function GET(request: NextRequest) {

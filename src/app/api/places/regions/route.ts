@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-
+export const dynamic = "force-dynamic";
 // places.address에서 상위 지역(예: '서울', '경기 광명시', '부산') 후보를 추출
 export async function GET(_req: NextRequest) {
     try {

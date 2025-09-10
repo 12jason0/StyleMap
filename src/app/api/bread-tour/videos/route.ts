@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
+export const dynamic = "force-dynamic";
 // 간단한 XML 파서 (RSS entry 일부만 필요하므로 정규식 기반)
 function parseYouTubeRss(xml: string) {
     const entries: { id: string; title: string; url: string; description?: string }[] = [];
