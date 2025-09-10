@@ -1,19 +1,13 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { metadata } from "./metadata";
 import LayoutContent from "@/components/LayoutContent";
 
-const geistSans = Geist({
+const inter = Inter({
     variable: "--font-geist-sans",
     subsets: ["latin"],
 });
-
-const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
-    subsets: ["latin"],
-});
-
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -21,7 +15,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="ko">
-            <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
+            <body className={`${inter.variable} antialiased min-h-screen flex flex-col`}>
                 <LayoutContent>{children}</LayoutContent>
                 {/* Kakao Map 스크립트를 body 태그가 닫히기 직전에 추가 */}
                 <Script
