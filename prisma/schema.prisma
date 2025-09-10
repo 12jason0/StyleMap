@@ -8,19 +8,19 @@ datasource db {
 }
 
 model User {
-  id              Int       @id @default(autoincrement())
-  email           String    @unique @db.VarChar(100)
-  password        String?   @db.VarChar(255)
-  nickname        String    @db.VarChar(50)
-  profileImageUrl String?   @db.VarChar(255)
-  socialId        String?   @db.VarChar(255)
-  provider        String    @default("local") @db.VarChar(20)
-  createdAt       DateTime  @default(now()) @db.Timestamp(0)
-  updatedAt       DateTime  @updatedAt @db.Timestamp(0)
-  mbti            String?   @db.VarChar(20)
-  age             Int?
-  reviews         Review[]
-  courses         Courses[]
+  id               Int       @id @default(autoincrement())
+  email            String?   @unique @db.VarChar(100)  // ? 추가하여 nullable로 변경
+  password         String?   @db.VarChar(255)
+  nickname         String    @db.VarChar(50)
+  profileImageUrl  String?   @db.VarChar(255)
+  socialId         String?   @db.VarChar(255)
+  provider         String    @default("local") @db.VarChar(20)
+  createdAt        DateTime  @default(now()) @db.Timestamp(0)
+  updatedAt        DateTime  @updatedAt @db.Timestamp(0)
+  mbti             String?   @db.VarChar(20)
+  age              Int?
+  reviews          Review[]
+  courses          Courses[]
 
   @@index([provider, socialId])
 }
@@ -148,6 +148,7 @@ model Place {
   latitude             Decimal?      @db.Decimal(10, 8)
   longitude            Decimal?      @db.Decimal(11, 8)
   imageUrl             String?       @db.VarChar(500)
+  tags                 String?       @db.Text   
   created_at           DateTime      @default(now())
   updated_at           DateTime      @updatedAt
   course_places        CoursePlace[]
