@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { getJwtSecret } from "@/lib/auth";
-
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
     try {
         // Authorization 헤더에서 토큰 추출
