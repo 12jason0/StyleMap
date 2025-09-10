@@ -59,10 +59,19 @@ const Login = () => {
             const data = await response.json();
 
             if (response.ok) {
-                // 서버 쿠키 기반이므로 세션 재조회
-                await fetchSession();
+                // 서버 응답의 토큰도 함께 로컬스토리지에 저장하여 기존 헤더 로직과 동기화
+                if (data?.token) {
+                    localStorage.setItem("authToken", data.token);
+                    if (data?.user) localStorage.setItem("user", JSON.stringify(data.user));
+                    localStorage.setItem("loginTime", Date.now().toString());
+                    window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
+                } else {
+                    // 쿠키만 설정된 케이스: 세션 조회 후 이벤트 발생
+                    await fetchSession();
+                    window.dispatchEvent(new CustomEvent("authTokenChange"));
+                }
 
-                // 홈페이지로 이동 (로그인 성공 모달 표시를 위해 파라미터 추가)
+                // 홈페이지로 이동 (로그인 성공 모달 표시)
                 router.push("/?login_success=true");
             } else {
                 setError(data.error || "로그인에 실패했습니다.");

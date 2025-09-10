@@ -960,7 +960,9 @@ function MapPageInner() {
                             className="absolute top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out z-20"
                             style={{ left: leftPanelOpen ? "24rem" : "0" }}
                         >
-                            <span className="text-gray-600 text-sm">{leftPanelOpen ? "◀" : "▶"}</span>
+                            <span className="text-gray-600 text-sm hover:cursor-pointer">
+                                {leftPanelOpen ? "◀" : "▶"}
+                            </span>
                         </button>
                     )}
 
@@ -1033,7 +1035,7 @@ function MapPageInner() {
                     {/* 내 위치로 이동 버튼 */}
                     <button
                         onClick={moveToMyLocation}
-                        className={`fixed ${
+                        className={`hover:cursor-pointer fixed ${
                             isMobile ? "bottom-28 right-4 p-2" : "bottom-6 right-6 p-3"
                         } bg-white border border-gray-300 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
                         title="내 위치로 이동"
@@ -1044,7 +1046,7 @@ function MapPageInner() {
                     {/* 확대 버튼 */}
                     <button
                         onClick={handleZoomIn}
-                        className={`fixed top-25 right-6 bg-white border border-gray-300 rounded-lg ${
+                        className={`hover:cursor-pointer fixed top-25 right-6 bg-white border border-gray-300 rounded-lg ${
                             isMobile ? "p-2" : "p-3"
                         } shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
                         title="확대"
@@ -1055,7 +1057,7 @@ function MapPageInner() {
                     {/* 축소 버튼 */}
                     <button
                         onClick={handleZoomOut}
-                        className={`fixed top-40 right-6 bg-white border border-gray-300 rounded-lg ${
+                        className={`hover:cursor-pointer fixed top-40 right-6 bg-white border border-gray-300 rounded-lg ${
                             isMobile ? "p-2" : "p-3"
                         } shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
                         title="축소"
