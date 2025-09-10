@@ -10,6 +10,8 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
         const limitParam = searchParams.get("limit");
+        const noCache = searchParams.get("nocache");
+        const noFilter = searchParams.get("noFilter");
         const effectiveLimit = Math.min(Math.max(Number(limitParam ?? 100), 1), 200);
 
         // Prisma로 조회 (컨셉 필터 + 이미지 조건)
@@ -26,12 +28,19 @@ export async function GET(request: NextRequest) {
             } as any,
         } as any);
 
-        const filtered = (results as any[]).filter((c) => {
-            const emptyImages = (c.course_places || []).filter((cp: any) => !cp.places?.imageUrl).length;
-            return emptyImages <= 1;
-        });
+        let usableResults: any[] = results as any[];
+        if (!noFilter) {
+            const filtered = (results as any[]).filter((c) => {
+                const emptyImages = (c.course_places || []).filter((cp: any) => !cp.places?.imageUrl).length;
+                return emptyImages <= 1;
+            });
+            // 필터 결과가 0이면 필터를 자동 완화하여 원본 사용 (초기 데이터 표시 보장)
+            if (filtered.length > 0) {
+                usableResults = filtered;
+            }
+        }
 
-        const formattedCourses = filtered.map((course) => ({
+        const formattedCourses = usableResults.map((course) => ({
             id: String(course.id),
             title: course.title || "제목 없음",
             description: course.description || "",
@@ -52,7 +61,10 @@ export async function GET(request: NextRequest) {
             status: 200,
             headers: {
                 "Content-Type": "application/json",
-                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", // 5분 캐시, 10분 stale-while-revalidate
+                ...(noCache
+                    ? { "Cache-Control": "no-store", Pragma: "no-cache" }
+                    : { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }),
+                "X-Records": String(formattedCourses.length),
             },
         });
     } catch (error) {

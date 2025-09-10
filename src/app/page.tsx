@@ -44,7 +44,7 @@ export default function Home() {
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await fetch("/api/courses?limit=12");
+                const response = await fetch("/api/courses?limit=12&nocache=1");
                 const data = await response.json();
 
                 // API 응답이 배열인지 확인하고 에러 객체인지 확인
