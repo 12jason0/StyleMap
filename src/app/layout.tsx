@@ -15,6 +15,8 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="ko">
+            <meta name="naver-site-verification" content="04bc95b70771b389d02d3cd52d52c76dfe9b85c3" />
+
             <body className={`${inter.variable} antialiased min-h-screen flex flex-col`}>
                 <LayoutContent>{children}</LayoutContent>
                 {/* Kakao Map 스크립트: 프로덕션에서 키가 없거나 브라우저가 아닐 때 주입 안함 */}
