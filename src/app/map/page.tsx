@@ -1032,38 +1032,61 @@ function MapPageInner() {
             {/* 지도 컨트롤 버튼들 (화면에 고정) */}
             {!loading && !error && (
                 <>
-                    {/* 내 위치로 이동 버튼 */}
-                    <button
-                        onClick={moveToMyLocation}
-                        className={`hover:cursor-pointer fixed ${
-                            isMobile ? "bottom-28 right-4 p-2" : "bottom-6 right-6 p-3"
-                        } bg-white border border-gray-300 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
-                        title="내 위치로 이동"
-                    >
-                        <div className={`${isMobile ? "w-5 h-5" : "w-6 h-6"} text-blue-500`}>📍</div>
-                    </button>
-
-                    {/* 확대 버튼 */}
-                    <button
-                        onClick={handleZoomIn}
-                        className={`hover:cursor-pointer fixed top-25 right-6 bg-white border border-gray-300 rounded-lg ${
-                            isMobile ? "p-2" : "p-3"
-                        } shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
-                        title="확대"
-                    >
-                        <div className={`${isMobile ? "w-5 h-5" : "w-6 h-6"} text-blue-500`}>➕</div>
-                    </button>
-
-                    {/* 축소 버튼 */}
-                    <button
-                        onClick={handleZoomOut}
-                        className={`hover:cursor-pointer fixed top-40 right-6 bg-white border border-gray-300 rounded-lg ${
-                            isMobile ? "p-2" : "p-3"
-                        } shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50`}
-                        title="축소"
-                    >
-                        <div className={`${isMobile ? "w-5 h-5" : "w-6 h-6"} text-blue-500`}>➖</div>
-                    </button>
+                    {isMobile ? (
+                        <div
+                            className="fixed right-4 bottom-20 z-50 flex flex-col items-end gap-2"
+                            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+                        >
+                            <button
+                                onClick={moveToMyLocation}
+                                title="내 위치로 이동"
+                                className="hover:cursor-pointer rounded-full bg-white border border-gray-300 p-3 shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95 hover:bg-gray-50"
+                            >
+                                <span className="text-blue-600">📍</span>
+                            </button>
+                            <div className="bg-white rounded-full border border-gray-300 shadow-lg overflow-hidden flex flex-col">
+                                <button
+                                    onClick={handleZoomIn}
+                                    title="확대"
+                                    className="hover:cursor-pointer p-3 active:bg-gray-50"
+                                >
+                                    <span className="text-blue-600">➕</span>
+                                </button>
+                                <div className="h-px bg-gray-200" />
+                                <button
+                                    onClick={handleZoomOut}
+                                    title="축소"
+                                    className="hover:cursor-pointer p-3 active:bg-gray-50"
+                                >
+                                    <span className="text-blue-600">➖</span>
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <button
+                                onClick={moveToMyLocation}
+                                className="hover:cursor-pointer fixed bottom-6 right-6 p-3 bg-white border border-gray-300 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50"
+                                title="내 위치로 이동"
+                            >
+                                <div className="w-6 h-6 text-blue-500">📍</div>
+                            </button>
+                            <button
+                                onClick={handleZoomIn}
+                                className="hover:cursor-pointer fixed top-25 right-6 bg-white border border-gray-300 rounded-lg p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50"
+                                title="확대"
+                            >
+                                <div className="w-6 h-6 text-blue-500">➕</div>
+                            </button>
+                            <button
+                                onClick={handleZoomOut}
+                                className="hover:cursor-pointer fixed top-40 right-6 bg-white border border-gray-300 rounded-lg p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:bg-gray-50 z-50"
+                                title="축소"
+                            >
+                                <div className="w-6 h-6 text-blue-500">➖</div>
+                            </button>
+                        </>
+                    )}
                 </>
             )}
         </>

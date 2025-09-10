@@ -1,137 +1,183 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type NearbyCourse = {
+type Course = {
     id: number;
     title: string;
     description?: string;
     imageUrl?: string;
     concept?: string;
     region?: string;
-    distance: number; // meters
+    distance?: number;
     start_place_name?: string;
+    location?: string;
+    price?: string;
+    duration?: string;
 };
 
+const activities = [
+    { key: "카페투어", label: "☕ 카페투어" },
+    { key: "맛집탐방", label: "🍜 맛집탐방" },
+    { key: "쇼핑", label: "🛍️ 쇼핑" },
+    { key: "문화예술", label: "🎨 문화예술" },
+];
+
+const regions = ["강남", "성수", "홍대", "종로", "연남", "한남", "서초", "건대", "잠실"];
+
 export default function NearbyPage() {
+    const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+    const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+    const [budget, setBudget] = useState<number>(10);
+    const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [courses, setCourses] = useState<NearbyCourse[]>([]);
-    const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-    const [km, setKm] = useState<number>(2);
 
-    const findNearbyCourses = () => {
-        setError(null);
-        setLoading(true);
-        if (!("geolocation" in navigator)) {
-            setLoading(false);
-            alert("현재 위치를 사용할 수 없어요. 브라우저 설정을 확인해주세요.");
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            async ({ coords }) => {
-                try {
-                    const lat = coords.latitude;
-                    const lng = coords.longitude;
-                    setCoords({ lat, lng });
-
-                    const res = await fetch(`/api/courses/nearby?lat=${lat}&lng=${lng}&km=${km}`, {
-                        cache: "no-store",
-                    });
-                    const data = await res.json();
-                    if (!res.ok || !data.success) {
-                        throw new Error(data.error || "주변 코스를 가져오는데 실패했습니다.");
-                    }
-                    // 정규화
-                    const list: NearbyCourse[] = (data.courses || []).map((c: any) => ({
-                        id: c.id,
-                        title: c.title,
-                        description: c.description,
-                        imageUrl: c.imageUrl,
-                        concept: c.concept,
-                        region: c.region,
-                        distance: Number(c.distance) || 0,
-                        start_place_name: c.start_place_name,
-                    }));
-                    setCourses(list);
-                } catch (e) {
-                    console.error(e);
-                    setError(e instanceof Error ? e.message : "알 수 없는 오류가 발생했습니다.");
-                    setCourses([]);
-                } finally {
-                    setLoading(false);
-                }
-            },
-            () => {
+    useEffect(() => {
+        const controller = new AbortController();
+        const fetchCourses = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const concept = selectedActivities[0];
+                const qs = new URLSearchParams();
+                if (concept) qs.set("concept", concept);
+                qs.set("limit", "200");
+                qs.set("nocache", "1");
+                const res = await fetch(`/api/courses?${qs.toString()}`, { signal: controller.signal });
+                const data = await res.json();
+                if (!Array.isArray(data)) throw new Error("unexpected");
+                setCourses(data as Course[]);
+            } catch (e: any) {
+                if (e?.name !== "AbortError") setError("데이터를 불러오지 못했습니다.");
+            } finally {
                 setLoading(false);
-                alert("위치 권한을 허용해주세요.");
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
-    };
+            }
+        };
+        fetchCourses();
+        return () => controller.abort();
+    }, [selectedActivities.join(",")]);
 
-    const formatDistance = (m: number) => (m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`);
+    const filtered = useMemo(() => {
+        const maxWon = budget * 10000;
+        const toWon = (price?: string) => {
+            if (!price) return null;
+            const d = price.replace(/[^0-9]/g, "");
+            return d ? Number(d) : null;
+        };
+        return courses.filter((c) => {
+            if (selectedActivities.length > 0 && !selectedActivities.some((a) => (c.concept || "").includes(a))) {
+                return false;
+            }
+            if (selectedRegions.length > 0) {
+                const loc = (c.location || c.region || "").toLowerCase();
+                if (!selectedRegions.some((r) => loc.includes(r.toLowerCase()))) return false;
+            }
+            const won = toWon(c.price);
+            if (won !== null && won > maxWon) return false;
+            return true;
+        });
+    }, [courses, selectedActivities, selectedRegions, budget]);
+
+    const toggle = (arr: string[], v: string, set: (n: string[]) => void) => {
+        if (arr.includes(v)) set(arr.filter((x) => x !== v));
+        else set([...arr, v]);
+    };
 
     return (
         <div className="min-h-screen bg-white text-black">
-            <section className="max-w-4xl mx-auto px-4 pt-28 pb-12">
-                <div className="rounded-3xl p-8 md:p-10 bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 text-white shadow-2xl">
-                    <div className="mb-4 text-3xl font-bold">📍 실시간 주변 코스 추천</div>
-                    <p className="text-white/90 mb-2">현재 위치 기반 · 반경 선택</p>
-                    <p className="text-white/80 mb-8">지금 있는 곳에서 가까운 코스를 거리순으로 추천합니다</p>
-                    <div className="flex flex-wrap gap-3 items-center">
-                        {/* 반경 선택 */}
-                        <div className="bg-white/15 rounded-xl p-1 flex gap-1">
-                            {[1, 2, 3, 5].map((value) => (
-                                <button
-                                    key={value}
-                                    onClick={() => setKm(value)}
-                                    className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
-                                        km === value ? "bg-white text-blue-700" : "text-white hover:bg-white/20"
-                                    }`}
-                                >
-                                    {value}km
-                                </button>
-                            ))}
-                        </div>
-                        <button
-                            onClick={findNearbyCourses}
-                            disabled={loading}
-                            className="px-6 py-3 rounded-xl bg-white text-blue-700 font-bold hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-60"
-                        >
-                            {loading ? "검색 중..." : "주변 코스 찾기"}
-                        </button>
-                    </div>
-                </div>
-
-                {/* 결과 */}
-                <div className="mt-8">
-                    {error && (
-                        <div className="bg-red-50 text-red-700 border border-red-200 rounded-xl p-4 mb-6">{error}</div>
-                    )}
-
-                    {!loading && courses.length > 0 && (
-                        <div className="space-y-4">
-                            <div className="text-gray-700 text-sm">
-                                {coords && (
-                                    <span>
-                                        현재 위치: {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-                                    </span>
-                                )}
-                                <span className="ml-2">
-                                    / 반경 {km}km 이내 {courses.length}개
-                                </span>
+            <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
+                <div className="md:flex md:gap-6">
+                    {/* Left: Control panel */}
+                    <aside className="md:w-1/3 lg:w-[30%] bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 md:mb-0">
+                        <h2 className="text-lg font-bold mb-4">주변 코스 필터</h2>
+                        {/* 활동 선택 */}
+                        <div className="mb-6">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-2">활동 선택</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {activities.map((a) => (
+                                    <button
+                                        key={a.key}
+                                        onClick={() => toggle(selectedActivities, a.key, setSelectedActivities)}
+                                        className={`px-3 py-2 rounded-lg border text-sm hover:bg-gray-50 ${
+                                            selectedActivities.includes(a.key)
+                                                ? "border-blue-500 text-blue-600 bg-blue-50"
+                                                : "border-gray-300 text-gray-700"
+                                        }`}
+                                    >
+                                        {a.label}
+                                    </button>
+                                ))}
                             </div>
+                        </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {courses.map((c) => (
+                        {/* 지역 선택 */}
+                        <div className="mb-6">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-2">지역 선택</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {regions.map((r) => (
+                                    <button
+                                        key={r}
+                                        onClick={() => toggle(selectedRegions, r, setSelectedRegions)}
+                                        className={`px-3 py-1.5 rounded-full border text-sm hover:bg-gray-50 ${
+                                            selectedRegions.includes(r)
+                                                ? "border-blue-500 text-blue-600 bg-blue-50"
+                                                : "border-gray-300 text-gray-700"
+                                        }`}
+                                    >
+                                        {r}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 예산 */}
+                        <div className="mb-2">
+                            <h3 className="text-sm font-semibold text-gray-700 mb-2">예산 (최대)</h3>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="range"
+                                    min={3}
+                                    max={30}
+                                    step={1}
+                                    value={budget}
+                                    onChange={(e) => setBudget(Number(e.target.value))}
+                                    className="w-full"
+                                />
+                                <span className="text-sm text-gray-700 whitespace-nowrap">{budget}만원</span>
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Right: Results */}
+                    <section className="md:w-2/3 lg:w-[70%]">
+                        <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm text-gray-600">총 {filtered.length}개 결과</p>
+                            <button
+                                onClick={() => {
+                                    setSelectedActivities([]);
+                                    setSelectedRegions([]);
+                                    setBudget(10);
+                                }}
+                                className="text-sm text-gray-600 hover:text-gray-800 border px-3 py-1.5 rounded-lg"
+                            >
+                                초기화
+                            </button>
+                        </div>
+
+                        {loading ? (
+                            <div className="p-8 text-center text-gray-500">불러오는 중...</div>
+                        ) : error ? (
+                            <div className="p-8 text-center text-red-500">{error}</div>
+                        ) : (
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                {filtered.slice(0, 24).map((c) => (
                                     <a
                                         key={c.id}
                                         href={`/courses/${c.id}`}
-                                        className="group flex gap-4 p-4 rounded-2xl border border-gray-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
+                                        className="block border border-gray-200 rounded-2xl p-4 hover:bg-gray-50 transition-colors"
                                     >
-                                        <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                                        <div className="w-full h-40 rounded-xl overflow-hidden bg-gray-100 mb-3">
                                             {c.imageUrl ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img
@@ -141,39 +187,22 @@ export default function NearbyPage() {
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center text-2xl">
-                                                    📦
+                                                    📷
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-3 mb-1">
-                                                <h3 className="font-bold text-gray-900 truncate">{c.title}</h3>
-                                                <span className="text-sm text-blue-600 whitespace-nowrap">
-                                                    {formatDistance(c.distance)}
-                                                </span>
-                                            </div>
-                                            <div className="text-sm text-gray-500 truncate mb-1">
-                                                {c.start_place_name || c.region || "시작 장소 정보 없음"}
-                                            </div>
-                                            <div className="text-xs text-gray-500 truncate">{c.concept || "코스"}</div>
+                                        <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{c.title}</h3>
+                                        <div className="text-xs text-gray-500 flex flex-wrap gap-3">
+                                            {c.location && <span>📍 {c.location}</span>}
+                                            {c.duration && <span>⏱ {c.duration}</span>}
+                                            {c.price && <span>💰 {c.price}</span>}
+                                            {c.concept && <span>🏷 {c.concept}</span>}
                                         </div>
                                     </a>
                                 ))}
                             </div>
-                        </div>
-                    )}
-
-                    {!loading && courses.length === 0 && !error && (
-                        <div className="mt-6 text-center text-gray-500">
-                            검색 결과가 없습니다. 조금 더 넓은 범위를 시도해 보세요.
-                        </div>
-                    )}
-                </div>
-
-                <div className="mt-8 bg-gray-50 rounded-2xl p-6 border border-gray-200">
-                    <h2 className="text-xl font-bold mb-2 text-gray-900">어떻게 동작하나요?</h2>
-                    <p className="text-gray-600">- 현재 위치를 받아 2km 반경 내 코스를 거리순으로 불러옵니다.</p>
-                    <p className="text-gray-600">- 코스의 시작 장소를 기준으로 거리를 계산합니다.</p>
+                        )}
+                    </section>
                 </div>
             </section>
             <div className="md:hidden h-20"></div>

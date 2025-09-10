@@ -5,6 +5,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 
 import ReviewModal from "@/components/ReviewModal";
 import KakaoMap from "@/components/KakaoMap";
@@ -823,7 +824,7 @@ export default function CourseDetailPage() {
 
                                                     {/* 장소 카드 */}
                                                     <div
-                                                        className="bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow "
+                                                        className=" hover:cursor-pointer bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow "
                                                         onClick={() => {
                                                             setSelectedPlace({
                                                                 id: coursePlace.place.id,
@@ -886,7 +887,7 @@ export default function CourseDetailPage() {
                                                                             coursePlace.place.latitude,
                                                                             coursePlace.place.longitude
                                                                         )}
-                                                                        className="bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-600 transition-colors"
+                                                                        className="hover:cursor-pointer bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-600 transition-colors"
                                                                     >
                                                                         길찾기
                                                                     </button>
@@ -1259,13 +1260,7 @@ export default function CourseDetailPage() {
                             </p>
                             <div className="mt-4 flex justify-end gap-2">
                                 <button
-                                    className="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100"
-                                    onClick={() => setShowPlaceModal(false)}
-                                >
-                                    닫기
-                                </button>
-                                <button
-                                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                                    className="hover:cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
                                     onClick={() => {
                                         setShowPlaceModal(false);
                                         // 상세페이지 내이므로 닫기만 하면 원래 화면 유지

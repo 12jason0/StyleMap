@@ -436,7 +436,7 @@ export default function Home() {
 
                                     <button
                                         onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="hover:cursor-pointer px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
+                                        className="hover:cursor-pointer px-5 py-2 md:px-6 md:py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm md:text-base"
                                     >
                                         코스 시작하기 →
                                     </button>
@@ -736,7 +736,7 @@ function ConceptSection() {
                     <div className="text-center mt-8">
                         <button
                             onClick={() => setShowAll(true)}
-                            className="hover:cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors transform hover:scale-105"
+                            className="rounded-2xl hover:cursor-pointer w-full border border-gray-200 bg-white text-gray-800 py-3 text-center hover:bg-gray-50"
                         >
                             더 많은 컨셉 보기 ({concepts.length - 6}개 더)
                         </button>
@@ -748,7 +748,7 @@ function ConceptSection() {
                     <div className="text-center mt-8">
                         <button
                             onClick={() => setShowAll(false)}
-                            className="hover:cursor-pointer bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors transform hover:scale-105"
+                            className="rounded-2xl hover:cursor-pointer w-full border border-gray-200 bg-white text-gray-800 py-3 text-center hover:bg-gray-50"
                         >
                             접기
                         </button>

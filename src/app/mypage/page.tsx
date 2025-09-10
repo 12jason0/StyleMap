@@ -293,17 +293,17 @@ const MyPage = () => {
     const renderProfileTab = () => (
         <div className="space-y-6">
             {/* 프로필 정보 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">프로필 정보</h3>
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">프로필 정보</h3>
                 {userInfo ? (
-                    <div className="flex items-center space-x-6">
-                        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-2xl font-bold">{userInfo.name[0]}</span>
+                    <div className="flex items-center space-x-4 md:space-x-6">
+                        <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xl md:text-2xl font-bold">{userInfo.name[0]}</span>
                         </div>
                         <div className="flex-1">
-                            <h4 className="text-xl font-bold text-gray-900 mb-2">{userInfo.name}</h4>
-                            <p className="text-gray-600 mb-1">{userInfo.email}</p>
-                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <h4 className="text-lg md:text-xl font-bold text-gray-900 mb-1 md:mb-2">{userInfo.name}</h4>
+                            <p className="text-gray-600 mb-1 text-sm md:text-base">{userInfo.email}</p>
+                            <div className="flex items-center space-x-3 md:space-x-4 text-xs md:text-sm text-gray-500">
                                 <span>가입일: {userInfo.joinDate}</span>
                                 {userInfo.mbti && <span>MBTI: {userInfo.mbti}</span>}
                                 {userInfo.age && <span>나이: {userInfo.age}세</span>}
@@ -311,30 +311,32 @@ const MyPage = () => {
                         </div>
                         <button
                             onClick={handleEditClick}
-                            className="px-4 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium cursor-pointer"
+                            className="px-3 md:px-4 py-2 text-blue-600 hover:text-blue-800 text-sm font-semibold cursor-pointer border border-blue-200 rounded-lg"
                         >
                             수정
                         </button>
                     </div>
                 ) : (
                     <div className="text-center py-8">
-                        <div className="text-6xl mb-4">👤</div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">프로필 정보를 불러오는 중...</h4>
+                        <div className="text-5xl md:text-6xl mb-3 md:mb-4">👤</div>
+                        <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2">
+                            프로필 정보를 불러오는 중...
+                        </h4>
                     </div>
                 )}
             </div>
 
             {/* 계정 관리 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">계정 관리</h3>
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">계정 관리</h3>
                 <div className="space-y-4">
-                    <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer">
+                    <button className="w-full text-left px-3 md:px-4 py-2.5 md:py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer text-sm md:text-base">
                         <div className="flex items-center justify-between">
                             <span className="font-medium text-gray-900">비밀번호 변경</span>
                             <span className="text-gray-400">→</span>
                         </div>
                     </button>
-                    <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer">
+                    <button className="w-full text-left px-3 md:px-4 py-2.5 md:py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer text-sm md:text-base">
                         <div className="flex items-center justify-between">
                             <span className="font-medium text-gray-900">알림 설정</span>
                             <span className="text-gray-400">→</span>
@@ -342,7 +344,7 @@ const MyPage = () => {
                     </button>
                     <button
                         onClick={handleLogoutClick}
-                        className="w-full text-left px-4 py-3 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors cursor-pointer"
+                        className="w-full text-left px-3 md:px-4 py-2.5 md:py-3 rounded-lg border border-red-200 hover:bg-red-50 transition-colors cursor-pointer text-sm md:text-base"
                     >
                         <div className="flex items-center justify-between">
                             <span className="font-medium text-red-600">로그아웃</span>
@@ -357,12 +359,12 @@ const MyPage = () => {
     const renderPreferencesTab = () => (
         <div className="space-y-6">
             {/* 선호도 정보 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-2xl font-bold text-gray-900">내 선호도</h3>
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <div className="flex items-center justify-between mb-4 md:mb-6">
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-900">내 선호도</h3>
                     <button
                         onClick={() => router.push("/onboarding")}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                        className="px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer"
                     >
                         수정하기
                     </button>
@@ -373,12 +375,14 @@ const MyPage = () => {
                         {/* 여행 스타일 */}
                         {userPreferences.travelStyle && userPreferences.travelStyle.length > 0 && (
                             <div>
-                                <h4 className="text-lg font-semibold text-gray-900 mb-3">여행 스타일</h4>
+                                <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
+                                    여행 스타일
+                                </h4>
                                 <div className="flex flex-wrap gap-2">
                                     {userPreferences.travelStyle.map((style) => (
                                         <span
                                             key={style}
-                                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                                            className="px-2.5 md:px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs md:text-sm"
                                         >
                                             {style}
                                         </span>
@@ -390,8 +394,10 @@ const MyPage = () => {
                         {/* 예산 */}
                         {userPreferences.budgetRange && (
                             <div>
-                                <h4 className="text-lg font-semibold text-gray-900 mb-3">예산 범위</h4>
-                                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                                <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
+                                    예산 범위
+                                </h4>
+                                <span className="px-2.5 md:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs md:text-sm">
                                     {userPreferences.budgetRange === "budget" && "5만원 미만"}
                                     {userPreferences.budgetRange === "moderate" && "5만원 ~ 10만원"}
                                     {userPreferences.budgetRange === "premium" && "10만원 ~ 20만원"}
@@ -403,12 +409,14 @@ const MyPage = () => {
                         {/* 선호 지역 */}
                         {userPreferences.locationPreferences && userPreferences.locationPreferences.length > 0 && (
                             <div>
-                                <h4 className="text-lg font-semibold text-gray-900 mb-3">선호 지역</h4>
+                                <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
+                                    선호 지역
+                                </h4>
                                 <div className="flex flex-wrap gap-2">
                                     {userPreferences.locationPreferences.map((location) => (
                                         <span
                                             key={location}
-                                            className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm"
+                                            className="px-2.5 md:px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs md:text-sm"
                                         >
                                             📍 {location}
                                         </span>
@@ -437,8 +445,8 @@ const MyPage = () => {
     const renderBookingsTab = () => (
         <div className="space-y-6">
             {/* 예약 내역 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">예약 내역</h3>
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">예약 내역</h3>
 
                 {bookings.length > 0 ? (
                     <div className="space-y-4">
@@ -447,8 +455,10 @@ const MyPage = () => {
                                 key={booking.id}
                                 className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
                             >
-                                <div className="flex items-center justify-between mb-3">
-                                    <h4 className="text-lg font-semibold text-gray-900">{booking.courseTitle}</h4>
+                                <div className="flex items-center justify-between mb-2 md:mb-3">
+                                    <h4 className="text-base md:text-lg font-semibold text-gray-900">
+                                        {booking.courseTitle}
+                                    </h4>
                                     <span
                                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                                             booking.status === "예약완료"
@@ -459,7 +469,7 @@ const MyPage = () => {
                                         {booking.status}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between text-sm text-gray-600">
+                                <div className="flex items-center justify-between text-xs md:text-sm text-gray-600">
                                     <span>📅 {booking.date}</span>
                                     <span>👥 {booking.participants}명</span>
                                     <span className="font-semibold text-blue-600">{booking.price}</span>
@@ -487,8 +497,8 @@ const MyPage = () => {
     const renderFavoritesTab = () => (
         <div className="space-y-6">
             {/* 찜 목록 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">찜 목록</h3>
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">찜 목록</h3>
 
                 {favorites.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -522,16 +532,20 @@ const MyPage = () => {
                                     </div>
                                 </div>
                                 <div className="p-4">
-                                    <h4 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                                    <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
                                         {favorite.title}
                                     </h4>
-                                    <p className="text-gray-600 text-sm mb-3 line-clamp-2">{favorite.description}</p>
+                                    <p className="text-gray-600 text-xs md:text-sm mb-3 line-clamp-2">
+                                        {favorite.description}
+                                    </p>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1">
                                             <span className="text-yellow-400">★</span>
-                                            <span className="text-sm font-medium">{favorite.rating}</span>
+                                            <span className="text-xs md:text-sm font-medium">{favorite.rating}</span>
                                         </div>
-                                        <span className="text-blue-600 font-semibold">{favorite.price}</span>
+                                        <span className="text-blue-600 font-semibold text-sm md:text-base">
+                                            {favorite.price}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -573,15 +587,17 @@ const MyPage = () => {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 typography-smooth">
             <Header />
 
-            <main className="max-w-4xl mx-auto px-4 py-8 pt-24">
+            <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 pt-20 md:pt-24">
                 {/* 헤더 섹션 */}
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2 tracking-tight">마이페이지</h1>
-                    <p className="text-[17px] text-gray-600">내 정보와 활동을 관리해보세요</p>
+                <div className="text-center mb-6 md:mb-8">
+                    <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-1 md:mb-2 tracking-tight">
+                        마이페이지
+                    </h1>
+                    <p className="text-sm md:text-[17px] text-gray-600">내 정보와 활동을 관리해보세요</p>
                 </div>
 
                 {/* 탭 네비게이션 */}
-                <div className="flex justify-center mb-8">
+                <div className="flex justify-center mb-6 md:mb-8">
                     <div className="bg-white rounded-xl shadow-lg p-1">
                         <div className="flex space-x-1">
                             {[
@@ -593,7 +609,7 @@ const MyPage = () => {
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`px-6 py-3 rounded-lg font-medium transition-all cursor-pointer ${
+                                    className={`px-4 md:px-6 py-2.5 md:py-3 rounded-lg font-medium transition-all cursor-pointer text-sm md:text-base ${
                                         activeTab === tab.id
                                             ? "bg-blue-600 text-white shadow-lg"
                                             : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
