@@ -23,13 +23,17 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "서버 설정 오류: 카카오 클라이언트 ID가 없습니다." }, { status: 500 });
         }
 
+        const isVercel = process.env.NEXT_PUBLIC_VERCEL_URL;
+        const redirectUri = isVercel
+            ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/auth/kakao/callback`
+            : "http://localhost:3000/api/auth/kakao/callback"; // 로컬 개발 환경용
+
         const tokenParams = new URLSearchParams({
             grant_type: "authorization_code",
             client_id: kakaoClientId,
             code: code,
-            redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/kakao/callback`,
+            redirect_uri: redirectUri, // 수정된 변수를 사용합니다.
         });
-
         if (process.env.KAKAO_CLIENT_SECRET) {
             tokenParams.append("client_secret", process.env.KAKAO_CLIENT_SECRET);
         }

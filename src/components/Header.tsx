@@ -153,20 +153,31 @@ const Header = () => {
         setIsMenuOpen(false);
     };
 
+    // --- ⬇️ 여기가 수정된 부분입니다 ⬇️ ---
     // 로그아웃 함수
-    const handleLogout = () => {
+    const handleLogout = async () => {
         try {
+            // 서버에 로그아웃 요청을 보내 httpOnly 쿠키를 삭제합니다.
+            await fetch("/api/auth/logout", { method: "POST" });
+
+            // 브라우저의 localStorage에 저장된 정보도 삭제합니다.
             localStorage.removeItem("authToken");
             localStorage.removeItem("user");
             localStorage.removeItem("loginTime");
-        } catch {}
+        } catch (error) {
+            console.error("로그아웃 처리 중 오류 발생:", error);
+        }
 
+        // 화면의 상태를 로그아웃으로 변경하고 홈으로 이동합니다.
         setIsLoggedIn(false);
+        setHasFavorites(false); // 찜 상태도 초기화
         window.dispatchEvent(new CustomEvent("authTokenChange"));
         closeMenu();
         router.push("/");
         alert("로그아웃되었습니다.");
     };
+    // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
+
     const openLogoutConfirm = () => {
         setShowLogoutConfirm(true);
     };
@@ -232,7 +243,7 @@ const Header = () => {
                                         className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 "
                                         onClick={() => setIsAiMenuOpen(false)}
                                     >
-                                        3초 완성! 나만의 코스 찾기
+                                        실시간 주변 추천
                                     </Link>
                                 </div>
                             )}

@@ -1,11 +1,9 @@
-// /src/app/signup/page.tsx
-
 "use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Header from "@/components/Header"; // Header 컴포넌트 경로 확인 필요
+import Header from "@/components/Header";
 
 const Signup = () => {
     const router = useRouter();
@@ -85,8 +83,13 @@ const Signup = () => {
             }
 
             const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID || "";
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-            const redirectUri = `${appUrl}/api/auth/kakao/callback`;
+
+            // --- ⬇️ 여기가 수정된 부분입니다 ⬇️ ---
+            const isVercel = process.env.NEXT_PUBLIC_VERCEL_URL;
+            const redirectUri = isVercel
+                ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/auth/kakao/callback`
+                : "http://localhost:3000/api/auth/kakao/callback";
+            // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
 
             if (!kakaoClientId) {
                 setError("환경변수 NEXT_PUBLIC_KAKAO_CLIENT_ID가 설정되지 않았습니다.");
@@ -128,6 +131,10 @@ const Signup = () => {
             };
 
             const messageHandler = async (event: MessageEvent) => {
+                const appUrl = process.env.NEXT_PUBLIC_VERCEL_URL
+                    ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+                    : "http://localhost:3000";
+
                 if (event.origin !== appUrl) return;
 
                 const { type, code, error, error_description } = event.data as any;
@@ -144,7 +151,6 @@ const Signup = () => {
                             throw new Error(data.details || data.error || "서버 처리 중 오류가 발생했습니다.");
                         }
 
-                        // 서버 쿠키 기반이므로 토큰 저장 불필요
                         router.push(data.token ? "/?login_success=true" : "/?signup_success=true");
                     } catch (err: unknown) {
                         setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -187,7 +193,6 @@ const Signup = () => {
                         </div>
                     )}
 
-                    {/* 소셜 회원가입 버튼 */}
                     <div className="mt-6 space-y-3">
                         <button
                             type="button"

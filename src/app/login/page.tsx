@@ -84,10 +84,7 @@ const Login = () => {
         }
     };
 
-    // login/page.tsx 파일의 이 함수 전체를 교체하세요.
-
     const handleSocialLogin = (provider: string) => {
-        // async를 제거하고, setLoading은 각 분기점에서 처리합니다.
         if (loading) return;
         setLoading(true);
         setError("");
@@ -95,7 +92,13 @@ const Login = () => {
 
         if (provider === "kakao") {
             const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
-            const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/api/auth/kakao/callback`;
+
+            // --- ⬇️ 여기가 수정된 부분입니다 ⬇️ ---
+            const isVercel = process.env.NEXT_PUBLIC_VERCEL_URL;
+            const redirectUri = isVercel
+                ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/auth/kakao/callback`
+                : "http://localhost:3000/api/auth/kakao/callback"; // 로컬 개발 환경용
+            // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
 
             if (!kakaoClientId) {
                 setError("환경변수 NEXT_PUBLIC_KAKAO_CLIENT_ID가 설정되지 않았습니다.");
@@ -130,9 +133,6 @@ const Login = () => {
                 return;
             }
 
-            // --- 코드 정리 및 안정성 개선 ---
-
-            // 팝업, 이벤트 리스너, 인터벌을 정리하는 함수를 하나로 통합
             let intervalId: NodeJS.Timeout | null = null;
 
             const cleanup = () => {
@@ -161,33 +161,30 @@ const Login = () => {
 
                         const data = await response.json();
                         if (!response.ok) {
-                            // 백엔드에서 보낸 에러 메시지를 표시
                             throw new Error(data.details || data.error || "서버 처리 중 오류가 발생했습니다.");
                         }
 
                         console.log("카카오 로그인 최종 성공!", data);
                         localStorage.setItem("authToken", data.token);
                         localStorage.setItem("user", JSON.stringify(data.user));
-                        // 로그인 시간 저장 (자동 로그아웃 방지용)
                         localStorage.setItem("loginTime", Date.now().toString());
                         window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
                         router.push("/?login_success=true");
                     } catch (err: unknown) {
                         setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
                     } finally {
-                        cleanup(); // 성공하든 실패하든 항상 정리
+                        cleanup();
                     }
                 } else if (type === "KAKAO_AUTH_ERROR") {
                     setError(`카카오 인증 실패: ${error_description || error}`);
-                    cleanup(); // 에러 발생 시 정리
+                    cleanup();
                 }
             };
 
-            // 팝업이 사용자에 의해 닫혔는지 확인
             intervalId = setInterval(() => {
                 if (popup.closed) {
                     console.log("카카오 인증 팝업이 닫혔습니다.");
-                    cleanup(); // 사용자가 직접 닫았을 때 정리
+                    cleanup();
                 }
             }, 1000);
 
@@ -196,7 +193,6 @@ const Login = () => {
             return;
         }
 
-        // 다른 소셜 로그인 로직
         setLoading(false);
     };
 
@@ -214,14 +210,12 @@ const Login = () => {
                         <p className="text-gray-600 text-sm">StyleMap에 오신 것을 환영합니다</p>
                     </div>
 
-                    {/* 성공 메시지 */}
                     {message && (
                         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                             <p className="text-green-600 text-sm">{message}</p>
                         </div>
                     )}
 
-                    {/* 에러 메시지 */}
                     {error && (
                         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                             <p className="text-red-600 text-sm">{error}</p>
@@ -279,7 +273,6 @@ const Login = () => {
                         </p>
                     </div>
 
-                    {/* 소셜 로그인 구분선 */}
                     <div className="mt-6">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
@@ -291,9 +284,7 @@ const Login = () => {
                         </div>
                     </div>
 
-                    {/* 소셜 로그인 버튼들 */}
                     <div className="mt-4 space-y-3 text-black">
-                        {/* 카카오톡 로그인 버튼 */}
                         <button
                             type="button"
                             onClick={() => handleSocialLogin("kakao")}
