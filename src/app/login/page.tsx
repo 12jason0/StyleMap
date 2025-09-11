@@ -93,12 +93,7 @@ const Login = () => {
         if (provider === "kakao") {
             const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
 
-            // --- ⬇️ 여기가 수정된 부분입니다 ⬇️ ---
-            const isVercel = process.env.NEXT_PUBLIC_VERCEL_URL;
-            const redirectUri = isVercel
-                ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/auth/kakao/callback`
-                : "http://localhost:3000/api/auth/kakao/callback"; // 로컬 개발 환경용
-            // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
+            const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`;
 
             if (!kakaoClientId) {
                 setError("환경변수 NEXT_PUBLIC_KAKAO_CLIENT_ID가 설정되지 않았습니다.");
