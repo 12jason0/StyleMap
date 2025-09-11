@@ -50,10 +50,10 @@ model Courses {
   highlights           Highlight[]
   notices              Notice[]
   tags                 CourseTag[]    @relation("CourseTagToCourses")
+  user_favorites       UserFavorite[] // <-- 이 줄을 추가하세요.
 
   @@map("courses")
 }
-
 model Review {
   id        Int      @id @default(autoincrement())
   userId    Int
@@ -148,7 +148,7 @@ model Place {
   latitude             Decimal?      @db.Decimal(10, 8)
   longitude            Decimal?      @db.Decimal(11, 8)
   imageUrl             String?       @db.VarChar(500)
-  tags                 String?       @db.Text   
+  tags                 String?       @db.Text 
   created_at           DateTime      @default(now())
   updated_at           DateTime      @updatedAt
   course_places        CoursePlace[]
@@ -240,6 +240,7 @@ model UserFavorite {
   user_id    Int
   course_id  Int
   created_at DateTime @default(now()) @db.Timestamp(0)
+  courses    Courses  @relation(fields: [course_id], references: [id]) // <-- 이 줄을 추가하세요.
 
   @@unique([user_id, course_id])
   @@map("user_favorites")
