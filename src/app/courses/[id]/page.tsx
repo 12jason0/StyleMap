@@ -377,6 +377,14 @@ export default function CourseDetailPage() {
         }
     }, [courseId]);
 
+    // 로그인 여부와 관계없이 상세 페이지 진입 시 조회수 증가
+    useEffect(() => {
+        if (!courseId) return;
+        try {
+            fetch(`/api/courses/${courseId}/view`, { method: "POST", keepalive: true }).catch(() => {});
+        } catch {}
+    }, [courseId]);
+
     // 코스 데이터 가져오기
     const fetchCourseData = useCallback(async () => {
         try {

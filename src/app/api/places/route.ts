@@ -1,13 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
+        const all = searchParams.get("all");
         const lat = searchParams.get("lat");
         const lng = searchParams.get("lng");
         const region = searchParams.get("region");
+
+        // Admin 등에서 전체 목록이 필요한 경우: /api/places?all=1&limit=200
+        if (all === "1") {
+            const limitParam = Math.min(Math.max(Number(searchParams.get("limit") ?? 100), 1), 500);
+            const places = (await (prisma as any).place.findMany({
+                take: limitParam,
+                orderBy: { id: "desc" },
+                select: {
+                    id: true,
+                    name: true,
+                    address: true,
+                    description: true,
+                    category: true,
+                    avg_cost_range: true,
+                    opening_hours: true,
+                    phone: true,
+                    website: true,
+                    parking_available: true,
+                    reservation_required: true,
+                    latitude: true,
+                    longitude: true,
+                    imageUrl: true,
+                    tags: true,
+                },
+            })) as any[];
+
+            return NextResponse.json({ success: true, places });
+        }
 
         if (!lat || !lng) {
             return NextResponse.json({ error: "위도와 경도가 필요합니다." }, { status: 400 });
@@ -91,5 +121,71 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error("API: 장소 검색 오류:", error);
         return NextResponse.json({ error: "장소 검색 중 오류가 발생했습니다." }, { status: 500 });
+    }
+}
+
+export async function POST(request: NextRequest) {
+    try {
+        const userId = getUserIdFromRequest(request);
+        if (!userId) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const {
+            name,
+            address,
+            description,
+            category,
+            avg_cost_range,
+            opening_hours,
+            phone,
+            website,
+            parking_available,
+            reservation_required,
+            latitude,
+            longitude,
+            imageUrl,
+            tags,
+        } = body || {};
+
+        if (!name) {
+            return NextResponse.json({ error: "장소 이름은 필수입니다." }, { status: 400 });
+        }
+
+        const created = await (prisma as any).place.create({
+            data: {
+                name,
+                address: address || null,
+                description: description || null,
+                category: category || null,
+                avg_cost_range: avg_cost_range || null,
+                opening_hours: opening_hours || null,
+                phone: phone || null,
+                website: website || null,
+                parking_available: typeof parking_available === "boolean" ? parking_available : false,
+                reservation_required: typeof reservation_required === "boolean" ? reservation_required : false,
+                latitude: latitude ?? null,
+                longitude: longitude ?? null,
+                imageUrl: imageUrl || null,
+                tags: tags || null,
+            },
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                description: true,
+                category: true,
+                latitude: true,
+                longitude: true,
+                imageUrl: true,
+                tags: true,
+            },
+        });
+
+        return NextResponse.json({ success: true, place: created }, { status: 201 });
+    } catch (error) {
+        console.error("API: 장소 생성 오류:", error);
+        return NextResponse.json({ error: "장소 생성 실패" }, { status: 500 });
     }
 }

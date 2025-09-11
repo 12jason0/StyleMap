@@ -232,7 +232,7 @@ const Header = () => {
                                         className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 "
                                         onClick={() => setIsAiMenuOpen(false)}
                                     >
-                                        실시간 주변 추천
+                                        3초 완성! 나만의 코스 찾기
                                     </Link>
                                 </div>
                             )}

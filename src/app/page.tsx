@@ -436,7 +436,7 @@ export default function Home() {
 
                                     <button
                                         onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="hover:cursor-pointer px-5 py-2 md:px-6 md:py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition-colors text-sm md:text-base"
+                                        className="hover:cursor-pointer px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
                                     >
                                         코스 시작하기 →
                                     </button>
@@ -484,8 +484,6 @@ export default function Home() {
                                             hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2
                                             ${index === 0 ? "md:col-span-2 md:row-span-2" : ""}
                                         `}
-                                    onMouseEnter={() => setHoveredCard(course.id)}
-                                    onMouseLeave={() => setHoveredCard(null)}
                                 >
                                     <div
                                         className={`relative overflow-hidden ${
@@ -506,36 +504,27 @@ export default function Home() {
                                             <div className="w-full h-full bg-gray-200" />
                                         )}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-
-                                        {/* 순위 배지 */}
                                         {index < 3 && (
                                             <div className="absolute top-4 left-4">
                                                 <span
-                                                    className={`
-                                                        px-4 py-2 font-bold rounded-full text-white shadow-lg
-                                                        ${
-                                                            index === 0
-                                                                ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-lg"
-                                                                : index === 1
-                                                                ? "bg-gradient-to-r from-gray-300 to-gray-400"
-                                                                : "bg-gradient-to-r from-orange-400 to-orange-600"
-                                                        }
-                                                    `}
+                                                    className={`${
+                                                        index === 0
+                                                            ? "bg-gradient-to-r from-yellow-400 to-orange-500"
+                                                            : index === 1
+                                                            ? "bg-gradient-to-r from-gray-300 to-gray-400"
+                                                            : "bg-gradient-to-r from-orange-400 to-orange-600"
+                                                    } px-4 py-2 font-bold rounded-full text-white shadow-lg`}
                                                 >
                                                     {index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위"}
                                                 </span>
                                             </div>
                                         )}
-
-                                        {/* 실시간 참여자 */}
                                         <div className="absolute top-4 right-4 text-black">
                                             <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                                                 <span className="text-sm font-bold">{course.participants}명</span>
                                             </div>
                                         </div>
-
-                                        {/* 하단 정보 */}
                                         <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
                                             <h3
                                                 className={`font-bold text-white mb-2 ${
@@ -562,44 +551,51 @@ export default function Home() {
                 {/* NEW 코스 섹션 */}
                 <section className="py-16">
                     <div className="max-w-7xl mx-auto px-4">
-                        <div className="text-center mb-12">
-                            <h2 className="text-4xl font-bold mb-4 text-black">✨ NEW 코스</h2>
-                            <p className="text-gray-600 text-lg">이번 주 새로 추가된 코스</p>
+                        <div className="text-center mb-10">
+                            <h2 className="text-3xl font-bold mb-2 text-black">✨ NEW 코스</h2>
+                            <p className="text-gray-600">이번 주 새로 추가된 코스</p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {newCourses.map((course) => (
-                                <Link
-                                    key={course.id}
-                                    href={`/courses/${course.id}`}
-                                    className="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all text-black"
-                                >
-                                    <div className="relative h-48 overflow-hidden">
-                                        {course.imageUrl ? (
-                                            <Image
-                                                src={course.imageUrl}
-                                                alt={course.title}
-                                                fill
-                                                sizes="(max-width: 768px) 100vw, 33vw"
-                                                className="object-cover group-hover:scale-110 transition-transform duration-500"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-white" />
-                                        )}
-                                        <span className="absolute top-4 left-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
-                                            NEW
-                                        </span>
-                                    </div>
-                                    <div className="p-6">
-                                        <h3 className="font-bold text-xl mb-2">{course.title}</h3>
-                                        <p className="text-gray-600 text-sm mb-4">{course.description}</p>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-gray-500 text-sm">{course.location}</span>
-                                            <span className="font-bold text-blue-600">{course.price}</span>
+                        {/* 간단 캐러셀 */}
+                        <div className="relative overflow-hidden">
+                            <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
+                                {newCourses.map((course) => (
+                                    <Link
+                                        key={course.id}
+                                        href={`/courses/${course.id}`}
+                                        className="snap-start min-w-[260px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black"
+                                    >
+                                        <div className="relative h-44">
+                                            {course.imageUrl ? (
+                                                <Image
+                                                    src={course.imageUrl}
+                                                    alt={course.title}
+                                                    fill
+                                                    sizes="260px"
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-gray-100" />
+                                            )}
+                                            <span className="absolute top-3 left-3 px-2.5 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
+                                                NEW
+                                            </span>
                                         </div>
-                                    </div>
-                                </Link>
-                            ))}
+                                        <div className="p-4">
+                                            <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
+                                                {course.title}
+                                            </h3>
+                                            <p className="text-sm text-gray-600 line-clamp-1 mb-2">
+                                                {course.description}
+                                            </p>
+                                            <div className="text-xs text-gray-500 flex justify-between">
+                                                <span>{course.location}</span>
+                                                <span className="font-semibold text-blue-600">{course.price}</span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </section>

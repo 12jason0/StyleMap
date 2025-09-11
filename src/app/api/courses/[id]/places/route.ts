@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -74,5 +75,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             },
             { status: 500 }
         );
+    }
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    try {
+        const userId = getUserIdFromRequest(request);
+        if (!userId) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
+
+        const { id: courseIdParam } = await params;
+        const course_id = Number(courseIdParam);
+        const body = await request.json();
+        const { place_id, order_index, estimated_duration, recommended_time, notes } = body || {};
+
+        if (!course_id || !place_id || !order_index) {
+            return NextResponse.json({ error: "course_id, place_id, order_index는 필수입니다." }, { status: 400 });
+        }
+
+        // 생성
+        const created = await (prisma as any).coursePlace.create({
+            data: {
+                course_id,
+                place_id: Number(place_id),
+                order_index: Number(order_index),
+                estimated_duration: typeof estimated_duration === "number" ? estimated_duration : null,
+                recommended_time: recommended_time || null,
+                notes: notes || null,
+            },
+        });
+
+        return NextResponse.json({ success: true, course_place: created }, { status: 201 });
+    } catch (error) {
+        console.error("API: 코스-장소 연결 생성 오류:", error);
+        return NextResponse.json({ error: "코스-장소 연결 생성 실패" }, { status: 500 });
     }
 }
