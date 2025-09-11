@@ -92,7 +92,6 @@ const Login = () => {
 
         if (provider === "kakao") {
             const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
-
             const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`;
 
             if (!kakaoClientId) {
@@ -107,11 +106,12 @@ const Login = () => {
                     client_id: kakaoClientId,
                     redirect_uri: redirectUri,
                     response_type: "code",
-                    scope: "profile_nickname, profile_image", // email은 권한 문제로 임시 제거
+                    scope: "profile_nickname, profile_image",
                 }).toString();
 
             console.log("카카오 로그인 시작");
             console.log("카카오 인증 URL:", kakaoAuthUrl);
+            console.log("Expected origin:", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
 
             const popup = window.open(
                 kakaoAuthUrl,
@@ -138,7 +138,11 @@ const Login = () => {
             };
 
             const messageHandler = async (event: MessageEvent) => {
-                if (event.origin !== (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000")) {
+                // origin 체크를 더 유연하게
+                const expectedOrigin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+                if (event.origin !== expectedOrigin && event.origin !== window.location.origin) {
+                    console.log("Origin mismatch - expected:", expectedOrigin, "received:", event.origin);
                     return;
                 }
 
@@ -147,6 +151,7 @@ const Login = () => {
                 const { type, code, error, error_description } = event.data;
 
                 if (type === "KAKAO_AUTH_CODE" && code) {
+                    console.log("카카오 인증 코드 받음:", code);
                     try {
                         const response = await fetch("/api/auth/kakao", {
                             method: "POST",
@@ -166,11 +171,13 @@ const Login = () => {
                         window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
                         router.push("/?login_success=true");
                     } catch (err: unknown) {
+                        console.error("카카오 로그인 처리 오류:", err);
                         setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
                     } finally {
                         cleanup();
                     }
                 } else if (type === "KAKAO_AUTH_ERROR") {
+                    console.error("카카오 인증 에러:", error, error_description);
                     setError(`카카오 인증 실패: ${error_description || error}`);
                     cleanup();
                 }
