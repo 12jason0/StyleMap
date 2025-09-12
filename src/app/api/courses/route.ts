@@ -54,19 +54,17 @@ export async function GET(request: NextRequest) {
 
         let usableResults: any[] = results as any[];
         if (!noFilter && !lean) {
+            // 요구사항: 장소 imageUrl이 모두 있거나 최대 1개만 없는 코스만 노출
             const filtered = (results as any[]).filter((c) => {
-                const emptyImages = (c.course_places || []).filter((cp: any) => !cp.places?.imageUrl).length;
-                return emptyImages <= 1;
+                const places: any[] = (c as any).course_places || [];
+                if (places.length === 0) return false;
+                const total = places.length;
+                const missing = places.filter((cp: any) => !cp.places?.imageUrl).length;
+                // 모든 장소에 이미지가 있거나(missing === 0) 최대 1개만 없는 경우(missing === 1)
+                return missing === 0 || missing === 1;
             });
 
-            // 필터링된 결과가 없으면 원본을 사용하고, 결과가 있으면 필터링된 목록을 사용하도록 명확하게 수정
-            if (filtered.length === 0 && results.length > 0) {
-                // 필터링으로 모든 코스가 제외되었지만, 원래 코스는 있었던 경우 -> 원본을 그대로 사용
-                usableResults = results;
-            } else {
-                // 필터링된 결과가 있거나, 원래부터 코스가 없었던 경우 -> 필터링된 결과를 사용
-                usableResults = filtered;
-            }
+            usableResults = filtered.length > 0 ? filtered : results;
         }
 
         const formattedCourses = usableResults.map((course) => ({

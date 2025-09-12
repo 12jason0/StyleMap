@@ -1,29 +1,31 @@
-// [전체 수정된 prisma/schema.prisma 파일]
+// [전체 수정된 최종 prisma/schema.prisma 파일]
 
 generator client {
   provider = "prisma-client-js"
 }
 
+// [수정됨] 데이터베이스 URL 환경 변수 이름을 "DATABASE_URL"로 통일합니다.
 datasource db {
   provider = "postgresql"
-  url      = env("PRISMA_DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id                  Int                 @id @default(autoincrement())
-  email               String?             @unique @db.VarChar(100)
-  password            String?             @db.VarChar(255)
-  nickname            String              @db.VarChar(50)
-  profileImageUrl     String?             @db.VarChar(255)
-  socialId            String?             @db.VarChar(255)
-  provider            String              @default("local") @db.VarChar(20)
-  createdAt           DateTime            @default(now()) @db.Timestamp(0)
-  updatedAt           DateTime            @updatedAt @db.Timestamp(0)
-  mbti                String?             @db.VarChar(20)
-  age                 Int?
-  reviews             Review[]
-  courses             Courses[]
-  // userStoryProgress   UserStoryProgress[]
+  id                Int                 @id @default(autoincrement())
+  email             String?             @unique @db.VarChar(100)
+  password          String?             @db.VarChar(255)
+  nickname          String              @db.VarChar(50)
+  profileImageUrl   String?             @db.VarChar(255)
+  socialId          String?             @db.VarChar(255)
+  provider          String              @default("local") @db.VarChar(20)
+  createdAt         DateTime            @default(now()) @db.Timestamp(0)
+  updatedAt         DateTime            @updatedAt @db.Timestamp(0)
+  mbti              String?             @db.VarChar(20)
+  age               Int?
+  reviews           Review[]
+  courses           Courses[]
+  // [수정됨] UserStoryProgress와의 양방향 관계를 추가했습니다.
+  userStoryProgress UserStoryProgress[]
 
   @@index([provider, socialId])
 }
@@ -248,3 +250,65 @@ model UserFavorite {
   @@map("user_favorites")
 }
 
+model Story {
+  id                     Int                 @id @default(autoincrement())
+  title                  String              @db.VarChar(255)
+  synopsis               String?
+  region                 String?             @db.VarChar(100)
+  estimated_duration_min Int?
+  price                  Decimal?            @db.Decimal(10, 2)
+  reward_badge_id        Int?
+  is_active              Boolean             @default(true)
+  created_at             DateTime            @default(now())
+  updated_at             DateTime            @updatedAt
+  chapters               StoryChapter[]
+  reward_badge           Badge?              @relation("StoryRewardBadge", fields: [reward_badge_id], references: [id])
+  // [수정됨] UserStoryProgress와의 양방향 관계를 추가했습니다.
+  userStoryProgress      UserStoryProgress[]
+
+  @@map("stories")
+}
+
+model StoryChapter {
+  id              Int      @id @default(autoincrement())
+  story_id        Int
+  chapter_number  Int
+  title           String   @db.VarChar(255)
+  location_name   String?  @db.VarChar(255)
+  address         String?
+  latitude        Decimal? @db.Decimal(10, 8)
+  longitude       Decimal? @db.Decimal(11, 8)
+  story_text      String?
+  mission_type    String?  @db.VarChar(50)
+  mission_payload Json?
+  puzzle_text     String?
+  story           Story    @relation(fields: [story_id], references: [id])
+
+  @@unique([story_id, chapter_number])
+  @@map("storychapters")
+}
+
+model Badge {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?
+  image_url   String?  @db.VarChar(500)
+  stories     Story[]  @relation("StoryRewardBadge")
+
+  @@map("badges")
+}
+
+model UserStoryProgress {
+  id              Int       @id @default(autoincrement())
+  user_id         Int
+  story_id        Int
+  current_chapter Int
+  status          String    @db.VarChar(30)
+  started_at      DateTime?
+  completed_at    DateTime?
+  user            User?     @relation(fields: [user_id], references: [id])
+  story           Story     @relation(fields: [story_id], references: [id])
+
+  @@unique([user_id, story_id])
+  @@map("userstoryprogress")
+}
