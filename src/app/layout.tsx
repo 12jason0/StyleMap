@@ -25,6 +25,15 @@ export default function RootLayout({
     return (
         <html lang="ko">
             <body className={`${inter.variable} antialiased min-h-screen flex flex-col`}>
+                {/* Google tag (gtag.js) */}
+                <Script src="https://www.googletagmanager.com/gtag/js?id=G-R3EYQNXY13" strategy="afterInteractive" />
+                <Script
+                    id="ga4-init"
+                    strategy="afterInteractive"
+                    dangerouslySetInnerHTML={{
+                        __html: "window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-R3EYQNXY13');",
+                    }}
+                />
                 <LayoutContent>{children}</LayoutContent>
 
                 {/* --- 여기에 카카오맵 SDK 스크립트를 추가했습니다 --- */}

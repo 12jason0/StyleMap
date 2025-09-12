@@ -26,39 +26,50 @@ export async function GET(request: NextRequest) {
         // Prisma로 가장 가까운 코스 5개 조회 (시작 장소 기준)
         // Postgres에선 ST_DistanceSphere가 없으므로 간단한 근사값(위경도 차이)으로 정렬
         const courses = await prisma.courses.findMany({
-            take: 20, // 1차 후보 20개 가져와 필터링
+            take: 50, // 후보를 넉넉히 가져와 필터링
             include: {
-                // 시작 장소를 찾기 위해 코스-장소를 포함
+                // 시작 장소를 찾기 위해 코스-장소와 장소 좌표 포함
                 course_places: {
-                    where: { order_index: 1 },
                     include: { places: true },
                 },
             } as any,
         } as any);
 
+        const toRad = (deg: number) => (deg * Math.PI) / 180;
+        const R = 6371000; // meters
+
         const enriched = (courses as any[])
             .map((c) => {
-                const start = c.course_places?.[0]?.places;
+                const start = (c.course_places || [])
+                    .map((cp: any) => cp.places)
+                    .find((p: any) => p?.latitude && p?.longitude);
                 if (!start?.latitude || !start?.longitude) return null;
-                const dLat = Number(start.latitude) - lat;
-                const dLng = Number(start.longitude) - lng;
-                const distanceApprox = Math.sqrt(dLat * dLat + dLng * dLng);
-                // 이미지 보유 장소 개수 집계
+                const lat1 = toRad(Number(start.latitude));
+                const lon1 = toRad(Number(start.longitude));
+                const lat2 = toRad(lat);
+                const lon2 = toRad(lng);
+                const dLat = lat2 - lat1;
+                const dLon = lon2 - lon1;
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const cH = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                const distanceMeters = R * cH;
                 const imagesCount = (c.course_places || []).filter((cp: any) => !!cp.places?.imageUrl).length;
                 return {
                     ...c,
                     start_place_name: start?.name,
-                    distanceApprox,
+                    distance: distanceMeters,
                     images_count: imagesCount,
                 };
             })
             .filter(Boolean) as any[];
 
-        // 반경 필터 (근사값 → 대략 0.1 ~ 수 km 수준, 널널하게 0.2 이내)
+        // 반경(m) 내 결과만, 이미지 조건은 완화
         const filtered = enriched
-            .filter((c) => c.images_count >= 2)
-            .sort((a, b) => a.distanceApprox - b.distanceApprox)
-            .slice(0, 5);
+            .filter((c) => c.distance <= radius)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 10);
 
         return NextResponse.json({ success: true, courses: filtered });
     } catch (error) {

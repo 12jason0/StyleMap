@@ -925,13 +925,13 @@ function MapPageInner() {
                                                             >
                                                                 {course.description || "멋진 코스입니다!"}
                                                             </p>
-                                                            <div className="flex gap-2 mt-3">
+                                                            <div className="hover:cursor-pointer flex gap-2 mt-3">
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         router.push(`/courses/${course.id}`);
                                                                     }}
-                                                                    className="text-xs bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors text-blue-700"
+                                                                    className="hover:cursor-pointer text-xs bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors text-blue-700"
                                                                 >
                                                                     코스 보기
                                                                 </button>
