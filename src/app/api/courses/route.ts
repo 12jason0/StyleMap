@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { filterCoursesByImagePolicy, type ImagePolicy } from "@/lib/imagePolicy";
 import { getUserIdFromRequest } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
         const offsetParam = searchParams.get("offset");
         const noCache = searchParams.get("nocache");
         const lean = searchParams.get("lean");
+        const imagePolicy = searchParams.get("imagePolicy") as ImagePolicy;
         const parsedLimit = Number(limitParam ?? 100);
         const effectiveLimit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 100, 1), 200);
         const parsedOffset = Number(offsetParam ?? 0);
@@ -27,7 +29,14 @@ export async function GET(request: NextRequest) {
             skip: effectiveOffset,
         };
 
-        if (lean) {
+        if (imagePolicy === "none-or-all" || imagePolicy === "all-or-one-missing") {
+            // 이미지 정책 검증을 위해 장소와 이미지 포함
+            prismaQuery.include = {
+                course_places: {
+                    include: { places: true },
+                },
+            } as any;
+        } else if (lean) {
             prismaQuery.select = {
                 id: true,
                 title: true,
@@ -45,8 +54,11 @@ export async function GET(request: NextRequest) {
 
         const results = await prisma.courses.findMany(prismaQuery);
 
+        // 이미지 정책 적용: 코스 내 장소 이미지가 하나도 없거나 전부 있는 코스만 허용
+        const imagePolicyApplied = filterCoursesByImagePolicy(results as any[], imagePolicy);
+
         // [수정됨] 복잡한 이미지 필터링 로직을 제거하고 조회된 결과를 바로 포맷팅합니다.
-        const formattedCourses = results.map((course: any) => ({
+        const formattedCourses = imagePolicyApplied.map((course: any) => ({
             id: String(course.id),
             title: course.title || "제목 없음",
             description: course.description || "",
@@ -63,19 +75,17 @@ export async function GET(request: NextRequest) {
 
         console.log("API: Returning formatted courses:", formattedCourses.length);
 
-        return NextResponse.json(
-            { success: true, courses: formattedCourses },
-            {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(noCache
-                        ? { "Cache-Control": "no-store", Pragma: "no-cache" }
-                        : { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }),
-                    "X-Records": String(formattedCourses.length),
-                },
-            }
-        );
+        // 모든 클라이언트(Home, Courses, Nearby)가 기대하는 형태(배열)로 통일 응답
+        return NextResponse.json(formattedCourses, {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json",
+                ...(noCache
+                    ? { "Cache-Control": "no-store", Pragma: "no-cache" }
+                    : { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }),
+                "X-Records": String(formattedCourses.length),
+            },
+        });
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         console.error("API: Detailed error in /api/courses:", { message: errorMessage });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { filterCoursesByImagePolicy } from "@/lib/imagePolicy";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
@@ -65,9 +66,11 @@ export async function GET(request: NextRequest) {
             })
             .filter(Boolean) as any[];
 
-        // 반경(m) 내 결과만, 이미지 조건은 완화
-        const filtered = enriched
-            .filter((c) => c.distance <= radius)
+        // 반경(m) 내 결과만 + 이미지 정책(모두 있거나 1개만 없는 경우 허용)
+        const filtered = filterCoursesByImagePolicy(
+            enriched.filter((c) => c.distance <= radius),
+            "all-or-one-missing"
+        )
             .sort((a, b) => a.distance - b.distance)
             .slice(0, 10);
 

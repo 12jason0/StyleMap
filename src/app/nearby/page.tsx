@@ -50,6 +50,8 @@ export default function NearbyPage() {
                 if (concept) qs.set("concept", concept);
                 qs.set("limit", "200");
                 qs.set("nocache", "1");
+                // 코스 내 장소 이미지가 모두 있거나 1개만 없는 경우만 허용
+                qs.set("imagePolicy", "all-or-one-missing");
                 const res = await fetch(`/api/courses?${qs.toString()}`, { signal: controller.signal });
                 const data = await res.json();
                 if (!Array.isArray(data)) throw new Error("unexpected");
