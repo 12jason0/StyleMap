@@ -1,6 +1,5 @@
-// src/app/terms/page.tsx 수정 내용
-
 export default function TermsOfServicePage() {
+    const CONTACT_EMAIL = "12jason@naver.com";
     return (
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
@@ -205,7 +204,7 @@ export default function TermsOfServicePage() {
                                 본 약관에 대한 문의사항이 있으시면 아래로 연락주시기 바랍니다.
                             </p>
                             <p className="text-gray-700 text-sm mt-2">
-                                <strong>이메일:</strong> 12jason@naver.com
+                                <strong>이메일:</strong> {CONTACT_EMAIL}
                                 <br />
                                 <strong>운영시간:</strong> 평일 10:00 - 18:00 (주말 및 공휴일 제외)
                             </p>

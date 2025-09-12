@@ -2,8 +2,6 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 
 const ContactPage = () => {
     useEffect(() => {
@@ -11,7 +9,6 @@ const ContactPage = () => {
     }, []);
     return (
         <div className="flex flex-col min-h-screen bg-white">
-            <Header />
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
                 <div className="max-w-4xl mx-auto">
                     <h1 className="text-3xl font-bold text-gray-900 mb-8">문의하기</h1>

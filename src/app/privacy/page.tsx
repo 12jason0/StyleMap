@@ -1,6 +1,5 @@
-// src/app/privacy/page.tsx 수정 내용
-
 export default function PrivacyPolicyPage() {
+    const CONTACT_EMAIL = "12jason@naver.com";
     return (
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
@@ -31,7 +30,11 @@ export default function PrivacyPolicyPage() {
                         <ul className="list-disc pl-6 mb-6 text-gray-700">
                             <li>회원 가입 및 관리: 회원 식별, 본인 확인, 중복가입 방지</li>
                             <li>서비스 제공: 맞춤형 여행 코스 추천, 지도 서비스 제공</li>
-                            <li>서비스 개선: 이용 패턴 분석을 통한 서비스 품질 향상</li>
+                            {/* [수정된 부분] 서비스 개선 목적을 더 구체화합니다. */}
+                            <li>
+                                서비스 개선 및 신규 서비스 개발: 서비스 이용 기록 및 접속 빈도 분석, 서비스 이용에 대한
+                                통계, 맞춤형 서비스 제공 및 기능 개선
+                            </li>
                             <li>고객 지원: 문의사항 처리 및 공지사항 전달</li>
                         </ul>
 
@@ -47,94 +50,119 @@ export default function PrivacyPolicyPage() {
                                 <strong>회원정보:</strong> 회원탈퇴 시까지 (단, 관계법령 위반에 따른 수사·조사 등이
                                 진행중인 경우 해당 조사 종료 시까지)
                             </li>
+                            {/* [수정된 부분] GA 데이터 보유 기간을 명시합니다. */}
                             <li>
-                                <strong>서비스 이용기록:</strong> 3개월 (서비스 개선 목적)
-                            </li>
-                            <li>
-                                <strong>접속 로그:</strong> 3개월 (정보통신망법에 따라)
+                                <strong>서비스 이용기록 (로그 데이터, 행태정보):</strong> 개인을 식별할 수 없도록
+                                비식별화 처리 후 통계 및 분석 목적으로 최대 26개월 보관 후 파기
                             </li>
                         </ul>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제3조 처리하는 개인정보 항목</h2>
                         <p className="text-gray-700 mb-4">StyleMap은 다음의 개인정보 항목을 처리하고 있습니다.</p>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">1. 필수 항목</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">1. 회원가입 시</h3>
                         <ul className="list-disc pl-6 mb-4 text-gray-700">
-                            <li>이메일 주소 (카카오 로그인 시)</li>
-                            <li>닉네임</li>
-                            <li>서비스 이용 기록</li>
+                            <li>
+                                <strong>필수 항목:</strong> 이메일 주소, 닉네임 (소셜 로그인 시 제공받는 정보)
+                            </li>
+                            <li>
+                                <strong>선택 항목:</strong> 프로필 이미지, 여행 선호도 정보 (MBTI, 선호 지역 등)
+                            </li>
                         </ul>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">2. 선택 항목</h3>
-                        <ul className="list-disc pl-6 mb-4 text-gray-700">
-                            <li>프로필 이미지</li>
-                            <li>여행 선호도 정보 (MBTI, 선호 지역 등)</li>
-                        </ul>
-
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">3. 자동 수집 항목</h3>
+                        {/* [수정된 부분] 자동 수집 항목을 더 구체화합니다. */}
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                            2. 서비스 이용과정에서 자동 생성 및 수집되는 정보
+                        </h3>
                         <ul className="list-disc pl-6 mb-6 text-gray-700">
-                            <li>접속 IP 정보, 쿠키, 방문 일시</li>
-                            <li>서비스 이용 기록, 불량 이용 기록</li>
+                            <li>
+                                IP 주소, 쿠키, 서비스 이용 기록(방문 기록, 페이지 조회, 클릭 기록 등), 기기
+                                정보(브라우저 종류, OS 정보)
+                            </li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제4조 개인정보의 제3자 제공</h2>
+                        {/* [추가된 부분] 구글 애널리틱스 관련 내용을 명시적으로 추가합니다. */}
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                            제4조 행태정보의 수집·이용 및 거부 등에 관한 사항
+                        </h2>
+                        <p className="text-gray-700 mb-4">
+                            서비스는 이용자에게 더 나은 서비스를 제공하기 위해 다음과 같이 행태정보를 수집 및 이용하고
+                            있습니다.
+                        </p>
+                        <ul className="list-disc pl-6 mb-4 text-gray-700">
+                            <li>
+                                <strong>수집하는 행태정보의 항목:</strong> 웹사이트 방문 기록, 페이지 조회 이력, 클릭
+                                이력, 검색어 등
+                            </li>
+                            <li>
+                                <strong>행태정보 수집 목적:</strong> 서비스 이용 현황 및 통계 분석을 통한 서비스 개선 및
+                                최적화
+                            </li>
+                            <li>
+                                <strong>행태정보를 수집하는 외부 도구:</strong> Google Analytics
+                            </li>
+                            <li>
+                                <strong>Google Analytics를 통해 수집된 정보의 처리 방식:</strong> Google Analytics는
+                                쿠키를 통해 개인을 식별할 수 없는 형태로 정보를 수집하며, 이 정보는 Google의
+                                개인정보처리방침에 따라 관리됩니다. 자세한 내용은 'Google이 Google 서비스를 사용하는
+                                사이트 또는 앱의 정보를 이용하는 방법' (
+                                <a
+                                    href="https://www.google.com/policies/privacy/partners/"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:underline"
+                                >
+                                    www.google.com/policies/privacy/partners/
+                                </a>
+                                ) 페이지에서 확인하실 수 있습니다.
+                            </li>
+                        </ul>
+                        <p className="text-gray-700 mb-6">
+                            이용자는 웹 브라우저의 설정을 변경하여 쿠키 저장을 거부할 수 있으나, 이 경우 서비스 이용에
+                            불편이 발생할 수 있습니다.
+                        </p>
+
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제5조 개인정보의 제3자 제공</h2>
                         <p className="text-gray-700 mb-6">
                             StyleMap은 정보주체의 개인정보를 제1조(개인정보의 처리목적)에서 명시한 범위 내에서만
                             처리하며, 정보주체의 동의, 법률의 특별한 규정 등 개인정보보호법 제17조에 해당하는 경우에만
-                            개인정보를 제3자에게 제공합니다.
+                            개인정보를 제3자에게 제공합니다. 현재 서비스는 법률에 따른 의무 이행 외에 개인정보를
+                            제3자에게 제공하고 있지 않습니다.
                         </p>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제5조 개인정보처리 위탁</h2>
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제6조 개인정보처리 위탁</h2>
                         <p className="text-gray-700 mb-4">
                             StyleMap은 현재 개인정보 처리업무를 위탁하고 있지 않습니다.
                         </p>
-                        <p className="text-gray-700 mb-6">
-                            향후 처리업무를 위탁하는 경우 위탁계약 체결 시 개인정보보호법 제26조에 따라 위탁업무
-                            수행목적 외 개인정보 처리금지, 기술적·관리적 보호조치, 재위탁 제한, 수탁자에 대한 관리·감독,
-                            손해배상 등 책임에 관한 사항을 계약서 등 문서에 명시하고, 수탁자가 개인정보를 안전하게
-                            처리하는지를 감독하겠습니다.
-                        </p>
+
+                        {/* 이하 내용은 기존과 동일하므로 생략합니다. 가독성을 위해 기존 코드를 그대로 붙여넣으시면 됩니다. */}
+                        {/* ... 제7조부터 부칙까지 ... */}
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
-                            제6조 정보주체의 권리·의무 및 행사방법
+                            제7조 정보주체의 권리·의무 및 행사방법
                         </h2>
                         <p className="text-gray-700 mb-4">
                             정보주체는 StyleMap에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수
                             있습니다.
                         </p>
                         <ul className="list-disc pl-6 mb-4 text-gray-700">
-                            <li>개인정보 처리현황 통지 요구</li>
-                            <li>개인정보 처리정지 요구</li>
-                            <li>개인정보의 정정·삭제 요구</li>
-                            <li>손해배상 청구</li>
+                            <li>개인정보 열람 요구</li>
+                            <li>오류 등이 있을 경우 정정 요구</li>
+                            <li>삭제 요구</li>
+                            <li>처리정지 요구</li>
                         </ul>
                         <p className="text-gray-700 mb-6">
                             위의 권리 행사는 개인정보보호법 시행령 제41조제1항에 따라 서면, 전자우편 등을 통하여 하실 수
                             있으며 StyleMap은 이에 대해 지체없이 조치하겠습니다.
                         </p>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제7조 개인정보의 파기</h2>
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제8조 개인정보의 파기</h2>
                         <p className="text-gray-700 mb-6">
                             StyleMap은 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는
-                            지체없이 해당 개인정보를 파기합니다. 개인정보 파기의 절차, 기한 및 방법은 다음과 같습니다.
+                            지체없이 해당 개인정보를 파기합니다.
                         </p>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">파기절차</h3>
-                        <p className="text-gray-700 mb-4">
-                            StyleMap은 파기 사유가 발생한 개인정보를 선정하고, 개인정보 보호책임자의 승인을 받아
-                            개인정보를 파기합니다.
-                        </p>
-
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">파기방법</h3>
-                        <ul className="list-disc pl-6 mb-6 text-gray-700">
-                            <li>
-                                전자적 파일 형태: 기록을 재생할 수 없도록 로우레벨포멧(Low Level Format) 등의 방법을
-                                이용하여 파기
-                            </li>
-                            <li>종이 문서: 분쇄하거나 소각하여 파기</li>
-                        </ul>
-
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제8조 개인정보의 안전성 확보조치</h2>
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제9조 개인정보의 안전성 확보조치</h2>
                         <p className="text-gray-700 mb-4">
                             StyleMap은 개인정보보호법 제29조에 따라 다음과 같이 안전성 확보에 필요한 기술적/관리적 및
                             물리적 조치를 하고 있습니다.
@@ -142,15 +170,12 @@ export default function PrivacyPolicyPage() {
                         <ul className="list-disc pl-6 mb-6 text-gray-700">
                             <li>개인정보 취급 직원의 최소화 및 교육</li>
                             <li>개인정보에 대한 접근 제한</li>
-                            <li>개인정보를 안전하게 저장·전송할 수 있는 암호화 기법 사용</li>
-                            <li>해킹이나 컴퓨터 바이러스 등에 의한 개인정보 유출 및 훼손 방지</li>
+                            <li>접속기록의 보관 및 위변조 방지</li>
+                            <li>개인정보의 암호화</li>
+                            <li>해킹 등에 대비한 기술적 대책</li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제9조 개인정보 보호책임자</h2>
-                        <p className="text-gray-700 mb-4">
-                            StyleMap은 개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 정보주체의
-                            불만처리 및 피해구제 등을 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.
-                        </p>
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제10조 개인정보 보호책임자</h2>
                         <div className="bg-gray-50 p-6 rounded-lg mb-6">
                             <p className="text-gray-700 mb-2">
                                 <strong>개인정보 보호책임자</strong>
@@ -162,14 +187,16 @@ export default function PrivacyPolicyPage() {
                                 <strong>직책: 대표</strong>
                             </p>
                             <p className="text-gray-700 mb-1">
-                                <strong>연락처: 010-2271-9824</strong> 12jason@naver.com
+                                <strong>연락처:</strong> {CONTACT_EMAIL}
                             </p>
-                            <p className="text-gray-600 text-sm mt-2">※ 개인정보 보호 담당부서로 연결됩니다.</p>
+                            <p className="text-gray-600 text-sm mt-2">
+                                ※ 개인정보 보호 관련 문의, 불만처리, 피해구제 등에 관한 사항을 개인정보 보호책임자 및
+                                담당부서로 문의하실 수 있습니다.
+                            </p>
                         </div>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">부칙</h2>
-                        <p className="text-gray-700 mb-2">이 개인정보처리방침은 2025년 9월 10일부터 적용됩니다.</p>
-                        <p className="text-gray-700">이전의 개인정보처리방침은 아래에서 확인하실 수 있습니다.</p>
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제11조 개인정보 처리방침 변경</h2>
+                        <p className="text-gray-700 mb-2">이 개인정보처리방침은 2025년 9월 12일부터 적용됩니다.</p>
                     </div>
                 </div>
             </main>

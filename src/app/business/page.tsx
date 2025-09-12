@@ -1,5 +1,5 @@
-// src/app/business/page.tsx 수정 내용
 export default function BusinessPage() {
+    const CONTACT_EMAIL = "12jason@naver.com";
     return (
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
@@ -7,14 +7,6 @@ export default function BusinessPage() {
                     <h1 className="text-3xl font-bold text-gray-900 mb-8">사업자 정보</h1>
 
                     <div className="prose prose-lg max-w-none">
-                        {/* 베타 서비스 안내 */}
-                        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
-                            <p className="text-sm text-blue-800">
-                                🚀 현재 베타 서비스 운영 중입니다. 정식 사업자등록 완료 후 상세 정보를 업데이트할
-                                예정입니다.
-                            </p>
-                        </div>
-
                         <div className="bg-gray-50 rounded-lg p-8">
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>

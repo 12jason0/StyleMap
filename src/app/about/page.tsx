@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 
 interface Course {
     id: string;
@@ -169,7 +167,6 @@ const AboutPage = () => {
     }, [reviews.length]);
     return (
         <>
-            <Header />
             <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 pt-10">
                 {/* 히어로 섹션 */}
                 <section className="pt-24 pb-16 px-4">
