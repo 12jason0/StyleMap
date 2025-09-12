@@ -233,9 +233,9 @@ const Header = () => {
                             지도
                         </Link>
                         <Link
-                            href="/Escape"
+                            href="/escape"
                             className={`text-sm font-medium transition-colors ${
-                                pathname === "/map" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+                                pathname === "/escape" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
                             }`}
                         >
                             사건 파일

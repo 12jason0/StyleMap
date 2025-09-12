@@ -63,16 +63,19 @@ export async function GET(request: NextRequest) {
 
         console.log("API: Returning formatted courses:", formattedCourses.length);
 
-        return NextResponse.json(formattedCourses, {
-            status: 200,
-            headers: {
-                "Content-Type": "application/json",
-                ...(noCache
-                    ? { "Cache-Control": "no-store", Pragma: "no-cache" }
-                    : { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }),
-                "X-Records": String(formattedCourses.length),
-            },
-        });
+        return NextResponse.json(
+            { success: true, courses: formattedCourses },
+            {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(noCache
+                        ? { "Cache-Control": "no-store", Pragma: "no-cache" }
+                        : { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }),
+                    "X-Records": String(formattedCourses.length),
+                },
+            }
+        );
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         console.error("API: Detailed error in /api/courses:", { message: errorMessage });
