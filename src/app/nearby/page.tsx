@@ -48,8 +48,8 @@ export default function NearbyPage() {
                 const concept = selectedActivities[0];
                 const qs = new URLSearchParams();
                 if (concept) qs.set("concept", concept);
-                qs.set("limit", "60");
-                qs.set("lean", "1");
+                qs.set("limit", "200");
+                qs.set("nocache", "1");
                 const res = await fetch(`/api/courses?${qs.toString()}`, { signal: controller.signal });
                 const data = await res.json();
                 if (!Array.isArray(data)) throw new Error("unexpected");

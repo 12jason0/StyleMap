@@ -1,19 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 // 상단 import 하단의 컴포넌트 시작부에 추가
 
 const Header = () => {
-    const [isAiMenuOpen, setIsAiMenuOpen] = useState(false);
+    // AI 추천 드롭다운 제거
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [hasFavorites, setHasFavorites] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
-    const aiMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         // JWT 토큰 유효성 검증 함수
@@ -131,19 +130,7 @@ const Header = () => {
         }
     };
 
-    // AI 추천 드롭다운 외부 클릭 시 닫기
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (aiMenuRef.current && !aiMenuRef.current.contains(event.target as Node)) {
-                setIsAiMenuOpen(false);
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, []);
+    // 드롭다운 제거로 외부 클릭 핸들러 삭제
 
     const toggleMenu = () => {
         setIsMenuOpen(!isMenuOpen);
@@ -218,36 +205,24 @@ const Header = () => {
                         >
                             코스
                         </Link>
-                        <div className="relative" ref={aiMenuRef}>
-                            <button
-                                onClick={() => setIsAiMenuOpen((v) => !v)}
-                                className={`hover:cursor-pointer text-sm font-medium transition-colors ${
-                                    pathname === "/personalized-home" || pathname === "/nearby"
-                                        ? "text-blue-600"
-                                        : "text-gray-700 hover:text-blue-600"
-                                }`}
-                            >
-                                🎯 AI 추천
-                            </button>
-                            {isAiMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50 hover:cursor-pointer">
-                                    <Link
-                                        href="/personalized-home"
-                                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-                                        onClick={() => setIsAiMenuOpen(false)}
-                                    >
-                                        맞춤형 추천
-                                    </Link>
-                                    <Link
-                                        href="/nearby"
-                                        className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 "
-                                        onClick={() => setIsAiMenuOpen(false)}
-                                    >
-                                        오늘 뭐하지?
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
+                        <Link
+                            href="/nearby"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/nearby" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
+                            }`}
+                        >
+                            오늘 뭐하지?
+                        </Link>
+                        <Link
+                            href="/personalized-home"
+                            className={`text-sm font-medium transition-colors ${
+                                pathname === "/personalized-home"
+                                    ? "text-blue-600"
+                                    : "text-gray-700 hover:text-blue-600"
+                            }`}
+                        >
+                            🎯 AI 추천
+                        </Link>
 
                         <Link
                             href="/map"
@@ -257,14 +232,7 @@ const Header = () => {
                         >
                             지도
                         </Link>
-                        <Link
-                            href="/tag-courses"
-                            className={`text-sm font-medium transition-colors ${
-                                pathname === "/tag-courses" ? "text-blue-600" : "text-gray-700 hover:text-blue-600"
-                            }`}
-                        >
-                            태그 코스
-                        </Link>
+
                         {/* 팝업 메뉴 제거 */}
                     </nav>
 
@@ -415,17 +383,7 @@ const Header = () => {
                         >
                             지도
                         </Link>
-                        <Link
-                            href="/tag-courses"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/tag-courses"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            태그 코스
-                        </Link>
+
                         {/* 팝업 메뉴 제거 */}
 
                         <div className="pt-4 pb-3 border-t border-gray-200">
