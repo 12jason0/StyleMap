@@ -290,7 +290,7 @@ model StoryChapter {
 
 model Badge {
   id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(100)
+  name        String   @unique @db.VarChar(100)
   description String?
   image_url   String?  @db.VarChar(500)
   stories     Story[]  @relation("StoryRewardBadge")
