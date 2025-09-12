@@ -40,7 +40,9 @@ function CoursesPageInner() {
             try {
                 setLoading(true);
 
-                const url = concept ? `/api/courses?concept=${encodeURIComponent(concept)}` : "/api/courses";
+                const url = concept
+                    ? `/api/courses?concept=${encodeURIComponent(concept)}&imagePolicy=all-or-one-missing`
+                    : "/api/courses?imagePolicy=all-or-one-missing";
 
                 // 캐시된 데이터 확인
                 const cacheKey = `courses_${concept || "all"}`;
@@ -117,7 +119,9 @@ function CoursesPageInner() {
             alert("코스 예약이 완료되었습니다!");
 
             // 코스 목록 새로고침
-            const url = concept ? `/api/courses?concept=${encodeURIComponent(concept)}` : "/api/courses";
+            const url = concept
+                ? `/api/courses?concept=${encodeURIComponent(concept)}&imagePolicy=all-or-one-missing`
+                : "/api/courses?imagePolicy=all-or-one-missing";
             const coursesResponse = await fetch(url);
             const coursesData = await coursesResponse.json();
             setCourses(coursesData);
