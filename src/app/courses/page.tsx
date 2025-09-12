@@ -67,7 +67,12 @@ function CoursesPageInner() {
                 }
 
                 const data = await response.json();
-                setCourses(data);
+                if (data && Array.isArray(data.courses)) {
+                    setCourses(data.courses);
+                } else {
+                    // 혹시 모를 다른 형식의 응답에 대비
+                    setCourses(data);
+                }
 
                 setError(null);
 
