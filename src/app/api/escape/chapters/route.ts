@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
         const storyId = Number(searchParams.get("storyId"));
         if (!storyId) return NextResponse.json({ error: "storyId required" }, { status: 400 });
         const client: any = prisma as any;
-        if (!client.storyChapter || typeof client.storyChapter.findMany !== "function") {
+        if (!client.storyChapter || typeof client.StoryChapter.findMany !== "function") {
             return NextResponse.json([]);
         }
         const rows = await client.storyChapter.findMany({

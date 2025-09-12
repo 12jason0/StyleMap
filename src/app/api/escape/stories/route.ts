@@ -9,7 +9,7 @@ export async function GET() {
             // 모델 미생성/마이그레이션 전: 빈 배열 반환
             return NextResponse.json([]);
         }
-        const stories = await client.story.findMany({
+        const stories = await client.Story.findMany({
             // is_active가 NULL인 레코드도 노출되도록 where 제거
             orderBy: { id: "asc" },
             include: { reward_badge: true },
