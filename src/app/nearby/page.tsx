@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type Course = {
-    id: number;
+    id: string;
     title: string;
     description?: string;
     imageUrl?: string;
@@ -21,15 +22,20 @@ const activities = [
     { key: "맛집탐방", label: "🍜 맛집탐방" },
     { key: "쇼핑", label: "🛍️ 쇼핑" },
     { key: "문화예술", label: "🎨 문화예술" },
+    { key: "야경", label: "🌃 야경" },
+    { key: "테마파크", label: "🎢 테마파크" },
+    { key: "체험", label: "🧪 체험" },
+    { key: "이색데이트", label: "✨ 이색데이트" },
 ];
 
-const regions = ["강남", "성수", "홍대", "종로", "연남", "한남", "서초", "건대", "잠실"];
+const regions = ["강남", "성수", "홍대", "종로", "연남", "한남", "서초", "건대", "송파", "신촌"];
 
 export default function NearbyPage() {
     const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
     const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
     const [budget, setBudget] = useState<number>(10);
     const [courses, setCourses] = useState<Course[]>([]);
+    // 되돌림: 페이징 상태 제거
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -42,8 +48,8 @@ export default function NearbyPage() {
                 const concept = selectedActivities[0];
                 const qs = new URLSearchParams();
                 if (concept) qs.set("concept", concept);
-                qs.set("limit", "200");
-                qs.set("nocache", "1");
+                qs.set("limit", "60");
+                qs.set("lean", "1");
                 const res = await fetch(`/api/courses?${qs.toString()}`, { signal: controller.signal });
                 const data = await res.json();
                 if (!Array.isArray(data)) throw new Error("unexpected");
@@ -57,6 +63,8 @@ export default function NearbyPage() {
         fetchCourses();
         return () => controller.abort();
     }, [selectedActivities.join(",")]);
+
+    // 되돌림: 필터 변경에 따른 페이징 초기화 제거
 
     const filtered = useMemo(() => {
         const maxWon = budget * 10000;
@@ -84,13 +92,19 @@ export default function NearbyPage() {
         else set([...arr, v]);
     };
 
+    // 활동은 단일 선택만 가능하도록 처리
+    const selectSingle = (arr: string[], v: string, set: (n: string[]) => void) => {
+        if (arr.includes(v)) set([]);
+        else set([v]);
+    };
+
     return (
         <div className="min-h-screen bg-white text-black">
             <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
                 <div className="md:flex md:gap-6">
                     {/* Left: Control panel */}
                     <aside className="md:w-1/3 lg:w-[30%] bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 md:mb-0">
-                        <h2 className="text-lg font-bold mb-4">주변 코스 필터</h2>
+                        <h2 className="text-lg font-bold mb-4">인기 지역 코스 필터</h2>
                         {/* 활동 선택 */}
                         <div className="mb-6">
                             <h3 className="text-sm font-semibold text-gray-700 mb-2">활동 선택</h3>
@@ -98,8 +112,8 @@ export default function NearbyPage() {
                                 {activities.map((a) => (
                                     <button
                                         key={a.key}
-                                        onClick={() => toggle(selectedActivities, a.key, setSelectedActivities)}
-                                        className={`px-3 py-2 rounded-lg border text-sm hover:bg-gray-50 ${
+                                        onClick={() => selectSingle(selectedActivities, a.key, setSelectedActivities)}
+                                        className={`px-3 py-2 rounded-lg border text-sm hover:bg-gray-50 hover:cursor-pointer   ${
                                             selectedActivities.includes(a.key)
                                                 ? "border-blue-500 text-blue-600 bg-blue-50"
                                                 : "border-gray-300 text-gray-700"
@@ -118,8 +132,8 @@ export default function NearbyPage() {
                                 {regions.map((r) => (
                                     <button
                                         key={r}
-                                        onClick={() => toggle(selectedRegions, r, setSelectedRegions)}
-                                        className={`px-3 py-1.5 rounded-full border text-sm hover:bg-gray-50 ${
+                                        onClick={() => selectSingle(selectedRegions, r, setSelectedRegions)}
+                                        className={`px-3 py-1.5 rounded-full border text-sm hover:bg-gray-50 hover:cursor-pointer ${
                                             selectedRegions.includes(r)
                                                 ? "border-blue-500 text-blue-600 bg-blue-50"
                                                 : "border-gray-300 text-gray-700"
@@ -142,9 +156,9 @@ export default function NearbyPage() {
                                     step={1}
                                     value={budget}
                                     onChange={(e) => setBudget(Number(e.target.value))}
-                                    className="w-full"
+                                    className="w-full hover:cursor-pointer"
                                 />
-                                <span className="text-sm text-gray-700 whitespace-nowrap">{budget}만원</span>
+                                <span className="text-sm text-gray-700 whitespace-nowrap ">{budget}만원</span>
                             </div>
                         </div>
                     </aside>
@@ -159,7 +173,7 @@ export default function NearbyPage() {
                                     setSelectedRegions([]);
                                     setBudget(10);
                                 }}
-                                className="text-sm text-gray-600 hover:text-gray-800 border px-3 py-1.5 rounded-lg"
+                                className="text-sm text-gray-600 hover:text-gray-800 border px-3 py-1.5 rounded-lg hover:cursor-pointer "
                             >
                                 초기화
                             </button>
@@ -170,37 +184,41 @@ export default function NearbyPage() {
                         ) : error ? (
                             <div className="p-8 text-center text-red-500">{error}</div>
                         ) : (
-                            <div className="grid sm:grid-cols-2 gap-4">
-                                {filtered.slice(0, 24).map((c) => (
-                                    <a
-                                        key={c.id}
-                                        href={`/courses/${c.id}`}
-                                        className="block border border-gray-200 rounded-2xl p-4 hover:bg-gray-50 transition-colors"
-                                    >
-                                        <div className="w-full h-40 rounded-xl overflow-hidden bg-gray-100 mb-3">
-                                            {c.imageUrl ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={c.imageUrl}
-                                                    alt={c.title}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-2xl">
-                                                    📷
-                                                </div>
-                                            )}
-                                        </div>
-                                        <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{c.title}</h3>
-                                        <div className="text-xs text-gray-500 flex flex-wrap gap-3">
-                                            {c.location && <span>📍 {c.location}</span>}
-                                            {c.duration && <span>⏱ {c.duration}</span>}
-                                            {c.price && <span>💰 {c.price}</span>}
-                                            {c.concept && <span>🏷 {c.concept}</span>}
-                                        </div>
-                                    </a>
-                                ))}
-                            </div>
+                            <>
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                    {filtered.map((c) => (
+                                        <Link
+                                            key={c.id}
+                                            href={`/courses/${c.id}`}
+                                            prefetch={true}
+                                            className="block border border-gray-200 rounded-2xl p-4 hover:bg-gray-50 transition-colors"
+                                        >
+                                            <div className="w-full h-40 rounded-xl overflow-hidden bg-gray-100 mb-3">
+                                                {c.imageUrl ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                        src={c.imageUrl}
+                                                        alt={c.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-2xl">
+                                                        📷
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{c.title}</h3>
+                                            <div className="text-xs text-gray-500 flex flex-wrap gap-3">
+                                                {c.location && <span>📍 {c.location}</span>}
+                                                {c.duration && <span>⏱ {c.duration}</span>}
+                                                {c.price && <span>💰 {c.price}</span>}
+                                                {c.concept && <span>🏷 {c.concept}</span>}
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                                {/* 되돌림: 더보기 버튼 제거 */}
+                            </>
                         )}
                     </section>
                 </div>

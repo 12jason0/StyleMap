@@ -193,7 +193,7 @@ const Header = () => {
                     <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logo.png"
+                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoM.png"
                             alt="StyleMap"
                             className="w-8 h-8 rounded-lg object-contain"
                         />
@@ -243,7 +243,7 @@ const Header = () => {
                                         className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 "
                                         onClick={() => setIsAiMenuOpen(false)}
                                     >
-                                        실시간 주변 추천
+                                        오늘 뭐하지?
                                     </Link>
                                 </div>
                             )}
@@ -402,7 +402,7 @@ const Header = () => {
                             }`}
                             onClick={closeMenu}
                         >
-                            🎯 AI 추천 - 주변
+                            오늘 뭐하지?
                         </Link>
                         <Link
                             href="/map"

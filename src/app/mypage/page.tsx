@@ -498,7 +498,7 @@ const MyPage = () => {
         <div className="space-y-6">
             {/* 찜 목록 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">찜 목록</h3>
+                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">내 여행 보관함</h3>
 
                 {favorites.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -604,7 +604,7 @@ const MyPage = () => {
                                 { id: "profile", label: "프로필", icon: "👤" },
                                 { id: "preferences", label: "선호도", icon: "🎯" },
                                 { id: "bookings", label: "예약내역", icon: "📋" },
-                                { id: "favorites", label: "찜 목록", icon: "💖" },
+                                { id: "favorites", label: "내 여행 보관함", icon: "💖" },
                             ].map((tab) => (
                                 <button
                                     key={tab.id}

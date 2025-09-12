@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserIdFromRequest } from "@/lib/auth";
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export async function GET(request: NextRequest) {
     try {
@@ -11,9 +11,14 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
         const limitParam = searchParams.get("limit");
+        const offsetParam = searchParams.get("offset");
         const noCache = searchParams.get("nocache");
         const noFilter = searchParams.get("noFilter");
-        const effectiveLimit = Math.min(Math.max(Number(limitParam ?? 100), 1), 200);
+        const lean = searchParams.get("lean");
+        const parsedLimit = Number(limitParam ?? 100);
+        const effectiveLimit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 100, 1), 200);
+        const parsedOffset = Number(offsetParam ?? 0);
+        const effectiveOffset = Math.max(Number.isFinite(parsedOffset) ? parsedOffset : 0, 0);
 
         // Prisma로 조회 (컨셉 필터 + 이미지 조건)
         const results = await prisma.courses.findMany({
@@ -22,21 +27,44 @@ export async function GET(request: NextRequest) {
             },
             orderBy: [{ id: "desc" }, { title: "asc" }],
             take: effectiveLimit,
-            include: {
-                course_places: {
-                    include: { places: true },
-                },
-            } as any,
+            skip: effectiveOffset,
+            ...((lean
+                ? {
+                      select: {
+                          id: true,
+                          title: true,
+                          description: true,
+                          duration: true,
+                          region: true,
+                          price: true,
+                          imageUrl: true,
+                          concept: true,
+                          rating: true,
+                          current_participants: true,
+                      },
+                  }
+                : {
+                      include: {
+                          course_places: {
+                              include: { places: true },
+                          },
+                      },
+                  }) as any),
         } as any);
 
         let usableResults: any[] = results as any[];
-        if (!noFilter) {
+        if (!noFilter && !lean) {
             const filtered = (results as any[]).filter((c) => {
                 const emptyImages = (c.course_places || []).filter((cp: any) => !cp.places?.imageUrl).length;
                 return emptyImages <= 1;
             });
-            // 필터 결과가 0이면 필터를 자동 완화하여 원본 사용 (초기 데이터 표시 보장)
-            if (filtered.length > 0) {
+
+            // 필터링된 결과가 없으면 원본을 사용하고, 결과가 있으면 필터링된 목록을 사용하도록 명확하게 수정
+            if (filtered.length === 0 && results.length > 0) {
+                // 필터링으로 모든 코스가 제외되었지만, 원래 코스는 있었던 경우 -> 원본을 그대로 사용
+                usableResults = results;
+            } else {
+                // 필터링된 결과가 있거나, 원래부터 코스가 없었던 경우 -> 필터링된 결과를 사용
                 usableResults = filtered;
             }
         }

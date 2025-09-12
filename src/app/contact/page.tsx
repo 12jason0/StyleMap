@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -45,9 +46,9 @@ const ContactPage = () => {
                         <h2 className="text-lg font-semibold text-gray-900 mb-2">자주 묻는 질문 (FAQ)</h2>
                         <p className="text-gray-700">
                             먼저{" "}
-                            <a href="/help" className="text-blue-600 hover:underline">
+                            <Link href="/help" className="text-blue-600 hover:underline" prefetch>
                                 자주 묻는 질문 페이지
-                            </a>
+                            </Link>
                             를 확인하시면 더 빠르게 답변을 찾으실 수 있습니다.
                         </p>
                     </div>
