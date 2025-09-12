@@ -67,7 +67,7 @@ function writeProgress(map: ProgressMap) {
     } catch {}
 }
 
-export default function EscapePage() {
+export default function escapePage() {
     const [stories, setStories] = useState<Story[]>([]);
     const [chapters, setChapters] = useState<StoryChapter[]>([]);
     const [badges, setBadges] = useState<Badge[]>([]);
@@ -209,7 +209,7 @@ export default function EscapePage() {
         <div className="min-h-screen bg-white text-black">
             <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold">Escape 미션</h1>
+                    <h1 className="text-3xl font-bold">escape 미션</h1>
                     <p className="text-gray-600 mt-1">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
                 </div>
 
@@ -249,14 +249,14 @@ export default function EscapePage() {
                                     ) : pr.status === "completed" ? (
                                         <button
                                             onClick={() => setSelectedStoryId(s.id)}
-                                            className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                                            className="hover:cursor-pointer px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
                                         >
                                             다시 보기
                                         </button>
                                     ) : (
                                         <button
                                             onClick={() => setSelectedStoryId(s.id)}
-                                            className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                                            className="hover:cursor-pointer px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
                                         >
                                             이어하기
                                         </button>

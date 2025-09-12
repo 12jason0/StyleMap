@@ -21,6 +21,8 @@ export async function GET(_request: NextRequest) {
             region: s.region ?? null,
             estimated_duration_min: s.estimated_duration_min ?? null,
             price: s.price != null ? String(s.price) : null,
+            // Prisma 타입 생성 이전 호환: imageUrl은 DB와 스키마에 존재하나, 캐스팅으로 접근
+            imageUrl: (s as any).imageUrl ?? null,
             reward_badge_id: s.reward_badge_id ?? null,
             is_active: s.is_active,
             created_at: s.created_at,

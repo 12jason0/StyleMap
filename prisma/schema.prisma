@@ -257,6 +257,7 @@ model Story {
   region                 String?             @db.VarChar(100)
   estimated_duration_min Int?
   price                  Decimal?            @db.Decimal(10, 2)
+  imageUrl               String?             @db.Text
   reward_badge_id        Int?
   is_active              Boolean             @default(true)
   created_at             DateTime            @default(now())
