@@ -1,4 +1,4 @@
-// [수정된 prisma/schema.prisma 파일]
+// [전체 수정된 prisma/schema.prisma 파일]
 
 generator client {
   provider = "prisma-client-js"
@@ -23,8 +23,7 @@ model User {
   age                 Int?
   reviews             Review[]
   courses             Courses[]
-  // ✅ [추가된 부분 1] UserStoryProgress와의 관계를 명시합니다.
-  userStoryProgress   UserStoryProgress[]
+  // userStoryProgress   UserStoryProgress[]
 
   @@index([provider, socialId])
 }
@@ -55,7 +54,7 @@ model Courses {
   notices              Notice[]
   tags                 CourseTag[]    @relation("CourseTagToCourses")
   user_favorites       UserFavorite[]
-  
+
   @@map("courses")
 }
 
@@ -137,7 +136,6 @@ model CourseTag {
   @@map("course_tags")
 }
 
-/// Places table
 model Place {
   id                   Int           @id @default(autoincrement())
   name                 String        @db.VarChar(255)
@@ -161,7 +159,6 @@ model Place {
   @@map("places")
 }
 
-/// Courses - Places pivot
 model CoursePlace {
   id                 Int      @id @default(autoincrement())
   course_id          Int
@@ -246,71 +243,8 @@ model UserFavorite {
   course_id  Int
   created_at DateTime @default(now()) @db.Timestamp(0)
   courses    Courses  @relation(fields: [course_id], references: [id])
-  
+
   @@unique([user_id, course_id])
   @@map("user_favorites")
 }
 
-/// Escape Stories
-model Story {
-  id                     Int                @id @default(autoincrement())
-  title                  String             @db.VarChar(255)
-  synopsis               String?
-  region                 String?            @db.VarChar(100)
-  estimated_duration_min Int?
-  price                  String?            @db.VarChar(100)
-  reward_badge_id        Int?
-  is_active              Boolean            @default(true)
-  created_at             DateTime           @default(now())
-  updated_at             DateTime           @updatedAt
-  chapters               StoryChapter[]
-  reward_badge           Badge?             @relation("StoryRewardBadge", fields: [reward_badge_id], references: [id])
-  // ✅ [추가된 부분 2] UserStoryProgress와의 관계를 명시합니다.
-  userStoryProgress      UserStoryProgress[]
-
-  @@map("stories")
-}
-
-model StoryChapter {
-  id             Int      @id @default(autoincrement())
-  story_id       Int
-  chapter_number Int
-  title          String   @db.VarChar(255)
-  location_name  String?  @db.VarChar(255)
-  address        String?
-  latitude       Decimal? @db.Decimal(10, 8)
-  longitude      Decimal? @db.Decimal(11, 8)
-  story_text     String?
-  mission_type   String?  @db.VarChar(50)
-  mission_payload Json?
-  puzzle_text    String?
-  story          Story    @relation(fields: [story_id], references: [id])
-
-  @@unique([story_id, chapter_number])
-  @@map("storychapters")
-}
-
-model Badge {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(100)
-  description String?
-  image_url   String?  @db.VarChar(500)
-  stories     Story[]  @relation("StoryRewardBadge")
-
-  @@map("badges")
-}
-
-model UserStoryProgress {
-  id              Int       @id @default(autoincrement())
-  user_id         Int
-  story_id        Int
-  current_chapter Int
-  status          String    @db.VarChar(30)
-  started_at      DateTime?
-  completed_at    DateTime?
-  user            User?     @relation(fields: [user_id], references: [id])
-  story           Story     @relation(fields: [story_id], references: [id])
-
-  @@unique([user_id, story_id])
-  @@map("userstoryprogress")
-}
