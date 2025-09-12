@@ -7,67 +7,46 @@ export async function GET(request: NextRequest) {
     try {
         console.log("API: Starting to fetch courses...");
 
-        // URL 파라미터에서 concept과 limit 가져오기
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
         const limitParam = searchParams.get("limit");
         const offsetParam = searchParams.get("offset");
         const noCache = searchParams.get("nocache");
-        const noFilter = searchParams.get("noFilter");
         const lean = searchParams.get("lean");
         const parsedLimit = Number(limitParam ?? 100);
         const effectiveLimit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 100, 1), 200);
         const parsedOffset = Number(offsetParam ?? 0);
         const effectiveOffset = Math.max(Number.isFinite(parsedOffset) ? parsedOffset : 0, 0);
 
-        // Prisma로 조회 (컨셉 필터 + 이미지 조건)
-        const results = await prisma.courses.findMany({
+        const prismaQuery: any = {
             where: {
                 ...(concept ? { concept } : {}),
             },
-            orderBy: [{ id: "desc" }, { title: "asc" }],
+            orderBy: [{ id: "desc" }],
             take: effectiveLimit,
             skip: effectiveOffset,
-            ...((lean
-                ? {
-                      select: {
-                          id: true,
-                          title: true,
-                          description: true,
-                          duration: true,
-                          region: true,
-                          price: true,
-                          imageUrl: true,
-                          concept: true,
-                          rating: true,
-                          current_participants: true,
-                      },
-                  }
-                : {
-                      include: {
-                          course_places: {
-                              include: { places: true },
-                          },
-                      },
-                  }) as any),
-        } as any);
+        };
 
-        let usableResults: any[] = results as any[];
-        if (!noFilter && !lean) {
-            // 요구사항: 장소 imageUrl이 모두 있거나 최대 1개만 없는 코스만 노출
-            const filtered = (results as any[]).filter((c) => {
-                const places: any[] = (c as any).course_places || [];
-                if (places.length === 0) return false;
-                const total = places.length;
-                const missing = places.filter((cp: any) => !cp.places?.imageUrl).length;
-                // 모든 장소에 이미지가 있거나(missing === 0) 최대 1개만 없는 경우(missing === 1)
-                return missing === 0 || missing === 1;
-            });
-
-            usableResults = filtered.length > 0 ? filtered : results;
+        if (lean) {
+            prismaQuery.select = {
+                id: true,
+                title: true,
+                description: true,
+                duration: true,
+                region: true,
+                price: true,
+                imageUrl: true,
+                concept: true,
+                rating: true,
+                current_participants: true,
+                view_count: true,
+            };
         }
 
-        const formattedCourses = usableResults.map((course) => ({
+        const results = await prisma.courses.findMany(prismaQuery);
+
+        // [수정됨] 복잡한 이미지 필터링 로직을 제거하고 조회된 결과를 바로 포맷팅합니다.
+        const formattedCourses = results.map((course: any) => ({
             id: String(course.id),
             title: course.title || "제목 없음",
             description: course.description || "",
@@ -77,9 +56,9 @@ export async function GET(request: NextRequest) {
             imageUrl: course.imageUrl || "",
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
-            reviewCount: 0,
+            reviewCount: 0, // 이 값은 나중에 별도 로직으로 채워야 합니다.
             participants: course.current_participants || 0,
-            viewCount: 0,
+            viewCount: course.view_count || 0,
         }));
 
         console.log("API: Returning formatted courses:", formattedCourses.length);
@@ -96,38 +75,15 @@ export async function GET(request: NextRequest) {
         });
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        const errorCode = (error as { code?: string })?.code;
-        const errorSqlState = (error as { sqlState?: string })?.sqlState;
-        const errorStack = error instanceof Error ? error.stack : undefined;
-
-        console.error("API: Detailed error:", {
-            message: errorMessage,
-            code: errorCode,
-            sqlState: errorSqlState,
-            stack: errorStack,
-        });
-
-        // 연결 오류인지 쿼리 오류인지 구분
-        if (errorCode === "ECONNREFUSED") {
-            return NextResponse.json(
-                { error: "데이터베이스 연결 실패", details: "DB 서버가 실행중인지 확인해주세요" },
-                { status: 503 }
-            );
-        } else if (errorCode === "ER_NO_SUCH_TABLE") {
-            return NextResponse.json(
-                { error: "테이블이 존재하지 않음", details: "courses 테이블을 생성해주세요" },
-                { status: 500 }
-            );
-        } else {
-            return NextResponse.json(
-                { error: "코스 데이터를 가져오는 중 오류 발생", details: errorMessage },
-                { status: 500 }
-            );
-        }
-    } finally {
+        console.error("API: Detailed error in /api/courses:", { message: errorMessage });
+        return NextResponse.json(
+            { error: "코스 데이터를 가져오는 중 오류 발생", details: errorMessage },
+            { status: 500 }
+        );
     }
 }
 
+// POST 함수는 그대로 둡니다.
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
@@ -176,6 +132,5 @@ export async function POST(request: NextRequest) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         console.error("코스 생성 오류:", error);
         return NextResponse.json({ error: "코스 생성 실패", details: errorMessage }, { status: 500 });
-    } finally {
     }
 }
