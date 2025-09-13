@@ -28,12 +28,16 @@ export default function KakaoMap({
     draggable = true,
     drawPath = false,
     routeMode = "simple",
+    ancientStyle = false,
+    highlightPlaceId,
 }: KakaoMapProps) {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
     const polylineRef = useRef<any>(null);
     const resolvedPositionsRef = useRef<Record<number, any>>({});
+    const tooltipOverlaysRef = useRef<Record<number, any>>({});
+    const glowOverlayRef = useRef<any>(null);
     const [isMapReady, setIsMapReady] = useState(false);
 
     // 1. 지도 초기화 Hook: 컴포넌트가 처음 마운트될 때 한 번만 실행
@@ -69,6 +73,13 @@ export default function KakaoMap({
 
             // 맵 인스턴스 생성
             const newMap = new window.kakao.maps.Map(mapRef.current, mapOptions);
+            try {
+                // 드래그/줌 인터랙션을 명시적으로 활성화
+                newMap.setDraggable(!!draggable);
+                newMap.setZoomable(true);
+                const zoomControl = new window.kakao.maps.ZoomControl();
+                newMap.addControl(zoomControl, window.kakao.maps.ControlPosition.RIGHT);
+            } catch {}
             mapInstance.current = newMap;
             setIsMapReady(true);
 
@@ -90,6 +101,19 @@ export default function KakaoMap({
         if (polylineRef.current) {
             polylineRef.current.setMap(null);
             polylineRef.current = null;
+        }
+        // 기존 툴팁/글로우 제거
+        Object.values(tooltipOverlaysRef.current).forEach((ov) => {
+            try {
+                ov.setMap(null);
+            } catch {}
+        });
+        tooltipOverlaysRef.current = {};
+        if (glowOverlayRef.current) {
+            try {
+                glowOverlayRef.current.setMap(null);
+            } catch {}
+            glowOverlayRef.current = null;
         }
 
         const bounds = new kakao.maps.LatLngBounds();
@@ -125,10 +149,14 @@ export default function KakaoMap({
                 const place = places[idx];
                 resolvedPositionsRef.current[place.id] = position;
 
-                const marker = new kakao.maps.Marker({
-                    position,
-                    title: place.name,
-                });
+                let markerOptions: any = { position, title: place.name };
+                if (ancientStyle || place.iconUrl) {
+                    const iconSrc = place.iconUrl || "/images/rune-marker.png";
+                    const size = new kakao.maps.Size(28, 28);
+                    const offset = new kakao.maps.Point(14, 28);
+                    markerOptions.image = new kakao.maps.MarkerImage(iconSrc, size, { offset });
+                }
+                const marker = new kakao.maps.Marker(markerOptions);
                 marker.setMap(map);
 
                 kakao.maps.event.addListener(marker, "click", () => {
@@ -140,6 +168,36 @@ export default function KakaoMap({
                         if (cur > 3) map.setLevel(3);
                     } catch {}
                 });
+
+                // Ancient tooltip overlay (hover)
+                if (ancientStyle) {
+                    const tooltipContent = document.createElement("div");
+                    tooltipContent.innerHTML = `
+                        <style>
+                          @keyframes pulseGlow { 0%{opacity:.45; transform:scale(0.96);} 50%{opacity:.9; transform:scale(1);} 100%{opacity:.45; transform:scale(0.96);} }
+                        </style>
+                        <div style="padding:6px 10px;border:1px solid rgba(124,45,18,.7);border-radius:8px;background:rgba(250, 245, 229, .92);box-shadow:0 2px 6px rgba(0,0,0,.25);backdrop-filter:blur(1px);white-space:nowrap;font-size:12px;color:#3f2d20;">
+                          ${place.name}
+                        </div>`;
+                    const tooltip = new kakao.maps.CustomOverlay({
+                        position,
+                        content: tooltipContent,
+                        yAnchor: 1.6,
+                        zIndex: 4,
+                    });
+                    tooltipOverlaysRef.current[place.id] = tooltip;
+                    // hover handlers
+                    kakao.maps.event.addListener(marker, "mouseover", () => {
+                        try {
+                            tooltip.setMap(map);
+                        } catch {}
+                    });
+                    kakao.maps.event.addListener(marker, "mouseout", () => {
+                        try {
+                            tooltip.setMap(null);
+                        } catch {}
+                    });
+                }
 
                 markersRef.current.push(marker);
                 bounds.extend(position);
@@ -181,10 +239,10 @@ export default function KakaoMap({
                         const simplePath = coords.map(([lon, lat]) => new kakao.maps.LatLng(lat, lon));
                         const simpleLine = new kakao.maps.Polyline({
                             path: simplePath,
-                            strokeWeight: 4,
-                            strokeColor: "#60a5fa",
+                            strokeWeight: 3,
+                            strokeColor: ancientStyle ? "#b45309" : "#60a5fa",
                             strokeOpacity: 0.9,
-                            strokeStyle: "solid",
+                            strokeStyle: ancientStyle ? "shortdash" : "solid",
                         });
                         simpleLine.setMap(map);
                         polylineRef.current = simpleLine;
@@ -225,6 +283,33 @@ export default function KakaoMap({
                 });
                 fallbackPolyline.setMap(map);
                 polylineRef.current = fallbackPolyline;
+            }
+
+            // Highlight glow for current/target place
+            if (ancientStyle && (highlightPlaceId || selectedPlace)) {
+                const pid = highlightPlaceId || selectedPlace?.id;
+                const pos = pid ? resolvedPositionsRef.current[pid] : null;
+                if (pos) {
+                    const glow = document.createElement("div");
+                    glow.innerHTML = `
+                      <style>
+                        @keyframes runeGlow { 0%{opacity:.35; transform:scale(.9);} 50%{opacity:.9; transform:scale(1);} 100%{opacity:.35; transform:scale(.9);} }
+                      </style>
+                      <div style="width:64px;height:64px;border-radius:50%;
+                          background:radial-gradient(closest-side, rgba(245, 158, 11,.55), rgba(245, 158, 11,.0) 70%);
+                          filter:blur(0.5px); animation:runeGlow 2s ease-in-out infinite; transform:translate(-50%,-50%);
+                          position:relative;">
+                      </div>`;
+                    const overlay = new kakao.maps.CustomOverlay({
+                        position: pos,
+                        content: glow,
+                        zIndex: 3,
+                        yAnchor: 0.5,
+                        xAnchor: 0.5,
+                    });
+                    overlay.setMap(map);
+                    glowOverlayRef.current = overlay;
+                }
             }
         })();
 
@@ -280,6 +365,16 @@ export default function KakaoMap({
             {/* 경로 API 경고 배너 (프로덕션 주의) */}
             {/* 안내 배너 제거 요청에 따라 출력하지 않습니다. */}
             <div ref={mapRef} className="w-full h-full" style={{ minHeight: "300px" }} />
+            {ancientStyle && (
+                <div
+                    className="pointer-events-none absolute inset-0 rounded-2xl mix-blend-multiply opacity-80"
+                    style={{
+                        backgroundImage: "url(/images/parchment-frame.png)",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                    }}
+                />
+            )}
             {/* window.kakao가 준비되지 않았을 때만 로딩 스피너 표시 */}
             {!window.kakao && (
                 <div className="absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center">

@@ -116,7 +116,14 @@ export default function escapePage() {
     };
 
     useEffect(() => {
-        setProgressMap(readProgress());
+        const initial = readProgress();
+        const pruned: ProgressMap = Object.fromEntries(
+            Object.entries(initial).filter(([, v]) => v.status !== "completed")
+        );
+        setProgressMap(pruned);
+        if (Object.keys(pruned).length !== Object.keys(initial).length) {
+            writeProgress(pruned);
+        }
         (async () => {
             try {
                 const sRes = await fetch("/api/escape/stories");
@@ -260,30 +267,23 @@ export default function escapePage() {
             router.push(`/login?message=${encodeURIComponent("로그인 후 이용 가능합니다")}`);
             return;
         }
-        // 기존 진행이 있으면 덮어쓰지 않고 이어하기만 허용
+        // 진행 데이터 보장 (없으면 생성)
         const existing = progressMap[String(storyId)];
-        if (existing) {
-            setResumeReadyMap((prev) => ({ ...prev, [String(storyId)]: true }));
-            setSelectedStoryId(storyId);
-            setModalMode(null);
-            setShowInlinePlay(true);
-            setToast("이어하기 준비됨");
-            await fetchChaptersForStory(storyId);
-            return;
+        if (!existing) {
+            const now = Date.now();
+            const next: ProgressMap = {
+                ...progressMap,
+                [String(storyId)]: { story_id: storyId, current_chapter: 1, status: "in_progress", started_at: now },
+            };
+            setProgressMap(next);
+            writeProgress(next);
+            // 서버 동기화는 기존 로직과 동일하게 챕터 로드 시점에 처리됨
         }
-        const now = Date.now();
-        const next: ProgressMap = {
-            ...progressMap,
-            [String(storyId)]: { story_id: storyId, current_chapter: 1, status: "in_progress", started_at: now },
-        };
-        setProgressMap(next);
-        writeProgress(next);
-        setResumeReadyMap((prev) => ({ ...prev, [String(storyId)]: true }));
-        setSelectedStoryId(storyId);
+        // 모달/인라인 닫고 상세 플레이 페이지로 이동
+        setSelectedStoryId(null);
         setModalMode(null);
-        setShowInlinePlay(true);
-        setToast("미션 시작!");
-        await fetchChaptersForStory(storyId);
+        setShowInlinePlay(false);
+        router.push(`/escape/${storyId}`);
     };
 
     const handleSubmitMission = () => {
@@ -349,54 +349,102 @@ export default function escapePage() {
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold">Escape 미션</h1>
                     <p className="text-gray-700 mt-1">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
+                    <button
+                        onClick={() => {
+                            const initial = readProgress();
+                            const pruned: ProgressMap = Object.fromEntries(
+                                Object.entries(initial).filter(([, v]) => v.status !== "completed")
+                            );
+                            writeProgress(pruned);
+                            setProgressMap(pruned);
+                            setToast("완료 데이터가 삭제되었습니다");
+                        }}
+                        className="mt-2 text-xs text-gray-600 underline hover:text-gray-900"
+                    >
+                        완료 데이터 삭제
+                    </button>
                 </div>
 
-                {/* 스토리 목록 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                {/* 스토리 목록 - 가로형 포스터 카드 */}
+                <div className="grid grid-cols-1 gap-6 mb-8">
                     {stories.map((s) => {
                         const pr = progressMap[String(s.id)];
                         const done = pr?.status === "completed";
                         const badge = s.reward_badge_id ? badges.find((b) => b.id === s.reward_badge_id) : null;
                         const imageSrc = (s.imageUrl || badge?.image_url) as string | undefined;
                         return (
-                            <div key={s.id} className="rounded-2xl p-0 hover:bg-gray-50 overflow-hidden">
-                                {imageSrc && (
-                                    <div
-                                        className="w-full h-56 bg-gray-100 hover:cursor-pointer"
-                                        onClick={() => openDetails(s.id)}
-                                    >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={imageSrc} alt={s.title} className="w-full h-full object-cover" />
-                                    </div>
-                                )}
-                                <div className="p-4">
-                                    <div onClick={() => openDetails(s.id)} className="hover:cursor-pointer">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <h3 className="font-semibold text-gray-900">{s.title}</h3>
-                                            {isLoggedIn && done && <span className="text-xs text-green-600">완료</span>}
-                                        </div>
-                                        <p className="text-sm text-gray-700 mb-2 line-clamp-2">{s.synopsis}</p>
-                                        <div className="text-xs text-gray-600 flex gap-3 mb-3">
-                                            {s.region && <span>📍 {s.region}</span>}
-                                            {s.estimated_duration_min && <span>⏱ {s.estimated_duration_min}분</span>}
-                                            {s.price && <span>💰 {s.price}</span>}
-                                        </div>
-                                        {badge && (
-                                            <div className="text-xs text-gray-700 mb-3">🏅 보상 배지: {badge.name}</div>
+                            <div
+                                key={s.id}
+                                className="group flex flex-col md:flex-row md:gap-10 bg-transparent rounded-none overflow-visible shadow-none"
+                            >
+                                {/* 좌측 포스터 */}
+                                <div
+                                    className="md:w-[420px] w-full md:h-auto h-56 relative overflow-hidden hover:cursor-pointer"
+                                    onClick={() => openDetails(s.id)}
+                                >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    {imageSrc && (
+                                        <img
+                                            src={imageSrc}
+                                            alt={s.title}
+                                            className="w-full h-full object-cover border-0 transform -translate-x-4 opacity-95 transition-all duration-700 ease-out group-hover:translate-x-0 group-hover:opacity-100"
+                                        />
+                                    )}
+                                </div>
+
+                                {/* 우측 상세 */}
+                                <div className="flex-1 p-6">
+                                    <div className="mb-2">
+                                        {s.region && (
+                                            <span className="inline-block text-xs font-semibold text-white bg-blue-600 px-3 py-1 rounded-full mr-2">
+                                                #{s.region}
+                                            </span>
                                         )}
                                     </div>
-                                    <div className="flex gap-2">
+                                    <h3 className="text-2xl font-extrabold text-gray-900 mb-3">{s.title}</h3>
+                                    <div className="space-y-2 text-gray-800 text-sm mb-5">
+                                        {s.estimated_duration_min && (
+                                            <div>
+                                                시간 <span className="font-semibold">{s.estimated_duration_min}분</span>
+                                            </div>
+                                        )}
+                                        {s.price && (
+                                            <div>
+                                                가격 <span className="font-semibold">{s.price}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-gray-700 leading-relaxed mb-6">{s.synopsis}</p>
+
+                                    {badge && (
+                                        <div className="text-xs text-amber-700 mb-4 bg-amber-50 px-2 py-1 rounded-md inline-block">
+                                            🏅 보상 배지: {badge.name}
+                                        </div>
+                                    )}
+
+                                    {/* CTA */}
+                                    <div className="mt-2">
                                         {!isLoggedIn ? (
-                                            <button
+                                            <div
                                                 onClick={() => handleStartStory(s.id)}
-                                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 hover:cursor-pointer"
+                                                role="button"
+                                                tabIndex={0}
+                                                className="relative group/ticket w-full md:w-[320px] hover:cursor-pointer"
                                             >
-                                                시작하기
-                                            </button>
+                                                <div className="relative overflow-hidden">
+                                                    <div className="absolute inset-0 bg-white" />
+                                                    <div className="absolute inset-x-0 bottom-0 h-0 bg-sky-400 transition-[height] duration-700 ease-out group-hover/ticket:h-full" />
+                                                    <div className="relative text-center text-sky-600 group-hover/ticket:text-white transition-colors font-extrabold py-4 text-base md:text-lg">
+                                                        시작하기
+                                                    </div>
+                                                </div>
+                                                <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full" />
+                                                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 bg-white rounded-full" />
+                                            </div>
                                         ) : pr?.status === "completed" ? (
                                             <button
                                                 onClick={() => openPlay(s.id)}
-                                                className="hover:cursor-pointer px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
+                                                className="inline-flex justify-center w-full md:w-[420px] px-10 py-4 border-2 border-green-500 text-green-700 bg-transparent rounded-full text-base md:text-lg font-extrabold hover:bg-green-50 transition-colors duration-200 hover:cursor-pointer"
                                             >
                                                 다시 보기
                                             </button>
@@ -405,14 +453,24 @@ export default function escapePage() {
                                                 const canContinue =
                                                     !!isLoggedIn && !!pr && !!resumeReadyMap[String(s.id)];
                                                 return (
-                                                    <button
+                                                    <div
                                                         onClick={() =>
                                                             canContinue ? openInlinePlay(s.id) : handleStartStory(s.id)
                                                         }
-                                                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 hover:cursor-pointer"
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        className="relative group/ticket w-full md:w-[320px] hover:cursor-pointer"
                                                     >
-                                                        {canContinue ? "이어하기" : "시작하기"}
-                                                    </button>
+                                                        <div className="relative overflow-hidden">
+                                                            <div className="absolute inset-0 bg-white" />
+                                                            <div className="absolute inset-x-0 bottom-0 h-0 bg-sky-400 transition-[height] duration-700 ease-out group-hover/ticket:h-full" />
+                                                            <div className="relative text-center text-sky-600 group-hover/ticket:text-white transition-colors font-extrabold py-4 text-base md:text-lg">
+                                                                {canContinue ? "이어하기" : "시작하기"}
+                                                            </div>
+                                                        </div>
+                                                        <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full" />
+                                                        <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 bg-white rounded-full" />
+                                                    </div>
                                                 );
                                             })()
                                         )}
@@ -422,14 +480,67 @@ export default function escapePage() {
                         );
                     })}
                 </div>
-
-                {/* 상세/미션 진행은 모달로 표시되도록 변경 */}
             </section>
 
-            {/* 이어하기(인라인) 진행 UI */}
+            {/* 개선된 인라인 플레이 UI */}
             {selectedStory && showInlinePlay && (
-                <section className="max-w-7xl mx-auto px-4 pb-12">
-                    <div className="rounded-2xl p-4">
+                <section className="max-w-5xl mx-auto px-4 pb-12">
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-3xl overflow-hidden shadow-lg border border-blue-100">
+                        {/* 헤더 영역 */}
+                        <div className="bg-white/80 backdrop-blur-sm p-6 border-b border-blue-100">
+                            <div className="flex items-start justify-between mb-4">
+                                <div className="flex-1">
+                                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedStory.title}</h2>
+                                    <p className="text-gray-700 leading-relaxed">{selectedStory.synopsis}</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setShowInlinePlay(false);
+                                        setSelectedStoryId(null);
+                                    }}
+                                    className="ml-4 p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                        />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            {/* 진행도 바 - 개선된 디자인 */}
+                            <div className="mb-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-medium text-gray-700">진행 상황</span>
+                                    <span className="text-sm text-gray-600">
+                                        {storyProgress?.status === "completed"
+                                            ? `완료 (${selectedChapters.length}/${selectedChapters.length})`
+                                            : `${Math.max(0, (storyProgress?.current_chapter ?? 1) - 1)}/${
+                                                  selectedChapters.length
+                                              } 챕터`}
+                                    </span>
+                                </div>
+                                <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+                                        style={{
+                                            width: `${Math.round(
+                                                (100 *
+                                                    (storyProgress?.status === "completed"
+                                                        ? selectedChapters.length
+                                                        : (storyProgress?.current_chapter ?? 1) - 1)) /
+                                                    Math.max(1, selectedChapters.length)
+                                            )}%`,
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 이미지 영역 - 더 나은 배치 */}
                         {(() => {
                             const src = (selectedStory.imageUrl ||
                                 badges.find((b) => b.id === selectedStory.reward_badge_id)?.image_url) as
@@ -437,110 +548,120 @@ export default function escapePage() {
                                 | undefined;
                             if (!src) return null;
                             return (
-                                <div className="w-full h-72 rounded-xl overflow-hidden mb-4 bg-gray-100">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={src} alt={selectedStory.title} className="w-full h-full object-cover" />
+                                <div className="px-6 pt-4">
+                                    <div className="w-full h-64 rounded-2xl overflow-hidden bg-gray-100 shadow-md">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={src}
+                                            alt={selectedStory.title}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    </div>
                                 </div>
                             );
                         })()}
-                        <div className="flex items-start justify-between mb-3">
-                            <div>
-                                <h2 className="text-xl font-semibold text-gray-900">{selectedStory.title}</h2>
-                                <p className="text-sm text-gray-600 mt-1">{selectedStory.synopsis}</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    setShowInlinePlay(false);
-                                    setSelectedStoryId(null);
-                                }}
-                                className="text-sm text-gray-500 hover:text-gray-700 border px-3 py-1.5 rounded-lg hover:cursor-pointer"
-                            >
-                                닫기
-                            </button>
-                        </div>
 
-                        <div className="mb-4">
-                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-blue-500"
-                                    style={{
-                                        width: `${Math.round(
-                                            (100 *
-                                                (storyProgress?.status === "completed"
-                                                    ? selectedChapters.length
-                                                    : (storyProgress?.current_chapter ?? 1) - 1)) /
-                                                Math.max(1, selectedChapters.length)
-                                        )}%`,
-                                    }}
-                                />
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                                {storyProgress?.status === "completed"
-                                    ? `완료 (${selectedChapters.length}/${selectedChapters.length})`
-                                    : `진행 ${Math.max(0, (storyProgress?.current_chapter ?? 1) - 1)}/${
-                                          selectedChapters.length
-                                      }`}
-                            </div>
-                        </div>
-
+                        {/* 현재 챕터 콘텐츠 */}
                         {(currentChapter as StoryChapter | null) && (
-                            <div className="bg-gray-50 rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-semibold">
-                                        Chapter {currentChapter!.chapter_number}. {currentChapter!.title}
-                                    </h3>
-                                    <span className="text-xs text-gray-500">총 {selectedChapters.length}장</span>
-                                </div>
-                                <div className="text-sm text-gray-700 whitespace-pre-wrap mb-3">
-                                    {currentChapter!.story_text || "미션 설명이 제공되지 않았습니다."}
-                                </div>
-                                {currentChapter!.mission_type === "quiz" && (
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <input
-                                            value={answer}
-                                            onChange={(e) => setAnswer(e.target.value)}
-                                            placeholder={currentChapter!.mission_payload?.question || "정답 입력"}
-                                            className="border rounded-lg px-3 py-2 text-sm w-full"
-                                        />
-                                        <button
-                                            onClick={handleSubmitMission}
-                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                                        >
-                                            제출
-                                        </button>
-                                    </div>
-                                )}
-                                {currentChapter!.mission_type === "location" && (
-                                    <div className="text-sm text-gray-600 mb-3">
-                                        힌트: {currentChapter!.mission_payload?.hint || "주변을 살펴보세요."}
-                                    </div>
-                                )}
-                                {currentChapter!.mission_type === "photo" && (
-                                    <div className="text-sm text-gray-600 mb-3">
-                                        미션: {currentChapter!.mission_payload?.tip || "사진을 촬영해 인증해보세요."}
-                                    </div>
-                                )}
-
-                                {storyProgress?.status !== "completed" && currentChapter!.mission_type !== "quiz" && (
-                                    <button
-                                        onClick={handleSubmitMission}
-                                        className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                                    >
-                                        완료 처리
-                                    </button>
-                                )}
-
-                                {storyProgress?.status === "completed" && earnedBadge && (
-                                    <div className="mt-4 flex items-center gap-3 p-3 border rounded-lg bg-white">
-                                        <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                                            🏅
-                                        </div>
+                            <div className="p-6">
+                                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                                    <div className="flex items-center justify-between mb-4">
                                         <div>
-                                            <div className="text-sm font-semibold">배지 획득: {earnedBadge.name}</div>
-                                            <div className="text-xs text-gray-600">{earnedBadge.description}</div>
+                                            <h3 className="text-xl font-bold text-gray-900 mb-1">
+                                                Chapter {currentChapter!.chapter_number}
+                                            </h3>
+                                            <h4 className="text-lg text-gray-700 font-medium">
+                                                {currentChapter!.title}
+                                            </h4>
+                                        </div>
+                                        <span className="bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1 rounded-full">
+                                            {selectedChapters.length}장 중 {currentChapter!.chapter_number}장
+                                        </span>
+                                    </div>
+
+                                    {/* 스토리 텍스트 */}
+                                    <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                                        <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                            {currentChapter!.story_text || "미션 설명이 제공되지 않았습니다."}
                                         </div>
                                     </div>
-                                )}
+
+                                    {/* 미션 UI - 개선된 디자인 */}
+                                    {currentChapter!.mission_type === "quiz" && (
+                                        <div className="bg-blue-50 rounded-xl p-4 mb-4">
+                                            <h5 className="text-sm font-semibold text-blue-900 mb-3">💡 퀴즈 미션</h5>
+                                            <p className="text-sm text-blue-800 mb-3">
+                                                {currentChapter!.mission_payload?.question || "문제를 풀어보세요."}
+                                            </p>
+                                            <div className="flex gap-3">
+                                                <input
+                                                    value={answer}
+                                                    onChange={(e) => setAnswer(e.target.value)}
+                                                    placeholder="정답을 입력하세요"
+                                                    className="flex-1 border-2 border-blue-200 rounded-lg px-4 py-3 text-sm focus:border-blue-500 focus:outline-none transition-colors duration-200"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") handleSubmitMission();
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={handleSubmitMission}
+                                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors duration-200"
+                                                >
+                                                    제출
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {currentChapter!.mission_type === "location" && (
+                                        <div className="bg-green-50 rounded-xl p-4 mb-4">
+                                            <h5 className="text-sm font-semibold text-green-900 mb-2">📍 위치 미션</h5>
+                                            <p className="text-sm text-green-800">
+                                                힌트: {currentChapter!.mission_payload?.hint || "주변을 살펴보세요."}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {currentChapter!.mission_type === "photo" && (
+                                        <div className="bg-purple-50 rounded-xl p-4 mb-4">
+                                            <h5 className="text-sm font-semibold text-purple-900 mb-2">📸 사진 미션</h5>
+                                            <p className="text-sm text-purple-800">
+                                                {currentChapter!.mission_payload?.tip || "사진을 촬영해 인증해보세요."}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* 완료 버튼 */}
+                                    {storyProgress?.status !== "completed" &&
+                                        currentChapter!.mission_type !== "quiz" && (
+                                            <button
+                                                onClick={handleSubmitMission}
+                                                className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors duration-200"
+                                            >
+                                                미션 완료하기
+                                            </button>
+                                        )}
+
+                                    {/* 배지 획득 알림 */}
+                                    {storyProgress?.status === "completed" && earnedBadge && (
+                                        <div className="mt-6 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 flex items-center justify-center text-white text-lg">
+                                                    🏅
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h6 className="text-sm font-bold text-amber-900 mb-1">
+                                                        축하합니다! 배지를 획득했습니다
+                                                    </h6>
+                                                    <p className="text-sm font-semibold text-amber-800">
+                                                        {earnedBadge.name}
+                                                    </p>
+                                                    <p className="text-xs text-amber-700">{earnedBadge.description}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -583,11 +704,9 @@ export default function escapePage() {
                                     </div>
                                 );
                             })()}
-                            <div className="flex items-start mb-3">
-                                <div>
-                                    <h2 className="text-xl font-semibold text-gray-900">{selectedStory.title}</h2>
-                                    <p className="text-sm text-gray-700 mt-1">{selectedStory.synopsis}</p>
-                                </div>
+                            <div className="mb-3">
+                                <h2 className="text-xl font-semibold text-gray-900">{selectedStory.title}</h2>
+                                <p className="text-sm text-gray-700 mt-1">{selectedStory.synopsis}</p>
                             </div>
 
                             {/* details 모달에서는 진행도 표시를 숨김 */}
@@ -911,7 +1030,7 @@ export default function escapePage() {
             )}
 
             {toast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-3 py-2 rounded-lg shadow-lg">
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-4 py-3 rounded-lg shadow-lg z-50">
                     {toast}
                 </div>
             )}
