@@ -83,6 +83,37 @@ export default function escapePage() {
     const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
     // 로그인 후 사용자가 해당 스토리에서 "시작하기"를 눌러 이어하기 노출을 허용했는지 여부
     const [resumeReadyMap, setResumeReadyMap] = useState<Record<string, boolean>>({});
+    // 상세 모달에서 챕터 클릭 시 하단에 펼칠 챕터 번호
+    const [detailsOpenChapterNo, setDetailsOpenChapterNo] = useState<number | null>(null);
+    // 상세 모달 챕터 잠금 해제 여부(1번 정답 입력 시 해제)
+    const [detailsUnlocked, setDetailsUnlocked] = useState<boolean>(false);
+    const [detailsAnswer, setDetailsAnswer] = useState<string>("");
+    const [showLockedModal, setShowLockedModal] = useState<boolean>(false);
+    const [detailsChapterAnswers, setDetailsChapterAnswers] = useState<Record<number, string>>({});
+
+    const handleDetailsQuizSubmit = (chapter: StoryChapter) => {
+        const userAnswer = (detailsChapterAnswers[chapter.chapter_number] || "").trim().toLowerCase();
+        const correct = String((chapter.mission_payload as any)?.answer ?? "")
+            .trim()
+            .toLowerCase();
+        if (!correct) {
+            setToast("정답 정보가 없습니다");
+            return;
+        }
+        if (userAnswer === correct) {
+            if (chapter.chapter_number === 1) setDetailsUnlocked(true);
+            // 다음 챕터로 이동
+            const next = selectedChapters.find((c) => c.chapter_number === chapter.chapter_number + 1);
+            if (next) {
+                setDetailsOpenChapterNo(next.chapter_number);
+            } else {
+                setDetailsOpenChapterNo(chapter.chapter_number);
+            }
+            setToast("정답입니다!");
+        } else {
+            setToast("정답이 아니에요");
+        }
+    };
 
     useEffect(() => {
         setProgressMap(readProgress());
@@ -179,6 +210,11 @@ export default function escapePage() {
         return selectedChapters.find((c) => c.chapter_number === currentNo) || selectedChapters[0];
     }, [selectedChapters, storyProgress]);
 
+    const firstChapter = useMemo(() => {
+        if (!selectedChapters.length) return null;
+        return selectedChapters[0];
+    }, [selectedChapters]);
+
     const fetchChaptersForStory = async (storyId: number) => {
         try {
             const res = await fetch(`/api/escape/chapters?storyId=${storyId}`);
@@ -203,6 +239,18 @@ export default function escapePage() {
         setSelectedStoryId(storyId);
         setModalMode(null);
         setShowInlinePlay(true);
+        await fetchChaptersForStory(storyId);
+    };
+
+    const openDetails = async (storyId: number) => {
+        try {
+            const res = await fetch(`/api/escape/stories?storyId=${storyId}`);
+            const fresh = await res.json();
+            setStories((prev) => prev.map((it) => (it.id === storyId ? { ...it, ...fresh } : it)));
+        } catch {}
+        setSelectedStoryId(storyId);
+        setModalMode("details");
+        // 함께 스토리 챕터도 미리 로드
         await fetchChaptersForStory(storyId);
     };
 
@@ -300,56 +348,52 @@ export default function escapePage() {
             <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold">Escape 미션</h1>
-                    <p className="text-gray-600 mt-1">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
+                    <p className="text-gray-700 mt-1">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
                 </div>
 
                 {/* 스토리 목록 */}
-                <div className="grid md:grid-cols-2 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                     {stories.map((s) => {
                         const pr = progressMap[String(s.id)];
                         const done = pr?.status === "completed";
                         const badge = s.reward_badge_id ? badges.find((b) => b.id === s.reward_badge_id) : null;
                         const imageSrc = (s.imageUrl || badge?.image_url) as string | undefined;
                         return (
-                            <div key={s.id} className="border rounded-2xl p-0 hover:bg-gray-50 overflow-hidden">
+                            <div key={s.id} className="rounded-2xl p-0 hover:bg-gray-50 overflow-hidden">
                                 {imageSrc && (
-                                    <div className="w-full h-40 bg-gray-100">
+                                    <div
+                                        className="w-full h-56 bg-gray-100 hover:cursor-pointer"
+                                        onClick={() => openDetails(s.id)}
+                                    >
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={imageSrc} alt={s.title} className="w-full h-full object-cover" />
                                     </div>
                                 )}
                                 <div className="p-4">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h3 className="font-semibold text-gray-900">{s.title}</h3>
-                                        {done && <span className="text-xs text-green-600">완료</span>}
+                                    <div onClick={() => openDetails(s.id)} className="hover:cursor-pointer">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <h3 className="font-semibold text-gray-900">{s.title}</h3>
+                                            {isLoggedIn && done && <span className="text-xs text-green-600">완료</span>}
+                                        </div>
+                                        <p className="text-sm text-gray-700 mb-2 line-clamp-2">{s.synopsis}</p>
+                                        <div className="text-xs text-gray-600 flex gap-3 mb-3">
+                                            {s.region && <span>📍 {s.region}</span>}
+                                            {s.estimated_duration_min && <span>⏱ {s.estimated_duration_min}분</span>}
+                                            {s.price && <span>💰 {s.price}</span>}
+                                        </div>
+                                        {badge && (
+                                            <div className="text-xs text-gray-700 mb-3">🏅 보상 배지: {badge.name}</div>
+                                        )}
                                     </div>
-                                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">{s.synopsis}</p>
-                                    <div className="text-xs text-gray-500 flex gap-3 mb-3">
-                                        {s.region && <span>📍 {s.region}</span>}
-                                        {s.estimated_duration_min && <span>⏱ {s.estimated_duration_min}분</span>}
-                                        {s.price && <span>💰 {s.price}</span>}
-                                    </div>
-                                    {badge && (
-                                        <div className="text-xs text-gray-600 mb-3">🏅 보상 배지: {badge.name}</div>
-                                    )}
                                     <div className="flex gap-2">
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    const res = await fetch(`/api/escape/stories?storyId=${s.id}`);
-                                                    const fresh = await res.json();
-                                                    setStories((prev) =>
-                                                        prev.map((it) => (it.id === s.id ? { ...it, ...fresh } : it))
-                                                    );
-                                                } catch {}
-                                                setSelectedStoryId(s.id);
-                                                setModalMode("details");
-                                            }}
-                                            className="px-3 py-1.5 border rounded-lg text-sm hover:bg-gray-100 hover:cursor-pointer"
-                                        >
-                                            자세히 보기
-                                        </button>
-                                        {pr?.status === "completed" ? (
+                                        {!isLoggedIn ? (
+                                            <button
+                                                onClick={() => handleStartStory(s.id)}
+                                                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 hover:cursor-pointer"
+                                            >
+                                                시작하기
+                                            </button>
+                                        ) : pr?.status === "completed" ? (
                                             <button
                                                 onClick={() => openPlay(s.id)}
                                                 className="hover:cursor-pointer px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700"
@@ -385,7 +429,7 @@ export default function escapePage() {
             {/* 이어하기(인라인) 진행 UI */}
             {selectedStory && showInlinePlay && (
                 <section className="max-w-7xl mx-auto px-4 pb-12">
-                    <div className="border rounded-2xl p-4">
+                    <div className="rounded-2xl p-4">
                         {(() => {
                             const src = (selectedStory.imageUrl ||
                                 badges.find((b) => b.id === selectedStory.reward_badge_id)?.image_url) as
@@ -393,7 +437,7 @@ export default function escapePage() {
                                 | undefined;
                             if (!src) return null;
                             return (
-                                <div className="w-full h-56 rounded-xl overflow-hidden mb-4 bg-gray-100">
+                                <div className="w-full h-72 rounded-xl overflow-hidden mb-4 bg-gray-100">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={src} alt={selectedStory.title} className="w-full h-full object-cover" />
                                 </div>
@@ -510,12 +554,15 @@ export default function escapePage() {
                     onClick={() => {
                         setSelectedStoryId(null);
                         setModalMode(null);
+                        setDetailsOpenChapterNo(null);
+                        setDetailsUnlocked(false);
+                        setDetailsAnswer("");
                     }}
                     role="dialog"
                     aria-modal="true"
                 >
                     <div
-                        className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto border"
+                        className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-4">
@@ -526,7 +573,7 @@ export default function escapePage() {
                                     | undefined;
                                 if (!src) return null;
                                 return (
-                                    <div className="w-full h-72 rounded-xl overflow-hidden mb-4 bg-gray-100">
+                                    <div className="w-full h-56 rounded-xl overflow-hidden mb-4 bg-gray-100">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={src}
@@ -539,11 +586,131 @@ export default function escapePage() {
                             <div className="flex items-start mb-3">
                                 <div>
                                     <h2 className="text-xl font-semibold text-gray-900">{selectedStory.title}</h2>
-                                    <p className="text-sm text-gray-600 mt-1">{selectedStory.synopsis}</p>
+                                    <p className="text-sm text-gray-700 mt-1">{selectedStory.synopsis}</p>
                                 </div>
                             </div>
 
                             {/* details 모달에서는 진행도 표시를 숨김 */}
+
+                            {/* 챕터 미리보기 */}
+                            <div className="mt-3">
+                                <h4 className="text-sm font-semibold text-gray-900 mb-2">챕터 목록</h4>
+                                {selectedChapters.length > 0 ? (
+                                    <>
+                                        <ul className="space-y-2">
+                                            {selectedChapters.map((c) => (
+                                                <li
+                                                    key={c.id}
+                                                    onClick={() =>
+                                                        setDetailsOpenChapterNo((prev) =>
+                                                            prev === c.chapter_number ? null : c.chapter_number
+                                                        )
+                                                    }
+                                                    className="text-sm text-gray-700 bg-gray-50 rounded-md px-3 py-2 hover:bg-gray-100 hover:cursor-pointer"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span>
+                                                            Chapter {c.chapter_number}. {c.title}
+                                                        </span>
+                                                        {c.mission_type && (
+                                                            <span className="text-xs text-gray-500">
+                                                                {c.mission_type === "quiz"
+                                                                    ? "퀴즈"
+                                                                    : c.mission_type === "photo"
+                                                                    ? "사진"
+                                                                    : c.mission_type === "location"
+                                                                    ? "위치"
+                                                                    : ""}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {detailsOpenChapterNo === c.chapter_number && (
+                                                        <div className="mt-2">
+                                                            <div className="text-sm text-gray-700 whitespace-pre-wrap mb-2">
+                                                                {c.story_text || "내용이 없습니다."}
+                                                            </div>
+                                                            {c.mission_type === "quiz" && (
+                                                                <div className="mb-2">
+                                                                    <div className="text-sm text-gray-700 mb-1">
+                                                                        {(c.mission_payload as any)?.question ||
+                                                                            "문제를 풀어보세요."}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <input
+                                                                            value={
+                                                                                detailsChapterAnswers[
+                                                                                    c.chapter_number
+                                                                                ] || ""
+                                                                            }
+                                                                            onChange={(e) =>
+                                                                                setDetailsChapterAnswers((prev) => ({
+                                                                                    ...prev,
+                                                                                    [c.chapter_number]: e.target.value,
+                                                                                }))
+                                                                            }
+                                                                            placeholder="정답 입력"
+                                                                            className="border rounded-lg px-3 py-2 text-sm w-full"
+                                                                            onKeyDown={(e) => {
+                                                                                if (e.key === "Enter")
+                                                                                    handleDetailsQuizSubmit(c);
+                                                                            }}
+                                                                        />
+                                                                        <button
+                                                                            onClick={() => handleDetailsQuizSubmit(c)}
+                                                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                                                                        >
+                                                                            제출
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {c.mission_type && (
+                                                                <div className="text-xs text-gray-600">
+                                                                    미션 유형:{" "}
+                                                                    {c.mission_type === "quiz"
+                                                                        ? "퀴즈"
+                                                                        : c.mission_type === "photo"
+                                                                        ? "사진"
+                                                                        : c.mission_type === "location"
+                                                                        ? "위치"
+                                                                        : "없음"}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </>
+                                ) : (
+                                    <div className="text-sm text-gray-500">챕터 정보를 불러오는 중...</div>
+                                )}
+                            </div>
+
+                            {showLockedModal && (
+                                <div
+                                    className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4"
+                                    onClick={() => setShowLockedModal(false)}
+                                >
+                                    <div
+                                        className="bg-white rounded-xl max-w-sm w-full p-5"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="text-base font-semibold text-gray-900 mb-2">알림</div>
+                                        <div className="text-sm text-gray-700 mb-4">
+                                            안열리는 챕터입니다. 1번 챕터부터 해주세요.
+                                        </div>
+                                        <div className="flex justify-end">
+                                            <button
+                                                onClick={() => setShowLockedModal(false)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                                            >
+                                                확인
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* details 모달에서는 챕터 UI는 숨김 */}
                             {false && currentChapter && (
@@ -605,7 +772,7 @@ export default function escapePage() {
                                                 <div className="text-sm font-semibold">
                                                     배지 획득: {earnedBadge!.name}
                                                 </div>
-                                                <div className="text-xs text-gray-600">{earnedBadge!.description}</div>
+                                                <div className="text-xs text-gray-700">{earnedBadge!.description}</div>
                                             </div>
                                         </div>
                                     )}
@@ -628,14 +795,14 @@ export default function escapePage() {
                     aria-modal="true"
                 >
                     <div
-                        className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto border"
+                        className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-4">
                             <div className="flex items-start justify-between mb-3">
                                 <div>
                                     <h2 className="text-xl font-semibold text-gray-900">{selectedStory.title}</h2>
-                                    <p className="text-sm text-gray-600 mt-1">{selectedStory.synopsis}</p>
+                                    <p className="text-sm text-gray-700 mt-1">{selectedStory.synopsis}</p>
                                 </div>
                                 <button
                                     onClick={() => {
