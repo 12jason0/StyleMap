@@ -263,6 +263,7 @@ model Story {
   created_at             DateTime            @default(now())
   updated_at             DateTime            @updatedAt
   chapters               StoryChapter[]
+  level                  Int?                @default(1) 
   reward_badge           Badge?              @relation("StoryRewardBadge", fields: [reward_badge_id], references: [id])
   // [수정됨] UserStoryProgress와의 양방향 관계를 추가했습니다.
   userStoryProgress      UserStoryProgress[]

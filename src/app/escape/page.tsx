@@ -375,11 +375,11 @@ export default function escapePage() {
                         return (
                             <div
                                 key={s.id}
-                                className="group flex flex-col md:flex-row md:gap-10 bg-transparent rounded-none overflow-visible shadow-none"
+                                className="group flex flex-row items-center gap-4 md:gap-10 bg-transparent rounded-none overflow-visible shadow-none pt-10"
                             >
                                 {/* 좌측 포스터 */}
                                 <div
-                                    className="md:w-[420px] w-full md:h-auto h-56 relative overflow-hidden hover:cursor-pointer"
+                                    className="w-28 h-28 md:w-[420px] md:h-auto relative overflow-hidden hover:cursor-pointer flex-shrink-0 rounded-xl md:rounded-none"
                                     onClick={() => openDetails(s.id)}
                                 >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -387,7 +387,7 @@ export default function escapePage() {
                                         <img
                                             src={imageSrc}
                                             alt={s.title}
-                                            className="w-full h-full object-cover border-0 transform -translate-x-4 opacity-95 transition-all duration-700 ease-out group-hover:translate-x-0 group-hover:opacity-100"
+                                            className="w-full h-full object-cover border-0 md:transform md:-translate-x-4 md:opacity-95 transition-all duration-700 ease-out md:group-hover:translate-x-0 md:group-hover:opacity-100"
                                         />
                                     )}
                                 </div>
@@ -413,6 +413,45 @@ export default function escapePage() {
                                                 가격 <span className="font-semibold">{s.price}</span>
                                             </div>
                                         )}
+                                        {(() => {
+                                            // 항상 별 5개 표시. level 값만큼 노란색으로, 값이 없거나 0/전각 ０이면 모두 회색
+                                            const raw = (s as any).level;
+                                            let lv = 0; // 기본값 0
+                                            if (raw !== undefined && raw !== null) {
+                                                let str = typeof raw === "number" ? String(raw) : String(raw).trim();
+                                                // 전각 숫자(０-９)를 반각으로 치환
+                                                str = str.replace(/[０-９]/g, (ch) =>
+                                                    String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
+                                                );
+                                                const parsed = parseInt(str, 10);
+                                                if (Number.isFinite(parsed) && parsed > 0) {
+                                                    lv = Math.min(5, Math.floor(parsed));
+                                                }
+                                            }
+                                            return (
+                                                <div className="flex items-center gap-2">
+                                                    <span>난이도</span>
+                                                    <span
+                                                        className="inline-flex items-center gap-1"
+                                                        title={`난이도 ${lv}/5`}
+                                                    >
+                                                        {Array.from({ length: 5 }).map((_, i) => (
+                                                            <svg
+                                                                key={i}
+                                                                className={`w-4 h-4 ${
+                                                                    i < lv ? "text-yellow-400" : "text-gray-300"
+                                                                }`}
+                                                                viewBox="0 0 20 20"
+                                                                fill="currentColor"
+                                                                aria-hidden
+                                                            >
+                                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.802 2.035a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.802-2.035a1 1 0 00-1.175 0l-2.802 2.035c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81H7.03a1 1 0 00.95-.69l1.07-3.292z" />
+                                                            </svg>
+                                                        ))}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <p className="text-gray-700 leading-relaxed mb-6">{s.synopsis}</p>
 

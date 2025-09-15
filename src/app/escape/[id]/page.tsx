@@ -105,7 +105,14 @@ export default function EscapePlayPage() {
             try {
                 const sRes = await fetch(`/api/escape/stories?storyId=${storyId}`);
                 const s = await sRes.json();
-                setStory(s || null);
+                // level/difficulty 필드 정규화
+                const normalized = s
+                    ? {
+                          ...s,
+                          level: s.level ?? s.difficulty ?? s.difficulty_level ?? null,
+                      }
+                    : null;
+                setStory(normalized);
 
                 const cRes = await fetch(`/api/escape/chapters?storyId=${storyId}`);
                 const c = await cRes.json();
@@ -321,7 +328,21 @@ export default function EscapePlayPage() {
             <section className="max-w-6xl mx-auto px-4 pt-24 pb-12">
                 <div className="mb-6 flex items-start justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold">{story?.title || "플레이"}</h1>
+                        <h1 className="text-2xl font-bold flex items-center gap-3">{story?.title || "플레이"}</h1>
+                        {/* 가격 아래 정보 */}
+                        <div className="mt-3 space-y-1 text-gray-900">
+                            {typeof story?.estimated_duration_min === "number" && (
+                                <div>
+                                    <span className="font-semibold">시간</span> {story.estimated_duration_min}분
+                                </div>
+                            )}
+                            {story?.price && (
+                                <div>
+                                    <span className="font-semibold">가격</span> {story.price}
+                                </div>
+                            )}
+                            {/* 난이도 표시 제거 (요청) */}
+                        </div>
                         <p className="text-gray-700 mt-1">{story?.synopsis}</p>
                     </div>
                     <button
@@ -417,7 +438,7 @@ export default function EscapePlayPage() {
                                 className="w-full h-full"
                                 drawPath={true}
                                 routeMode="simple"
-                                ancientStyle={true}
+                                ancientStyle={false}
                                 highlightPlaceId={currentChapter?.id}
                             />
                         </div>

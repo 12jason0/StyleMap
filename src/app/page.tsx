@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import Header from "@/components/Header";
+// 페이지 단에서 Header를 중복 렌더링하지 않도록 제거 (레이아웃에서 이미 포함)
+import SectionHeader from "@/components/SectionHeader";
 
 type Course = {
     id: string;
@@ -24,13 +25,13 @@ export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [, setLoading] = useState(true);
-    const [hoveredCard, setHoveredCard] = useState<string | null>(null);
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [showAdModal, setShowAdModal] = useState(false);
 
     const [isSignup, setIsSignup] = useState(false);
     const [showAiAdModal, setShowAiAdModal] = useState(false);
+    const [showLoginRequiredModal, setShowLoginRequiredModal] = useState(false);
     const router = useRouter();
 
     // 페이지 로드 시 스크롤을 맨 위로
@@ -172,10 +173,17 @@ export default function Home() {
         .slice(0, 6);
     const newCourses = courses.slice(-3);
 
+    const handleStartOnboarding = () => {
+        const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+        if (!token) {
+            setShowLoginRequiredModal(true);
+            return;
+        }
+        router.push("/onboarding");
+    };
+
     return (
         <>
-            <Header />
-
             {/* 환영 메시지 */}
             {showWelcome && (
                 <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
@@ -268,7 +276,7 @@ export default function Home() {
                         <div className="text-4xl mb-4">🤖</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">AI 추천 티켓 지급!</h2>
                         <p className="text-gray-600 mb-4">새로 가입하신 고객님을 위한 특별한 혜택</p>
-                        <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg mb-4">
+                        <div className="bg-sky-500 text-white p-4 rounded-lg mb-4">
                             <div className="text-2xl font-bold mb-1">AI 추천 티켓 1회</div>
                             <div className="text-sm opacity-90">개인 맞춤 코스 추천을 받아보세요!</div>
                         </div>
@@ -309,7 +317,7 @@ export default function Home() {
                         <div className="text-4xl mb-4">🤖</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">AI 코스 이용해보세요!</h2>
                         <p className="text-gray-600 mb-4">개인 맞춤 AI 추천 코스를 경험해보세요</p>
-                        <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white p-4 rounded-lg mb-4">
+                        <div className="bg-sky-500 text-white p-4 rounded-lg mb-4">
                             <div className="text-2xl font-bold mb-1">AI 맞춤 추천</div>
                             <div className="text-sm opacity-90">당신만을 위한 특별한 여행 코스</div>
                         </div>
@@ -341,6 +349,49 @@ export default function Home() {
                 </div>
             )}
 
+            {/* 로그인 필요 모달 */}
+            {showLoginRequiredModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
+                        <button
+                            onClick={() => setShowLoginRequiredModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
+                            aria-label="닫기"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
+                        </button>
+
+                        <div className="text-4xl mb-3">🔐</div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">로그인이 필요합니다</h2>
+                        <p className="text-gray-600 mb-5">내 취향을 설정하려면 먼저 로그인해 주세요.</p>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                onClick={() => setShowLoginRequiredModal(false)}
+                                className="hover:cursor-pointer px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowLoginRequiredModal(false);
+                                    router.push("/login?redirect=/onboarding");
+                                }}
+                                className="hover:cursor-pointer px-4 py-2 bg-sky-600 text-white rounded-lg font-medium hover:bg-sky-700"
+                            >
+                                로그인하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <main className="min-h-screen bg-white pt-10">
                 {/* Hero Section - 대형 슬라이드 */}
                 <section className="relative h-[460px] md:h-[520px] overflow-hidden">
@@ -365,7 +416,7 @@ export default function Home() {
                                 ) : (
                                     <div className="w-full h-full bg-white" />
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+                                <div className="absolute inset-0 bg-black/50" />
                             </div>
 
                             {/* 콘텐츠 */}
@@ -436,7 +487,7 @@ export default function Home() {
 
                                     <button
                                         onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="hover:cursor-pointer px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
+                                        className="hover:cursor-pointer px-6 py-3 md:px-8 md:py-4 bg-sky-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
                                     >
                                         코스 시작하기 →
                                     </button>
@@ -464,61 +515,71 @@ export default function Home() {
                 {/* 컨셉 선택 섹션 */}
                 <ConceptSection />
 
-                {/* 실시간 인기 코스 */}
-                <section className="py-16 bg-gradient-to-br from-gray-50 to-white">
+                {/* 개인화 온보딩 섹션 */}
+                <section className="py-8">
                     <div className="max-w-7xl mx-auto px-4">
-                        <div className="text-center mb-8 md:mb-12">
-                            <h2 className="text-2xl md:text-4xl font-bold mb-2 md:mb-4 text-black">
-                                🔥 지금 가장 핫한 코스
-                            </h2>
-                            <p className="text-gray-600 text-base md:text-lg">실시간으로 많은 사람들이 참여중인 코스</p>
+                        <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
+                            <div className="flex items-start gap-4">
+                                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-700 text-2xl">
+                                    💫
+                                </div>
+                                <div>
+                                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+                                        더 정확한 추천을 원하시나요?
+                                    </h3>
+                                    <p className="text-gray-600 mb-4">3분만 투자하면 완전히 다른 경험을 드릴게요</p>
+                                    <button
+                                        onClick={handleStartOnboarding}
+                                        className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+                                    >
+                                        내 취향 설정하기
+                                        <span>→</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                </section>
+
+                {/* 실시간 인기 코스 */}
+                <section className="py-16 bg-sky-50">
+                    <div className="max-w-7xl mx-auto px-4">
+                        <SectionHeader
+                            title="🔥 지금 가장 핫한 코스"
+                            subtitle="실시간으로 많은 사람들이 참여중인 코스"
+                        />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {hotCourses.map((course, index) => (
+                            {hotCourses.slice(0, 3).map((course, index) => (
                                 <Link
                                     key={course.id}
                                     href={`/courses/${course.id}`}
-                                    className={`
-                                            group relative rounded-2xl overflow-hidden shadow-xl 
-                                            hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2
-                                            ${index === 0 ? "md:col-span-2 md:row-span-2" : ""}
-                                        `}
+                                    className={
+                                        "group relative rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
+                                    }
                                 >
-                                    <div
-                                        className={`relative overflow-hidden ${
-                                            index === 0 ? "h-[360px] md:h-[520px]" : "h-61"
-                                        }`}
-                                    >
+                                    <div className={"relative overflow-hidden h-64 md:h-72"}>
                                         {course.imageUrl ? (
                                             <Image
                                                 src={course.imageUrl}
                                                 alt={course.title}
                                                 fill
                                                 sizes="(max-width: 1024px) 100vw, 50vw"
-                                                className={`object-cover transition-transform duration-700 ${
-                                                    hoveredCard === course.id ? "scale-110" : "scale-100"
-                                                }`}
+                                                className={
+                                                    "object-cover transition-transform duration-700 group-hover:scale-105"
+                                                }
                                             />
                                         ) : (
                                             <div className="w-full h-full bg-gray-200" />
                                         )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                                        {index < 3 && (
-                                            <div className="absolute top-4 left-4">
-                                                <span
-                                                    className={`${
-                                                        index === 0
-                                                            ? "bg-gradient-to-r from-yellow-400 to-orange-500"
-                                                            : index === 1
-                                                            ? "bg-gradient-to-r from-gray-300 to-gray-400"
-                                                            : "bg-gradient-to-r from-orange-400 to-orange-600"
-                                                    } px-4 py-2 font-bold rounded-full text-white shadow-lg`}
-                                                >
-                                                    {index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위"}
-                                                </span>
-                                            </div>
-                                        )}
+                                        <div className="absolute inset-0 bg-black/40" />
+                                        <div className="absolute top-4 left-4">
+                                            <span
+                                                className={`bg-sky-600 px-4 py-2 font-bold rounded-full text-white shadow-lg`}
+                                            >
+                                                {index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위"}
+                                            </span>
+                                        </div>
                                         <div className="absolute top-4 right-4 text-black">
                                             <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -526,11 +587,52 @@ export default function Home() {
                                             </div>
                                         </div>
                                         <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                                            <h3
-                                                className={`font-bold text-white mb-2 ${
-                                                    index === 0 ? "text-xl md:text-2xl" : "text-lg md:text-xl"
-                                                }`}
-                                            >
+                                            <h3 className={"font-bold text-white mb-2 text-lg md:text-xl"}>
+                                                {course.title}
+                                            </h3>
+                                            <div className="flex items-center gap-3 text-white/90 text-sm">
+                                                <span>📍 {course.location}</span>
+                                                <span>⏱ {course.duration}</span>
+                                                <span className="flex items-center gap-1">
+                                                    <span className="text-yellow-400">★</span> {course.rating}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))}
+
+                            {hotCourses.slice(3).map((course) => (
+                                <Link
+                                    key={course.id}
+                                    href={`/courses/${course.id}`}
+                                    className={
+                                        "group relative rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
+                                    }
+                                >
+                                    <div className={"relative overflow-hidden h-64 md:h-72"}>
+                                        {course.imageUrl ? (
+                                            <Image
+                                                src={course.imageUrl}
+                                                alt={course.title}
+                                                fill
+                                                sizes="(max-width: 1024px) 100vw, 50vw"
+                                                className={
+                                                    "object-cover transition-transform duration-700 group-hover:scale-105"
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gray-200" />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/40" />
+                                        <div className="absolute top-4 right-4 text-black">
+                                            <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                                                <span className="text-sm font-bold">{course.participants}명</span>
+                                            </div>
+                                        </div>
+                                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+                                            <h3 className={"font-bold text-white mb-2 text-lg md:text-xl"}>
                                                 {course.title}
                                             </h3>
                                             <div className="flex items-center gap-3 text-white/90 text-sm">
@@ -551,10 +653,7 @@ export default function Home() {
                 {/* NEW 코스 섹션 */}
                 <section className="py-16">
                     <div className="max-w-7xl mx-auto px-4">
-                        <div className="text-center mb-10">
-                            <h2 className="text-3xl font-bold mb-2 text-black">✨ NEW 코스</h2>
-                            <p className="text-gray-600">이번 주 새로 추가된 코스</p>
-                        </div>
+                        <SectionHeader title="✨ NEW 코스" subtitle="이번 주 새로 추가된 코스" />
 
                         {/* 간단 캐러셀 */}
                         <div className="relative overflow-hidden">
@@ -665,10 +764,7 @@ function ConceptSection() {
     return (
         <section className="py-16 bg-white">
             <div className="max-w-7xl mx-auto px-4">
-                <div className="text-center mb-12">
-                    <h2 className="text-4xl font-bold mb-4 text-black">이런 컨셉은 어때요?</h2>
-                    <p className="text-gray-600 text-lg">취향에 맞는 코스를 찾아보세요</p>
-                </div>
+                <SectionHeader title="이런 컨셉은 어때요?" subtitle="취향에 맞는 코스를 찾아보세요" />
 
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {concepts.slice(0, showAll ? concepts.length : 6).map((concept, index) => {
@@ -700,9 +796,7 @@ function ConceptSection() {
                                         href={`/courses?concept=${encodeURIComponent(concept.name)}`}
                                         className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block"
                                     >
-                                        <div
-                                            className={`absolute inset-0 bg-gradient-to-br ${concept.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`}
-                                        />
+                                        <div className="absolute inset-0 bg-sky-100 opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity" />
                                         <div className="relative text-center">
                                             <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">
                                                 {concept.icon}

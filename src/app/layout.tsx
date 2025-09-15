@@ -24,7 +24,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="ko">
-            <body className={`${inter.variable} antialiased min-h-screen flex flex-col`}>
+            <body className={`${inter.variable} antialiased min-h-screen flex flex-col typography-smooth`}>
                 {/* Google tag (gtag.js) */}
                 <Script src="https://www.googletagmanager.com/gtag/js?id=G-R3EYQNXY13" strategy="afterInteractive" />
                 <Script

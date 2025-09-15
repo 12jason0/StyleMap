@@ -619,7 +619,7 @@ const AIRecommender = () => {
 
                 <div className="w-full max-w-4xl flex flex-col">
                     {/* AI 추천 헤더 */}
-                    <header className="bg-gradient-to-r from-purple-600 via-pink-500 to-blue-600 rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 flex-shrink-0">
+                    <header className="bg-gradient-to-r bg-sky-400 rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 flex-shrink-0">
                         <div className="flex flex-col sm:flex-row items-center justify-between">
                             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
                                 <div className="relative">
@@ -672,7 +672,7 @@ const AIRecommender = () => {
                             <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white/50 rounded-3xl">
                                 <button
                                     onClick={startConversation}
-                                    className="cursor-pointer px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
+                                    className="cursor-pointer px-8 py-4 bg-gradient-to-r bg-sky-400 text-white rounded-2xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
                                 >
                                     <MessageCircle className="w-6 h-6 mr-3" />
                                     AI 추천 시작하기
