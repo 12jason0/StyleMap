@@ -38,10 +38,10 @@ model Courses {
   imageUrl             String?        @db.VarChar(255)
   region               String?        @db.VarChar(50)
   duration             String?        @db.VarChar(45)
-  price                Decimal?       @db.Decimal(10, 2)
+  price                String?        @db.VarChar(100)
   concept              String?        @db.VarChar(45)
   isPopular            Boolean        @default(false)
-  rating               Decimal        @default(0.0) @db.Decimal(3, 2)
+  rating               Float          @default(0.0)
   current_participants Int            @default(0)
   max_participants     Int            @default(0)
   view_count           Int            @default(0)
@@ -156,9 +156,9 @@ model Place {
   website              String?       @db.VarChar(500)
   parking_available    Boolean?      @default(false)
   reservation_required Boolean?      @default(false)
-  latitude             Decimal?      @db.Decimal(10, 8)
-  longitude            Decimal?      @db.Decimal(11, 8)
-  imageUrl             String?       @map("image_url") @db.VarChar(500)
+  latitude             Float?
+  longitude            Float?
+  imageUrl             String?       @db.VarChar(500) // [수정] @map("image_url") 제거
   tags                 String?       @db.Text
   created_at           DateTime      @default(now())
   updated_at           DateTime      @updatedAt
@@ -253,7 +253,7 @@ model Story {
   synopsis               String?             @db.Text
   region                 String?             @db.VarChar(100)
   estimated_duration_min Int?
-  price                  Decimal?            @db.Decimal(10, 2)
+  price                  String?             @db.VarChar(100)
   imageUrl               String?             @db.Text
   reward_badge_id        Int?
   is_active              Boolean             @default(true)
@@ -274,8 +274,8 @@ model StoryChapter {
   title           String   @db.VarChar(255)
   location_name   String?  @db.VarChar(255)
   address         String?  @db.VarChar(500)
-  latitude        Decimal? @db.Decimal(10, 8)
-  longitude       Decimal? @db.Decimal(11, 8)
+  latitude        Float?
+  longitude       Float?
   story_text      String?  @db.Text
   mission_type    String?  @db.VarChar(50)
   mission_payload Json?

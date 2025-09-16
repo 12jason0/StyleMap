@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import jwt from "jsonwebtoken";
 export const dynamic = "force-dynamic";
+
 // 찜 목록 조회
 export async function GET(request: NextRequest) {
     try {
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
         const favorites = await (prisma as any).userFavorite.findMany({
             where: { userId: Number(userId) },
-            orderBy: { created_at: "desc" },
+            orderBy: { createdAt: "desc" }, // [수정] created_at -> createdAt
             include: {
                 course: {
                     select: {
@@ -59,10 +60,10 @@ export async function POST(request: NextRequest) {
         }
 
         const existing = await (prisma as any).userFavorite.findFirst({
-            where: { user_id: Number(userId), course_id: Number(courseId) },
+            where: { userId: Number(userId), courseId: Number(courseId) }, // [수정] prisma 스키마에 맞춰 user_id, course_id 대신 userId, courseId 사용
         });
         if (existing) return NextResponse.json({ error: "Already favorited" }, { status: 400 });
-        await (prisma as any).userFavorite.create({ data: { user_id: Number(userId), course_id: Number(courseId) } });
+        await (prisma as any).userFavorite.create({ data: { userId: Number(userId), courseId: Number(courseId) } }); // [수정]
         return NextResponse.json({ message: "Added to favorites" });
     } catch (error) {
         console.error("Error adding favorite:", error);
@@ -91,7 +92,7 @@ export async function DELETE(request: NextRequest) {
         }
 
         await (prisma as any).userFavorite.deleteMany({
-            where: { user_id: Number(userId), course_id: Number(courseId) },
+            where: { userId: Number(userId), courseId: Number(courseId) }, // [수정]
         });
         return NextResponse.json({ message: "Removed from favorites" });
     } catch (error) {

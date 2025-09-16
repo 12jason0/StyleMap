@@ -14,8 +14,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             include: {
                 highlights: true,
                 benefits: true,
-                notices: true,
-                course_places: { include: { places: true }, orderBy: { order_index: "asc" } },
+                course_notices: true, // [수정] 'notices' -> 'course_notices'
+                course_places: { include: { place: true }, orderBy: { order_index: "asc" } }, // [수정] 'places' -> 'place'
                 _count: { select: { course_places: true } },
             } as any,
         } as any);
@@ -60,20 +60,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             recommended_time: cp.recommended_time,
             notes: cp.notes,
             place: {
-                id: cp.places.id,
-                name: cp.places.name,
-                address: cp.places.address,
-                description: cp.places.description,
-                category: cp.places.category,
-                avg_cost_range: cp.places.avg_cost_range,
-                opening_hours: cp.places.opening_hours,
-                phone: cp.places.phone,
-                parking_available: !!cp.places.parking_available,
-                reservation_required: !!cp.places.reservation_required,
-                latitude: Number(cp.places.latitude),
-                longitude: Number(cp.places.longitude),
-                image_url: cp.places.imageUrl || "",
-                imageUrl: cp.places.imageUrl || "",
+                id: cp.place.id, // [수정] 'cp.places' -> 'cp.place'
+                name: cp.place.name,
+                address: cp.place.address,
+                description: cp.place.description,
+                category: cp.place.category,
+                avg_cost_range: cp.place.avg_cost_range,
+                opening_hours: cp.place.opening_hours,
+                phone: cp.place.phone,
+                parking_available: !!cp.place.parking_available,
+                reservation_required: !!cp.place.reservation_required,
+                latitude: Number(cp.place.latitude),
+                longitude: Number(cp.place.longitude),
+                image_url: cp.place.imageUrl || "",
+                imageUrl: cp.place.imageUrl || "",
             },
         }));
 
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             ...formattedCourse,
             highlights: (course as any).highlights || [],
             benefits: (course as any).benefits || [],
-            notices: (course as any).notices || [],
+            notices: (course as any).course_notices || [], // [수정] 'course.notices' -> 'course.course_notices'
             coursePlaces,
         };
 
