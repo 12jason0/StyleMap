@@ -12,7 +12,7 @@ model User {
   email             String?             @unique @db.VarChar(191)
   password          String?             @db.VarChar(255)
   nickname          String              @db.VarChar(50)
-  profileImageUrl   String?             @db.VarChar(255)
+  profileImageUrl   String?
   socialId          String?             @db.VarChar(255)
   provider          String              @default("local") @db.VarChar(20)
   createdAt         DateTime            @default(now())
@@ -21,9 +21,9 @@ model User {
   age               Int?
   reviews           Review[]
   courses           Courses[]
-  userStoryProgress UserStoryProgress[]
+  user_story_progress UserStoryProgress[]
   preferences       UserPreferences?
-  userFavorites     UserFavorite[]
+  user_favorites    UserFavorite[]
   bookings          Booking[]
 
   @@index([provider, socialId])
@@ -31,207 +31,76 @@ model User {
 }
 
 model Courses {
-  id                   Int            @id @default(autoincrement())
-  userId               Int?
-  title                String         @db.VarChar(100)
-  description          String?        @db.Text
-  imageUrl             String?        @db.VarChar(255)
-  region               String?        @db.VarChar(50)
-  duration             String?        @db.VarChar(45)
-  price                String?        @db.VarChar(100)
-  concept              String?        @db.VarChar(45)
-  isPopular            Boolean        @default(false)
-  rating               Float          @default(0.0)
-  current_participants Int            @default(0)
-  max_participants     Int            @default(0)
-  view_count           Int            @default(0)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  reviews              Review[]
-  benefits             Benefit[]
-  course_notices       CourseNotice[]
-  course_places        CoursePlace[]
-  creator              User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  highlights           Highlight[]
-  user_favorites       UserFavorite[]
-  tags                 CourseTag[]    @relation("CourseTagToCourses")
-  bookings             Booking[]
-  contacts             Contact[]
+  id                     Int            @id @default(autoincrement())
+  userId                 Int?
+  title                  String         @db.VarChar(100)
+  description            String?        @db.Text
+  imageUrl               String?        @db.VarChar(255)
+  region                 String?        @db.VarChar(50)
+  duration               String?        @db.VarChar(45)
+  price                  String?        @db.VarChar(100)
+  concept                String?        @db.VarChar(45)
+  isPopular              Boolean        @default(false)
+  rating                 Decimal        @default(0.0) @db.Decimal(3, 2)
+  current_participants   Int            @default(0)
+  max_participants       Int            @default(0)
+  view_count             Int            @default(0)
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+  reviews                Review[]
+  benefits               Benefit[]
+  course_notices         CourseNotice[]
+  course_places          CoursePlace[]
+  creator                User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  highlights             Highlight[]
+  user_favorites         UserFavorite[]
+  tags                   CourseTag[]    @relation("CourseTagToCourses")
+  bookings               Booking[]
+  contacts               Contact[]
 
   @@map("courses")
 }
 
 model Review {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  courseId  Int
-  rating    Int
-  comment   String?  @db.Text
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  course    Courses  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  course_id  Int
+  rating     Int
+  comment    String?  @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  course     Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("reviews")
 }
 
 model Booking {
-  id           Int      @id @default(autoincrement())
-  user_id      Int      
-  course_id    Int      
-  course_title String   @db.VarChar(255)
-  booking_date DateTime @db.Date
-  status       String   @db.VarChar(45)
-  price        String   @db.VarChar(50)
-  participants Int
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
-  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  course       Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  course_id     Int
+  course_title  String   @db.VarChar(255)
+  booking_date  DateTime @db.Date
+  status        String   @db.VarChar(45)
+  price         String   @db.VarChar(50)
+  participants  Int
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  course        Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@map("bookings")
 }
 
 model UserPreferences {
-  id          Int      @id @default(autoincrement())
-  user_id     Int      @unique
-  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  preferences Json
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  user_id      Int      @unique
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  preferences  Json
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
   @@map("user_preferences")
-}
-
-model UserBehavior {
-  id                   Int             @id @default(autoincrement())
-  userId               String          @unique @db.VarChar(100)
-  viewedCourses        Json            @default("[]")
-  bookedCourses        Json            @default("[]")
-  likedCourses         Json            @default("[]")
-  searchHistory        Json            @default("[]")
-  timeSpent            Json            @default("{}")
-  preferences          Json            @default("{}")
-  lastActiveAt         DateTime        @default(now())
-  lastRecommendationAt DateTime?
-  createdAt            DateTime        @default(now())
-  updatedAt            DateTime        @updatedAt
-  trackingEvents       TrackingEvent[]
-
-  @@map("user_behavior")
-}
-
-model TrackingEvent {
-  id           Int          @id @default(autoincrement())
-  userId       String       @db.VarChar(100)
-  eventType    String       @db.VarChar(50)
-  courseId     String?      @db.VarChar(100)
-  searchQuery  String?
-  timeSpent    Int?
-  metadata     Json         @default("{}")
-  timestamp    DateTime     @default(now())
-  userBehavior UserBehavior @relation(fields: [userId], references: [userId])
-
-  @@map("tracking_events")
-}
-
-model CourseTag {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique @db.VarChar(100)
-  createdAt DateTime  @default(now())
-  courses   Courses[] @relation("CourseTagToCourses")
-
-  @@map("course_tags")
-}
-
-model Place {
-  id                   Int           @id @default(autoincrement())
-  name                 String        @db.VarChar(255)
-  address              String?       @db.VarChar(500)
-  description          String?       @db.Text
-  category             String?       @db.VarChar(100)
-  avg_cost_range       String?       @db.VarChar(100)
-  opening_hours        String?       @db.VarChar(200)
-  phone                String?       @db.VarChar(50)
-  website              String?       @db.VarChar(500)
-  parking_available    Boolean?      @default(false)
-  reservation_required Boolean?      @default(false)
-  latitude             Float?
-  longitude            Float?
-  imageUrl             String?       @db.VarChar(500)
-  tags                 String?       @db.Text
-  created_at           DateTime      @default(now())
-  updated_at           DateTime      @updatedAt
-  course_places        CoursePlace[]
-
-  @@map("places")
-}
-
-model CoursePlace {
-  id                 Int      @id @default(autoincrement())
-  course_id          Int
-  place_id           Int
-  order_index        Int
-  estimated_duration Int?
-  recommended_time   String?  @db.VarChar(100)
-  notes              String?  @db.Text
-  created_at         DateTime @default(now())
-  updated_at         DateTime @updatedAt
-  course             Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
-  place              Place    @relation(fields: [place_id], references: [id], onDelete: Cascade)
-
-  @@map("course_places")
-}
-
-model Highlight {
-  id          Int      @id @default(autoincrement())
-  course_id   Int
-  title       String   @db.VarChar(255)
-  description String?  @db.Text
-  icon        String?  @db.VarChar(10)
-  created_at  DateTime @default(now())
-  course      Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
-
-  @@map("highlights")
-}
-
-model Benefit {
-  id            Int      @id @default(autoincrement())
-  course_id     Int
-  benefit_text  String   @db.Text
-  category      String?  @db.VarChar(100)
-  display_order Int?     @default(0)
-  created_at    DateTime @default(now())
-  course        Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
-
-  @@map("benefits")
-}
-
-model CourseNotice {
-  id            Int      @id @default(autoincrement())
-  course_id     Int
-  notice_text   String   @db.Text
-  type          String?  @default("info") @db.VarChar(100)
-  display_order Int?     @default(0)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-  course        Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
-
-  @@map("course_notices")
-}
-
-model Contact {
-  id          Int      @id @default(autoincrement())
-  course_id   Int
-  type        String?  @db.VarChar(100)
-  icon        String?  @db.VarChar(10)
-  label       String?  @db.VarChar(255)
-  value       String?  @db.VarChar(500)
-  description String?  @db.Text
-  created_at  DateTime @default(now())
-  course      Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
-
-  @@map("contacts")
 }
 
 model UserFavorite {
@@ -242,71 +111,6 @@ model UserFavorite {
   course     Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
   user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@unique([user_id, course_id])
+  @@unique([user_id, course_id], map: "unique_user_course")
   @@map("user_favorites")
-}
-
-// Escape Mission Models
-model Story {
-  id                     Int                 @id @default(autoincrement())
-  title                  String              @db.VarChar(255)
-  synopsis               String?             @db.Text
-  region                 String?             @db.VarChar(100)
-  estimated_duration_min Int?
-  price                  String?             @db.VarChar(100)
-  imageUrl               String?             @db.Text
-  reward_badge_id        Int?
-  is_active              Boolean             @default(true)
-  created_at             DateTime            @default(now())
-  updated_at             DateTime            @updatedAt
-  level                  Int?                @default(1)
-  chapters               StoryChapter[]
-  reward_badge           Badge?              @relation("StoryRewardBadge", fields: [reward_badge_id], references: [id])
-  userStoryProgress      UserStoryProgress[]
-
-  @@map("stories")
-}
-
-model StoryChapter {
-  id              Int      @id @default(autoincrement())
-  story_id        Int
-  chapter_number  Int
-  title           String   @db.VarChar(255)
-  location_name   String?  @db.VarChar(255)
-  address         String?  @db.VarChar(500)
-  latitude        Float?
-  longitude       Float?
-  story_text      String?  @db.Text
-  mission_type    String?  @db.VarChar(50)
-  mission_payload Json?
-  puzzle_text     String?  @db.Text
-  story           Story    @relation(fields: [story_id], references: [id], onDelete: Cascade)
-
-  @@unique([story_id, chapter_number])
-  @@map("storychapters")
-}
-
-model Badge {
-  id          Int     @id @default(autoincrement())
-  name        String  @unique @db.VarChar(100)
-  description String? @db.Text
-  image_url   String? @db.VarChar(500)
-  stories     Story[] @relation("StoryRewardBadge")
-
-  @@map("badges")
-}
-
-model UserStoryProgress {
-  id              Int       @id @default(autoincrement())
-  user_id         Int
-  story_id        Int
-  current_chapter Int
-  status          String    @db.VarChar(30)
-  started_at      DateTime?
-  completed_at    DateTime?
-  story           Story     @relation(fields: [story_id], references: [id], onDelete: Cascade)
-  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, story_id])
-  @@map("userstoryprogress")
 }

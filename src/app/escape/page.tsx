@@ -126,7 +126,7 @@ export default function escapePage() {
         }
         (async () => {
             try {
-                const sRes = await fetch("/api/escape/stories");
+                const sRes = await fetch("/api/escape/stories", { cache: "force-cache" });
                 const sRaw = await sRes.json();
                 const sData: any[] = Array.isArray(sRaw)
                     ? sRaw
@@ -200,6 +200,7 @@ export default function escapePage() {
         if (!Array.isArray(stories)) return null;
         return stories.find((s) => s.id === selectedStoryId) || null;
     }, [stories, selectedStoryId]);
+
     const selectedChapters = useMemo(
         () =>
             chapters.filter((c) => c.story_id === selectedStoryId).sort((a, b) => a.chapter_number - b.chapter_number),
@@ -387,6 +388,7 @@ export default function escapePage() {
                                         <img
                                             src={imageSrc}
                                             alt={s.title}
+                                            loading="lazy"
                                             className="w-full h-full object-cover border-0 md:transform md:-translate-x-4 md:opacity-95 transition-all duration-700 ease-out md:group-hover:translate-x-0 md:group-hover:opacity-100"
                                         />
                                     )}
