@@ -14,8 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             where: { course_id: Number(courseId) },
             orderBy: [{ order_index: "asc" }],
             include: {
-                place: {
-                    // [수정] 'places' -> 'place'
+                places: {
                     select: {
                         id: true,
                         name: true,
@@ -46,19 +45,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             notes: cp.notes,
             place: {
                 id: cp.place_id,
-                name: cp.place?.name ?? "", // [수정] 'cp.places' -> 'cp.place'
-                address: cp.place?.address ?? "",
-                description: cp.place?.description ?? "",
-                category: cp.place?.category ?? "",
-                avg_cost_range: cp.place?.avg_cost_range ?? "",
-                opening_hours: cp.place?.opening_hours ?? "",
-                phone: cp.place?.phone ?? "",
-                website: cp.place?.website ?? "",
-                parking_available: Boolean(cp.place?.parking_available),
-                reservation_required: Boolean(cp.place?.reservation_required),
-                latitude: Number(cp.place?.latitude),
-                longitude: Number(cp.place?.longitude),
-                image_url: cp.place?.imageUrl ?? "",
+                name: cp.places?.name ?? "",
+                address: cp.places?.address ?? "",
+                description: cp.places?.description ?? "",
+                category: cp.places?.category ?? "",
+                avg_cost_range: cp.places?.avg_cost_range ?? "",
+                opening_hours: cp.places?.opening_hours ?? "",
+                phone: cp.places?.phone ?? "",
+                website: cp.places?.website ?? "",
+                parking_available: Boolean(cp.places?.parking_available),
+                reservation_required: Boolean(cp.places?.reservation_required),
+                latitude: Number(cp.places?.latitude),
+                longitude: Number(cp.places?.longitude),
+                image_url: cp.places?.imageUrl ?? "",
             },
         }));
 

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
             // 이미지 정책 검증을 위해 장소와 이미지 포함
             prismaQuery.include = {
                 course_places: {
-                    include: { place: true },
+                    include: { places: true },
                 },
             } as any;
         } else if (lean) {
