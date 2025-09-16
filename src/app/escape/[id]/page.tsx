@@ -28,7 +28,7 @@ type StoryChapter = {
     chapter_number: number;
     title: string;
     story_text?: string;
-    mission_type?: "quiz" | "photo" | "location" | "none";
+    mission_type?: "quiz" | "photo" | "GPS" | "PUZZLE_ANSWER" | "none";
     mission_payload?: any;
 };
 
@@ -84,6 +84,9 @@ export default function EscapePlayPage() {
     const [progressMap, setProgressMap] = useState<ProgressMap>({});
     const [answer, setAnswer] = useState<string>("");
     const [toast, setToast] = useState<string | null>(null);
+    const [photoUploading, setPhotoUploading] = useState<boolean>(false);
+    const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+    const [pendingNextProgress, setPendingNextProgress] = useState<UserStoryProgress | null>(null);
 
     useEffect(() => {
         if (!storyId) return;
@@ -103,9 +106,11 @@ export default function EscapePlayPage() {
 
         (async () => {
             try {
-                const sRes = await fetch(`/api/escape/stories?storyId=${storyId}`);
-                const s = await sRes.json();
-                // level/difficulty 필드 정규화
+                const [sRes, cRes] = await Promise.all([
+                    fetch(`/api/escape/stories?storyId=${storyId}`, { cache: "force-cache" }),
+                    fetch(`/api/escape/chapters?storyId=${storyId}`, { cache: "force-cache" }),
+                ]);
+                const [s, c] = await Promise.all([sRes.json(), cRes.json()]);
                 const normalized = s
                     ? {
                           ...s,
@@ -113,12 +118,7 @@ export default function EscapePlayPage() {
                       }
                     : null;
                 setStory(normalized);
-
-                const cRes = await fetch(`/api/escape/chapters?storyId=${storyId}`);
-                const c = await cRes.json();
                 setChapters(Array.isArray(c) ? c : []);
-
-                // 배지는 목록 페이지와 동일 포맷 가정 (안전하게 빈 배열)
                 if (s?.badge) setBadges([s.badge as Badge]);
             } catch (e) {
                 console.error("Failed to load story/chapters", e);
@@ -160,7 +160,7 @@ export default function EscapePlayPage() {
         if (!story || !currentChapter) return;
         const p = progressMap[String(story.id)];
 
-        if (currentChapter.mission_type === "quiz") {
+        if (currentChapter.mission_type === "quiz" || currentChapter.mission_type === "PUZZLE_ANSWER") {
             const correct = String(currentChapter.mission_payload?.answer ?? "")
                 .trim()
                 .toLowerCase();
@@ -168,11 +168,40 @@ export default function EscapePlayPage() {
                 setToast("정답이 아니에요");
                 return;
             }
+            // 정답일 때는 즉시 입력값 초기화
+            setAnswer("");
         }
 
         const chapterIdx = selectedChapters.findIndex((c) => c.chapter_number === currentChapter.chapter_number);
         const isLast = chapterIdx === selectedChapters.length - 1;
         const now = Date.now();
+
+        // 다음 챕터 위치 정보를 모달로 안내 후, 사용자가 닫기 눌러야 진행
+        let willShowNextInfo = false;
+        if (!isLast) {
+            const nextChapter = selectedChapters[chapterIdx + 1];
+            if (nextChapter) {
+                const locName = (nextChapter as any).location_name || nextChapter.title;
+                const address = (nextChapter as any).address;
+                const lat = (nextChapter as any).latitude;
+                const lng = (nextChapter as any).longitude;
+                const gpsHint =
+                    nextChapter.mission_type === "GPS" ? String(nextChapter.mission_payload?.hint || "").trim() : "";
+                const info = [
+                    `다음 장소로 이동하세요.`,
+                    `Chapter ${nextChapter.chapter_number} - ${locName}`,
+                    address ? `주소: ${address}` : null,
+                    lat && lng ? `좌표: ${lat}, ${lng}` : null,
+                    gpsHint ? `힌트: ${gpsHint}` : null,
+                ]
+                    .filter(Boolean)
+                    .join("\n");
+                setModalContent(info);
+                setModalRole("narration");
+                setShowMemo(true);
+                willShowNextInfo = true;
+            }
+        }
 
         const nextProgress: UserStoryProgress = isLast
             ? {
@@ -190,16 +219,31 @@ export default function EscapePlayPage() {
                   completed_at: null,
               };
 
-        const nextMap = { ...progressMap, [String(story.id)]: nextProgress } as ProgressMap;
-        setProgressMap(nextMap);
-        writeProgress(nextMap);
-        fetch("/api/escape/progress", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(nextProgress),
-        }).catch(() => {});
-        setAnswer("");
-        setToast(isLast ? "스토리 완료!" : "다음 미션으로 이동");
+        const commit = () => {
+            const nextMap = { ...progressMap, [String(story.id)]: nextProgress } as ProgressMap;
+            setProgressMap(nextMap);
+            writeProgress(nextMap);
+            fetch("/api/escape/progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(nextProgress),
+            }).catch(() => {});
+            setAnswer("");
+            if (isLast) {
+                setToast("스토리 완료!");
+            } else if (!willShowNextInfo) {
+                setToast("다음 미션으로 이동");
+            }
+        };
+
+        if (isLast) {
+            commit();
+        } else if (willShowNextInfo) {
+            // 사용자가 모달 닫기 버튼을 눌러야 진행되도록 보류
+            setPendingNextProgress(nextProgress);
+        } else {
+            commit();
+        }
     };
 
     // --- 대화형 스토리텔링: 말풍선/편지/나레이션 ---
@@ -331,11 +375,6 @@ export default function EscapePlayPage() {
                         <h1 className="text-2xl font-bold flex items-center gap-3">{story?.title || "플레이"}</h1>
                         {/* 가격 아래 정보 */}
                         <div className="mt-3 space-y-1 text-gray-900">
-                            {typeof story?.estimated_duration_min === "number" && (
-                                <div>
-                                    <span className="font-semibold">시간</span> {story.estimated_duration_min}분
-                                </div>
-                            )}
                             {story?.price && (
                                 <div>
                                     <span className="font-semibold">가격</span> {story.price}
@@ -396,7 +435,7 @@ export default function EscapePlayPage() {
                                     낡은 지도
                                 </button>
                             </div>
-                            {/* 실(붉은 실) */}
+                            {/* 실(붉은 실) 표시 */}
                             <svg
                                 className="absolute inset-0 w-full h-full"
                                 viewBox="0 0 100 100"
@@ -414,14 +453,19 @@ export default function EscapePlayPage() {
                                 />
                             </svg>
                             <KakaoMap
-                                places={selectedChapters.map((c) => ({
-                                    id: c.id,
-                                    name: `Chapter ${c.chapter_number}`,
-                                    latitude: Number((c as any).latitude ?? 37.5665),
-                                    longitude: Number((c as any).longitude ?? 126.978),
-                                    address: (c as any).address,
-                                    order: c.chapter_number,
-                                }))}
+                                places={
+                                    currentChapter
+                                        ? [
+                                              {
+                                                  id: currentChapter.id,
+                                                  name: `Chapter ${currentChapter.chapter_number}`,
+                                                  latitude: Number((currentChapter as any).latitude ?? 37.5665),
+                                                  longitude: Number((currentChapter as any).longitude ?? 126.978),
+                                                  address: (currentChapter as any).address,
+                                              },
+                                          ]
+                                        : []
+                                }
                                 userLocation={null}
                                 selectedPlace={
                                     currentChapter
@@ -436,7 +480,7 @@ export default function EscapePlayPage() {
                                 }
                                 onPlaceClick={() => {}}
                                 className="w-full h-full"
-                                drawPath={true}
+                                drawPath={false}
                                 routeMode="simple"
                                 ancientStyle={false}
                                 highlightPlaceId={currentChapter?.id}
@@ -455,50 +499,143 @@ export default function EscapePlayPage() {
                                     <div className="text-sm text-gray-700">{currentChapter.title}</div>
                                 </div>
                                 <div className="p-5">
+                                    {/* 미션 타입 라벨 */}
+                                    <div className="mb-3">
+                                        {currentChapter.mission_type === "quiz" && (
+                                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-blue-900 bg-blue-50 px-3 py-1 rounded-full">
+                                                💡 퀴즈 미션
+                                            </span>
+                                        )}
+                                        {currentChapter.mission_type === "GPS" && (
+                                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-green-900 bg-green-50 px-3 py-1 rounded-full">
+                                                📍 위치 미션
+                                            </span>
+                                        )}
+                                        {currentChapter.mission_type === "photo" && (
+                                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-purple-900 bg-purple-50 px-3 py-1 rounded-full">
+                                                📸 사진 미션
+                                            </span>
+                                        )}
+                                        {currentChapter.mission_type === "PUZZLE_ANSWER" && (
+                                            <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-900 bg-amber-50 px-3 py-1 rounded-full">
+                                                🧩 퍼즐 정답 입력
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="text-sm text-gray-800 whitespace-pre-wrap mb-4">
                                         {currentChapter.story_text || "미션 설명이 제공되지 않았습니다."}
                                     </div>
 
-                                    {currentChapter.mission_type === "quiz" && (
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <input
-                                                value={answer}
-                                                onChange={(e) => setAnswer(e.target.value)}
-                                                placeholder={currentChapter.mission_payload?.question || "정답 입력"}
-                                                className="border rounded-lg px-3 py-2 text-sm w-full"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === "Enter") handleSubmitMission();
-                                                }}
-                                            />
-                                            <button
-                                                onClick={handleSubmitMission}
-                                                className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-                                            >
-                                                제출
-                                            </button>
+                                    {(currentChapter.mission_type === "quiz" ||
+                                        currentChapter.mission_type === "PUZZLE_ANSWER") && (
+                                        <div className="mb-3">
+                                            {currentChapter.mission_payload?.question && (
+                                                <div className="text-sm font-semibold text-gray-900 mb-2">
+                                                    {currentChapter.mission_payload.question}
+                                                </div>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    value={answer}
+                                                    onChange={(e) => setAnswer(e.target.value)}
+                                                    placeholder={
+                                                        currentChapter.mission_type === "PUZZLE_ANSWER"
+                                                            ? "정답을 입력하세요"
+                                                            : "정답 입력"
+                                                    }
+                                                    className="border rounded-lg px-3 py-2 text-sm w-full"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") handleSubmitMission();
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={handleSubmitMission}
+                                                    className="hover:cursor-pointer w-full md:w-auto px-5 py-2.5 rounded-2xl border border-gray-200 text-gray-900 bg-white hover:bg-gray-50 text-sm font-semibold shadow-sm whitespace-nowrap shrink-0 min-w-[72px] text-center"
+                                                >
+                                                    제출
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
 
-                                    {/* 선택지(옵션형) 미션: mission_payload.options가 배열이면 버튼 렌더 */}
-                                    {Array.isArray(currentChapter.mission_payload?.options) && (
-                                        <div className="grid grid-cols-1 gap-2 mt-2">
-                                            {(currentChapter.mission_payload.options as string[]).map((opt, i) => (
-                                                <button
-                                                    key={i}
-                                                    onClick={() => handleOptionSelect(opt)}
-                                                    className="w-full text-left px-4 py-2 rounded-lg border hover:bg-gray-50"
-                                                >
-                                                    {opt}
-                                                </button>
-                                            ))}
+                                    {currentChapter.mission_type === "GPS" && (
+                                        <div className="bg-green-50 rounded-lg p-3 mb-3">
+                                            <div className="text-sm font-semibold text-green-900 mb-1">힌트</div>
+                                            <div className="text-sm text-green-800">
+                                                {currentChapter.mission_payload?.hint || "주변을 살펴보세요."}
+                                            </div>
                                         </div>
                                     )}
+
+                                    {currentChapter.mission_type === "photo" && (
+                                        <div className="bg-purple-50 rounded-lg p-3 mb-4">
+                                            <div className="text-sm font-semibold text-purple-900 mb-2">
+                                                📸 사진 인증
+                                            </div>
+                                            <div className="text-sm text-purple-800 mb-3">
+                                                {currentChapter.mission_payload?.tip || "사진을 촬영해 인증해보세요."}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <label className="inline-flex items-center px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm hover:cursor-pointer">
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*;capture=camera"
+                                                        className="hidden"
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            setPhotoPreviewUrl(URL.createObjectURL(file));
+                                                            try {
+                                                                setPhotoUploading(true);
+                                                                const form = new FormData();
+                                                                form.append("photo", file);
+                                                                form.append("storyId", String(storyId));
+                                                                form.append(
+                                                                    "chapterNumber",
+                                                                    String(currentChapter.chapter_number)
+                                                                );
+                                                                const res = await fetch("/api/escape/photo", {
+                                                                    method: "POST",
+                                                                    body: form,
+                                                                });
+                                                                if (!res.ok) {
+                                                                    const err = await res.json().catch(() => ({}));
+                                                                    setToast(err?.error || "업로드에 실패했어요");
+                                                                    return;
+                                                                }
+                                                                setToast("사진 업로드 완료");
+                                                                // 사진 인증 완료로 간주하고 진행
+                                                                handleSubmitMission();
+                                                            } catch {
+                                                                setToast("업로드 중 오류가 발생했어요");
+                                                            } finally {
+                                                                setPhotoUploading(false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    {photoUploading ? "업로드 중..." : "사진 촬영/업로드"}
+                                                </label>
+                                                {photoPreviewUrl && (
+                                                    <div className="w-16 h-16 rounded-lg overflow-hidden border bg-white">
+                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                        <img
+                                                            src={photoPreviewUrl}
+                                                            alt="preview"
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 보기(선택지) UI 제거 */}
 
                                     {storyProgress?.status !== "completed" &&
                                         currentChapter.mission_type !== "quiz" && (
                                             <button
                                                 onClick={handleSubmitMission}
-                                                className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                                                className="hover:cursor-pointer w-full py-3 bg-sky-400 text-white rounded-lg text-sm font-medium hover:bg-sky-500"
                                             >
                                                 미션 완료하기
                                             </button>
@@ -613,35 +750,36 @@ export default function EscapePlayPage() {
                 {/* 낡은 지도 모달 (나레이션/편지 전용) + 참고 이미지 표시 */}
                 {showMemo && (
                     <div
-                        className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-                        onClick={() => setShowMemo(false)}
+                        className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4"
                         role="dialog"
                         aria-modal="true"
                     >
                         <div
-                            className="relative w-full max-w-xl rounded-2xl overflow-hidden shadow-xl"
+                            className="relative w-full max-w-3xl rounded-[24px] overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,.6)] ring-1 ring-amber-200/50 border border-amber-900/20 bg-[#1b1307]/90 backdrop-blur-sm"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="relative bg-[url('/images/old-map.jpg')] bg-cover bg-center">
                                 <div className="backdrop-brightness-95 p-6">
-                                    <div className="text-white drop-shadow text-lg font-bold mb-3 flex items-center justify-between">
+                                    <div className="text-amber-200 drop-shadow-[0_1px_1px_rgba(0,0,0,.6)] text-xl font-extrabold mb-4 flex items-center justify-between font-serif tracking-wide">
                                         <span>낡은 지도</span>
                                         {referenceImageUrl && (
                                             <span className="text-[11px] font-normal opacity-80">참고 이미지</span>
                                         )}
                                     </div>
                                     {/* 고대 지도 캔버스 */}
-                                    <div className="relative w-full h-[280px] rounded-xl overflow-hidden border border-white/40 ring-1 ring-amber-200/60 shadow-lg bg-[url('/images/parchment-frame.png')] bg-cover bg-center contrast-125 saturate-125">
+                                    <div className="relative w-full h-[280px] rounded-[16px] overflow-hidden border border-amber-900/40 ring-1 ring-amber-300/50 shadow-[0_8px_24px_rgba(0,0,0,.5)] bg-[url('/images/parchment-frame.png')] bg-cover bg-center contrast-125 saturate-125">
                                         {referenceImageUrl && (
                                             <div className="absolute inset-0 opacity-60">
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img
                                                     src={referenceImageUrl}
                                                     alt="reference"
+                                                    loading="lazy"
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
                                         )}
+                                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0)_50%,rgba(0,0,0,0.55)_100%)] mix-blend-multiply" />
                                         <svg
                                             className="absolute inset-0 w-full h-full"
                                             viewBox="0 0 100 100"
@@ -678,20 +816,24 @@ export default function EscapePlayPage() {
                                                     transform: `translate(-50%, -50%) rotate(${p.rotate}deg)`,
                                                 }}
                                             >
-                                                <div
-                                                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold select-none border ${
-                                                        currentChapter?.id === p.id
-                                                            ? "bg-amber-400 text-amber-900 shadow-[0_0_12px_rgba(245,158,11,.9)] border-amber-200"
-                                                            : "bg-amber-800/90 text-amber-100 shadow-[0_0_6px_rgba(0,0,0,.35)] border-amber-200/50"
-                                                    }`}
-                                                    style={
-                                                        currentChapter?.id === p.id
-                                                            ? { animation: "glowPulse 1.8s ease-in-out infinite" }
-                                                            : {}
-                                                    }
-                                                    title={`${p.chapter}. ${p.title}`}
-                                                >
-                                                    ᚠ
+                                                <div className="relative">
+                                                    <div className="absolute -top-2 -left-2 w-3 h-3 bg-red-400 rounded-full rotate-12 shadow-[0_0_4px_rgba(0,0,0,.4)]" />
+                                                    <div className="absolute -bottom-2 -right-2 w-3 h-3 bg-red-400 rounded-full -rotate-12 shadow-[0_0_4px_rgba(0,0,0,.4)]" />
+                                                    <div
+                                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold select-none border ${
+                                                            currentChapter?.id === p.id
+                                                                ? "bg-amber-400 text-amber-900 shadow-[0_0_12px_rgba(245,158,11,.9)] border-amber-200"
+                                                                : "bg-amber-800/90 text-amber-100 shadow-[0_0_6px_rgba(0,0,0,.35)] border-amber-200/50"
+                                                        }`}
+                                                        style={
+                                                            currentChapter?.id === p.id
+                                                                ? { animation: "glowPulse 1.8s ease-in-out infinite" }
+                                                                : {}
+                                                        }
+                                                        title={`${p.chapter}. ${p.title}`}
+                                                    >
+                                                        {p.chapter}
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -700,14 +842,31 @@ export default function EscapePlayPage() {
                                         className={`${
                                             modalRole === "letter"
                                                 ? "bg-white/85 rounded-xl p-4 text-gray-800 mt-3"
-                                                : "text-white whitespace-pre-wrap mt-3"
+                                                : "text-amber-100 whitespace-pre-wrap mt-3"
                                         }`}
                                     >
                                         {modalContent}
                                     </div>
                                     <div className="mt-3 flex justify-end gap-2">
                                         <button
-                                            onClick={() => setShowMemo(false)}
+                                            onClick={() => {
+                                                setShowMemo(false);
+                                                if (pendingNextProgress) {
+                                                    const nextMap = {
+                                                        ...progressMap,
+                                                        [String(pendingNextProgress.story_id)]: pendingNextProgress,
+                                                    } as ProgressMap;
+                                                    setProgressMap(nextMap);
+                                                    writeProgress(nextMap);
+                                                    fetch("/api/escape/progress", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify(pendingNextProgress),
+                                                    }).catch(() => {});
+                                                    setPendingNextProgress(null);
+                                                    setToast("다음 미션으로 이동");
+                                                }
+                                            }}
                                             className="hover:cursor-pointer px-4 py-2 text-sm rounded-lg border bg-white/90 hover:bg-white"
                                         >
                                             닫기

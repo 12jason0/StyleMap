@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserIdFromRequest } from "@/lib/auth";
 export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
     try {
         const userId = getUserIdFromRequest(request);
@@ -13,8 +14,8 @@ export async function POST(request: NextRequest) {
         const { preferences } = body;
 
         // upsert: 있으면 업데이트, 없으면 생성
-        await (prisma as any).user_preferences.upsert({
-            where: { userId: String(userId) },
+        await prisma.userPreferences.upsert({
+            where: { userId: Number(userId) },
             update: {
                 preferences: {
                     travelStyle: preferences.travelStyle || [],
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
                 },
             },
             create: {
-                userId: String(userId),
+                userId: Number(userId),
                 preferences: {
                     travelStyle: preferences.travelStyle || [],
                     budgetRange: preferences.budgetRange || null,
@@ -59,8 +60,9 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(null);
         }
 
-        const row = await (prisma as any).user_preferences.findUnique({ where: { userId: String(userId) } });
+        const row = await prisma.userPreferences.findUnique({ where: { userId: Number(userId) } });
         if (!row) return NextResponse.json(null);
+
         const prefs = row.preferences as any;
         return NextResponse.json({
             travelStyle: prefs?.travelStyle ?? [],

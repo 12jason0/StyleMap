@@ -32,7 +32,11 @@ export async function GET(request: NextRequest) {
             puzzle_text: c.puzzle_text ?? undefined,
         }));
 
-        return NextResponse.json(normalized);
+        return NextResponse.json(normalized, {
+            headers: {
+                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+            },
+        });
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch chapters" }, { status: 500 });
     }

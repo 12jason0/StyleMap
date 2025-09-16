@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
         const userId = decoded.userId;
 
         const favorites = await (prisma as any).userFavorite.findMany({
-            where: { user_id: Number(userId) },
+            where: { userId: Number(userId) },
             orderBy: { created_at: "desc" },
             include: {
-                courses: {
+                course: {
                     select: {
                         title: true,
                         description: true,

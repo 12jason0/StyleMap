@@ -35,7 +35,6 @@ export async function GET(request: NextRequest) {
                 title: s.title,
                 synopsis: s.synopsis ?? "",
                 region: s.region ?? null,
-                estimated_duration_min: s.estimated_duration_min ?? null,
                 price: s.price != null ? String(s.price) : null,
                 imageUrl: s.imageUrl ?? null,
                 reward_badge_id: s.reward_badge_id ?? null,
@@ -52,7 +51,11 @@ export async function GET(request: NextRequest) {
                       }
                     : null,
             };
-            return NextResponse.json(normalized);
+            return NextResponse.json(normalized, {
+                headers: {
+                    "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+                },
+            });
         }
 
         const stories = await prisma.story.findMany({
@@ -78,7 +81,6 @@ export async function GET(request: NextRequest) {
             title: s.title,
             synopsis: s.synopsis ?? "",
             region: s.region ?? null,
-            estimated_duration_min: s.estimated_duration_min ?? null,
             price: s.price != null ? String(s.price) : null,
             imageUrl: s.imageUrl ?? null,
             reward_badge_id: s.reward_badge_id ?? null,
@@ -96,7 +98,11 @@ export async function GET(request: NextRequest) {
                 : null,
         }));
 
-        return NextResponse.json(normalized);
+        return NextResponse.json(normalized, {
+            headers: {
+                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+            },
+        });
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch stories" }, { status: 500 });
     }
