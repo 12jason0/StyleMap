@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
         const userId = decoded.userId;
 
         const favorites = await (prisma as any).userFavorite.findMany({
-            where: { userId: Number(userId) },
-            orderBy: { createdAt: "desc" }, // 'created_at' -> 'createdAt'
+            where: { user_id: Number(userId) },
+            orderBy: { created_at: "desc" },
             include: {
                 course: {
                     select: {
@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
         }
 
         const existing = await (prisma as any).userFavorite.findFirst({
-            where: { userId: Number(userId), courseId: Number(courseId) },
+            where: { user_id: Number(userId), course_id: Number(courseId) },
         });
         if (existing) return NextResponse.json({ error: "Already favorited" }, { status: 400 });
-        await (prisma as any).userFavorite.create({ data: { userId: Number(userId), courseId: Number(courseId) } });
+        await (prisma as any).userFavorite.create({ data: { user_id: Number(userId), course_id: Number(courseId) } });
         return NextResponse.json({ message: "Added to favorites" });
     } catch (error) {
         console.error("Error adding favorite:", error);
@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
         }
 
         await (prisma as any).userFavorite.deleteMany({
-            where: { userId: Number(userId), courseId: Number(courseId) },
+            where: { user_id: Number(userId), course_id: Number(courseId) },
         });
         return NextResponse.json({ message: "Removed from favorites" });
     } catch (error) {

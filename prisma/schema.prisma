@@ -77,25 +77,25 @@ model Review {
 
 model Booking {
   id           Int      @id @default(autoincrement())
-  userId       Int      @map("user_id")
-  courseId     Int      @map("course_id")
-  courseTitle  String   @map("course_title") @db.VarChar(255)
-  bookingDate  DateTime @map("booking_date") @db.Date
+  user_id      Int      
+  course_id    Int      
+  course_title String   @db.VarChar(255)
+  booking_date DateTime @db.Date
   status       String   @db.VarChar(45)
   price        String   @db.VarChar(50)
   participants Int
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course       Courses  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  course       Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@map("bookings")
 }
 
 model UserPreferences {
   id          Int      @id @default(autoincrement())
-  userId      Int      @unique @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user_id     Int      @unique
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   preferences Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -158,7 +158,7 @@ model Place {
   reservation_required Boolean?      @default(false)
   latitude             Float?
   longitude            Float?
-  imageUrl             String?       @db.VarChar(500) // [수정] @map("image_url") 제거
+  imageUrl             String?       @db.VarChar(500)
   tags                 String?       @db.Text
   created_at           DateTime      @default(now())
   updated_at           DateTime      @updatedAt
@@ -235,14 +235,14 @@ model Contact {
 }
 
 model UserFavorite {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  courseId  Int      @map("course_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  course    Courses  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  course_id  Int
+  created_at DateTime @default(now())
+  course     Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@unique([userId, courseId])
+  @@unique([user_id, course_id])
   @@map("user_favorites")
 }
 
