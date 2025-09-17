@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
         // 사용자 선호도가 있으면 업데이트, 없으면 생성 (upsert)
         await prisma.userPreferences.upsert({
-            where: { userId: Number(userId) },
+            where: { user_id: Number(userId) },
             update: {
                 preferences: {
                     travelStyle: preferences.travelStyle || [],
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
                 },
             },
             create: {
-                userId: Number(userId),
+                user_id: Number(userId),
                 preferences: {
                     travelStyle: preferences.travelStyle || [],
                     budgetRange: preferences.budgetRange || null,
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         }
 
         const preferenceRow = await prisma.userPreferences.findUnique({
-            where: { userId: Number(userId) },
+            where: { user_id: Number(userId) },
         });
 
         if (!preferenceRow) {

@@ -180,7 +180,7 @@ const Header = () => {
                     <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoM.png"
+                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoicon-navy.png"
                             alt="StyleMap"
                             className="w-8 h-8 rounded-lg object-contain"
                         />
@@ -334,113 +334,120 @@ const Header = () => {
 
             {/* 모바일 메뉴 */}
             {isMenuOpen && (
-                <div className="md:hidden bg-white border-t border-gray-200">
-                    <div className="px-4 py-2 space-y-1">
-                        <Link
-                            href="/"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            홈
-                        </Link>
-                        <Link
-                            href="/courses"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/courses"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            코스
-                        </Link>
-                        <Link
-                            href="/personalized-home"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/personalized-home"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            🎯 AI 추천 - 맞춤형
-                        </Link>
-                        <Link
-                            href="/nearby"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/nearby"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            오늘 뭐하지?
-                        </Link>
-                        <Link
-                            href="/map"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/map"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            지도
-                        </Link>
+                <div className="md:hidden">
+                    {/* 메뉴 외부 클릭시 닫힘: 헤더(높이 h-16) 아래 전체 투명 오버레이 */}
+                    <div className="fixed left-0 right-0 top-16 bottom-0 z-40" onClick={closeMenu} />
+                    <div
+                        className="bg-white border-t border-gray-200 relative z-50"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-4 py-2 space-y-1">
+                            <Link
+                                href="/"
+                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                    pathname === "/"
+                                        ? "text-blue-600 bg-blue-50"
+                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                }`}
+                                onClick={closeMenu}
+                            >
+                                홈
+                            </Link>
+                            <Link
+                                href="/courses"
+                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                    pathname === "/courses"
+                                        ? "text-blue-600 bg-blue-50"
+                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                }`}
+                                onClick={closeMenu}
+                            >
+                                코스
+                            </Link>
+                            <Link
+                                href="/personalized-home"
+                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                    pathname === "/personalized-home"
+                                        ? "text-blue-600 bg-blue-50"
+                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                }`}
+                                onClick={closeMenu}
+                            >
+                                🎯 AI 추천 - 맞춤형
+                            </Link>
+                            <Link
+                                href="/nearby"
+                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                    pathname === "/nearby"
+                                        ? "text-blue-600 bg-blue-50"
+                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                }`}
+                                onClick={closeMenu}
+                            >
+                                오늘 뭐하지?
+                            </Link>
+                            <Link
+                                href="/map"
+                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                    pathname === "/map"
+                                        ? "text-blue-600 bg-blue-50"
+                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                }`}
+                                onClick={closeMenu}
+                            >
+                                지도
+                            </Link>
 
-                        <Link
-                            href="/escape"
-                            className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                pathname === "/escape"
-                                    ? "text-blue-600 bg-blue-50"
-                                    : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            }`}
-                            onClick={closeMenu}
-                        >
-                            사건 파일
-                        </Link>
+                            <Link
+                                href="/escape"
+                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                                    pathname === "/escape"
+                                        ? "text-blue-600 bg-blue-50"
+                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                }`}
+                                onClick={closeMenu}
+                            >
+                                사건 파일
+                            </Link>
 
-                        {/* 팝업 메뉴 제거 */}
+                            {/* 팝업 메뉴 제거 */}
 
-                        <div className="pt-4 pb-3 border-t border-gray-200">
-                            {isLoggedIn ? (
-                                <>
-                                    <Link
-                                        href="/mypage"
-                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                        onClick={closeMenu}
-                                    >
-                                        마이페이지
-                                    </Link>
-                                    <button
-                                        onClick={openLogoutConfirm}
-                                        className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors active:scale-95 transform"
-                                    >
-                                        로그아웃
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <Link
-                                        href="/login"
-                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                        onClick={closeMenu}
-                                    >
-                                        로그인
-                                    </Link>
-                                    <Link
-                                        href="/signup"
-                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                        onClick={closeMenu}
-                                    >
-                                        회원가입
-                                    </Link>
-                                </>
-                            )}
+                            <div className="pt-4 pb-3 border-t border-gray-200">
+                                {isLoggedIn ? (
+                                    <>
+                                        <Link
+                                            href="/mypage"
+                                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                            onClick={closeMenu}
+                                        >
+                                            마이페이지
+                                        </Link>
+                                        <button
+                                            onClick={openLogoutConfirm}
+                                            className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors active:scale-95 transform"
+                                        >
+                                            로그아웃
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link
+                                            href="/login"
+                                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                            onClick={closeMenu}
+                                        >
+                                            로그인
+                                        </Link>
+                                        <Link
+                                            href="/signup"
+                                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+                                            onClick={closeMenu}
+                                        >
+                                            회원가입
+                                        </Link>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
