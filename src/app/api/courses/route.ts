@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
                 "Content-Type": "application/json",
                 ...(noCache
                     ? { "Cache-Control": "no-store", Pragma: "no-cache" }
-                    : { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" }),
+                    : { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" }),
                 "X-Records": String(formattedCourses.length),
             },
         });
