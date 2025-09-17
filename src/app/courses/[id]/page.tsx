@@ -251,6 +251,19 @@ export default function CourseDetailPage() {
         setToast({ message, type });
     }, []);
 
+    // 비로그인 사용자 조회수 증가 (중복 방지: 30분 쿨다운)
+    useEffect(() => {
+        const key = `course_view_${courseId}`;
+        try {
+            const last = localStorage.getItem(key);
+            const now = Date.now();
+            if (!last || now - parseInt(last) > 10 * 60 * 1000) {
+                fetch(`/api/courses/${courseId}/view`, { method: "POST" }).catch(() => {});
+                localStorage.setItem(key, String(now));
+            }
+        } catch {}
+    }, [courseId]);
+
     // 마커 이미지 생성 함수
     const createMarkerImageSrc = useCallback((orderIndex: number): string => {
         const svg = `
