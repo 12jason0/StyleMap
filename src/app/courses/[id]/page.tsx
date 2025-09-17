@@ -719,7 +719,7 @@ export default function CourseDetailPage() {
                                 </span>
                             </div>
 
-                            <h3 className="text-lg md:text-s font-bold text-white mb-4">{courseData.title}</h3>
+                            <h1 className="text-lg md:text-s font-bold text-white mb-4">{courseData.title}</h1>
                             <p
                                 className="text-base md:text-xl text-white/90 mb-6"
                                 style={{
