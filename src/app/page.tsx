@@ -45,7 +45,11 @@ export default function Home() {
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await fetch("/api/courses?limit=12&nocache=1&imagePolicy=all-or-one-missing");
+                // 캐싱 허용 + 서버 압축/캐시 활용
+                const response = await fetch("/api/courses?limit=12&imagePolicy=all-or-one-missing&lean=1", {
+                    cache: "force-cache",
+                    next: { revalidate: 300 },
+                });
                 const data = await response.json();
 
                 // API 응답이 배열인지 확인하고 에러 객체인지 확인
@@ -246,7 +250,7 @@ export default function Home() {
                                     }
                                 }
                             }}
-                            className="mt-6 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors hover:cursor-pointer"
+                            className="mt-6 btn-primary hover:cursor-pointer"
                         >
                             확인
                         </button>
@@ -280,10 +284,7 @@ export default function Home() {
                             <div className="text-2xl font-bold mb-1">AI 추천 티켓 1회</div>
                             <div className="text-sm opacity-90">개인 맞춤 코스 추천을 받아보세요!</div>
                         </div>
-                        <button
-                            onClick={() => setShowAdModal(false)}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors hover:cursor-pointer"
-                        >
+                        <button onClick={() => setShowAdModal(false)} className="btn-primary hover:cursor-pointer">
                             확인
                         </button>
                     </div>
@@ -328,7 +329,7 @@ export default function Home() {
                                     setShowAiAdModal(false);
                                     router.push("/personalized-home");
                                 }}
-                                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors hover:cursor-pointer"
+                                className="btn-primary hover:cursor-pointer"
                             >
                                 AI 코스 시작하기
                             </button>
@@ -374,7 +375,7 @@ export default function Home() {
                         <div className="flex gap-3 justify-center">
                             <button
                                 onClick={() => setShowLoginRequiredModal(false)}
-                                className="hover:cursor-pointer px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                                className="hover:cursor-pointer btn-secondary"
                             >
                                 취소
                             </button>
@@ -383,7 +384,7 @@ export default function Home() {
                                     setShowLoginRequiredModal(false);
                                     router.push("/login?redirect=/onboarding");
                                 }}
-                                className="hover:cursor-pointer px-4 py-2 bg-sky-600 text-white rounded-lg font-medium hover:bg-sky-700"
+                                className="hover:cursor-pointer btn-primary"
                             >
                                 로그인하기
                             </button>
@@ -574,11 +575,23 @@ export default function Home() {
                                         )}
                                         <div className="absolute inset-0 bg-black/40" />
                                         <div className="absolute top-4 left-4">
-                                            <span
-                                                className={`bg-sky-600 px-4 py-2 font-bold rounded-full text-white shadow-lg`}
-                                            >
-                                                {index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위"}
-                                            </span>
+                                            {(() => {
+                                                const rankClass =
+                                                    index === 0
+                                                        ? "bg-amber-400 text-white"
+                                                        : index === 1
+                                                        ? "bg-gray-400 text-white"
+                                                        : "bg-orange-500 text-white";
+                                                const label =
+                                                    index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위";
+                                                return (
+                                                    <span
+                                                        className={`${rankClass} px-4 py-2 font-bold rounded-full shadow-lg`}
+                                                    >
+                                                        {label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="absolute top-4 right-4 text-black">
                                             <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">

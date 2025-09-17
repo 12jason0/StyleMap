@@ -126,7 +126,7 @@ export default function escapePage() {
         }
         (async () => {
             try {
-                const sRes = await fetch("/api/escape/stories", { cache: "force-cache" });
+                const sRes = await fetch("/api/escape/stories?nocache=1", { cache: "no-store" });
                 const sRaw = await sRes.json();
                 const sData: any[] = Array.isArray(sRaw)
                     ? sRaw
@@ -349,7 +349,6 @@ export default function escapePage() {
             <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold">Escape 미션</h1>
-                    <p className="text-gray-700 mt-1">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
                     <button
                         onClick={() => {
                             const initial = readProgress();
@@ -364,6 +363,9 @@ export default function escapePage() {
                     >
                         완료 데이터 삭제
                     </button>
+                    <p className="text-gray-700 mt-1 pb-10 border-b">
+                        도심을 누비며 챕터를 완료하고 배지를 획득하세요!
+                    </p>
                 </div>
 
                 {/* 스토리 목록 - 가로형 포스터 카드 */}
@@ -376,7 +378,7 @@ export default function escapePage() {
                         return (
                             <div
                                 key={s.id}
-                                className="group flex flex-row items-center gap-4 md:gap-10 bg-transparent rounded-none overflow-visible shadow-none pt-10"
+                                className="group flex flex-row items-center gap-4 md:gap-10 bg-transparent rounded-none overflow-visible shadow-none pb-10 border-b"
                             >
                                 {/* 좌측 포스터 */}
                                 <div
@@ -465,17 +467,22 @@ export default function escapePage() {
                                                 onClick={() => handleStartStory(s.id)}
                                                 role="button"
                                                 tabIndex={0}
-                                                className="relative group/ticket w-full md:w-[320px] hover:cursor-pointer"
+                                                className="relative group/ticket w-full md:w-[320px] hover:cursor-pointer overflow-hidden border-y-2 border-sky-500"
                                             >
                                                 <div className="relative overflow-hidden">
                                                     <div className="absolute inset-0 bg-white" />
-                                                    <div className="absolute inset-x-0 bottom-0 h-0 bg-sky-400 transition-[height] duration-700 ease-out group-hover/ticket:h-full" />
-                                                    <div className="relative text-center text-sky-600 group-hover/ticket:text-white transition-colors font-extrabold py-4 text-base md:text-lg">
+                                                    <div className="absolute inset-x-0 bottom-0 h-0 bg-sky-400 transition-[height] duration-700 ease-out group-hover/ticket:h-full border-x-2 border-sky-500" />
+                                                    <div className=" relative text-center text-sky-600 group-hover/ticket:text-white transition-colors font-extrabold py-4 text-base md:text-lg">
                                                         시작하기
                                                     </div>
                                                 </div>
-                                                <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full" />
-                                                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 bg-white rounded-full" />
+                                                <span className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full border-2 border-sky-500" />
+                                                <span className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 bg-white rounded-full border-2 border-sky-500" />
+                                                {/* 세로 라인 보강: 중앙 비우고 상/하단만 표시 (반대 형태) */}
+                                                <span className="pointer-events-none absolute left-0 top-0 h-2.5 border-l-2 border-sky-500 z-10" />
+                                                <span className="pointer-events-none absolute left-0 bottom-0 h-2.5 border-l-2 border-sky-500 z-10" />
+                                                <span className="pointer-events-none absolute right-0 top-0 h-2.5 border-r-2 border-sky-500 z-10" />
+                                                <span className="pointer-events-none absolute right-0 bottom-0 h-2.5 border-r-2 border-sky-500 z-10" />
                                             </div>
                                         ) : pr?.status === "completed" ? (
                                             <button

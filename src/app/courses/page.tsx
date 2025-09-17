@@ -146,10 +146,7 @@ function CoursesPageInner() {
                     <div className="text-6xl mb-4">😔</div>
                     <h3 className="text-xl font-bold text-gray-900 mb-2">오류가 발생했습니다</h3>
                     <p className="text-gray-600 mb-6">{error}</p>
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
-                    >
+                    <button onClick={() => window.location.reload()} className="btn-primary rounded-full">
                         다시 시도하기
                     </button>
                 </div>
@@ -171,10 +168,7 @@ function CoursesPageInner() {
                                 {concept ? `${concept} 관련 코스를 찾아보세요` : "다양한 코스를 둘러보세요"}
                             </p>
                         </div>
-                        <Link
-                            href="/"
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium transition-colors"
-                        >
+                        <Link href="/" className="btn-primary rounded-full">
                             ← 홈으로
                         </Link>
                     </div>
@@ -269,7 +263,7 @@ function CoursesPageInner() {
                                             e.stopPropagation();
                                             handleBooking(course.id);
                                         }}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors active:scale-95"
+                                        className="btn-primary rounded-full text-sm active:scale-95"
                                     >
                                         코스 시작하기
                                     </button>
@@ -289,7 +283,7 @@ function CoursesPageInner() {
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <Link
                                 href={`/coming-soon?concept=${encodeURIComponent(concept)}`}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                                className="btn-primary rounded-full"
                             >
                                 자세히 보기
                             </Link>
@@ -308,10 +302,7 @@ function CoursesPageInner() {
                         <div className="text-6xl mb-4">🚧</div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">코스를 찾을 수 없습니다</h3>
                         <p className="text-gray-600 mb-6">다른 컨셉의 코스를 찾아보시거나 나중에 다시 확인해보세요.</p>
-                        <Link
-                            href="/"
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
-                        >
+                        <Link href="/" className="btn-primary rounded-full">
                             홈으로 돌아가기
                         </Link>
                     </div>

@@ -24,6 +24,13 @@ body {
     font-family: Arial, Helvetica, sans-serif;
 }
 
+/* 전역 버튼 기본값 통일 */
+@layer base {
+    button {
+        @apply rounded-lg font-medium px-4 py-2 transition-colors;
+    }
+}
+
 /* 타이포그래피 스무딩 (한국어 가독성 개선) */
 .typography-smooth {
     -webkit-font-smoothing: antialiased;
@@ -73,3 +80,28 @@ body {
 .animate-fade-in-up {
     animation: fade-in-up 0.5s ease-out forwards;
 }
+
+/* 공통 컴포넌트 스타일 (팔레트/컴포넌트 통일) */
+@layer components {
+    .btn-primary {
+        @apply inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm active:shadow;
+    }
+
+    .btn-secondary {
+        @apply inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm active:shadow;
+    }
+
+    .input {
+        @apply w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow;
+    }
+
+    .textarea {
+        @apply w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow min-h-28;
+    }
+
+    .card {
+        @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+    }
+}
+
+/* removed palette override */

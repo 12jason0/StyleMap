@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { filterCoursesByImagePolicy, type ImagePolicy } from "@/lib/imagePolicy";
 import { getUserIdFromRequest } from "@/lib/auth";
 export const dynamic = "force-dynamic";
+export const revalidate = 300; // ISR for GET (5분)
 
 export async function GET(request: NextRequest) {
     try {
@@ -52,7 +53,11 @@ export async function GET(request: NextRequest) {
             };
         }
 
-        const results = await prisma.courses.findMany(prismaQuery);
+        // DB 조회 + 부가 데이터는 병렬 준비
+        const [results] = await Promise.all([
+            prisma.courses.findMany(prismaQuery),
+            // 향후 필요시 추가 병렬 작업을 여기에 배치
+        ]);
 
         // 이미지 정책 적용: 코스 내 장소 이미지가 하나도 없거나 전부 있는 코스만 허용
         const imagePolicyApplied = filterCoursesByImagePolicy(results as any[], imagePolicy);
