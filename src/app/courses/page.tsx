@@ -51,7 +51,7 @@ function CoursesPageInner() {
                 const now = Date.now();
 
                 // 3분 이내 캐시된 데이터가 있으면 사용
-                if (cachedData && cacheTime && now - parseInt(cacheTime) < 3 * 60 * 1000) {
+                if (cachedData && cacheTime && now - parseInt(cacheTime) < 1 * 60 * 1000) {
                     const data = JSON.parse(cachedData);
                     setCourses(data);
                     setError(null);
@@ -267,6 +267,16 @@ function CoursesPageInner() {
                                     >
                                         코스 시작하기
                                     </button>
+                                    <a
+                                        href={`https://www.google.com/search?q=${encodeURIComponent(course.title)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="btn-secondary rounded-full text-sm active:scale-95 ml-2"
+                                        title="공식 웹사이트 또는 정보 검색"
+                                    >
+                                        웹사이트
+                                    </a>
                                 </div>
                             </div>
                         </div>
