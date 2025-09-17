@@ -11,28 +11,6 @@ type Badge = {
     description: string;
     image_url?: string;
 };
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-    try {
-        // API를 통해 해당 스토리(방탈출 미션)의 정보를 가져옵니다.
-        const story = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/escape/stories?storyId=${params.id}`).then(
-            (res) => res.json()
-        );
-
-        if (!story) {
-            return { title: "방탈출 미션" };
-        }
-
-        return {
-            title: `${story.title} | 도심 속 이색 방탈출 미션`,
-            description: `스타일맵과 함께하는 새로운 탈출 게임! ${story.synopsis || story.title}`,
-        };
-    } catch (error) {
-        return {
-            title: "방탈출 미션 | 스타일맵",
-            description: "도심 속에서 즐기는 새로운 탈출 게임을 경험해보세요.",
-        };
-    }
-}
 
 type Story = {
     id: number;
