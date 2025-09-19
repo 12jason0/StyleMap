@@ -10,12 +10,13 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     const isAuthPage = pathname === "/login" || pathname === "/signup";
     // const isCourseDetailPage = pathname.startsWith("/courses/");
     const isPersonalizedHomePage = pathname === "/personalized-home";
+    const isEscapeIntroPage = pathname.startsWith("/escape/intro");
 
     return (
         <>
-            <Header />
+            {!isEscapeIntroPage && <Header />}
             <main className="flex-1">{children}</main>
-            {!isMapPage && !isAuthPage && !isPersonalizedHomePage && <Footer />}
+            {!isEscapeIntroPage && !isMapPage && !isAuthPage && !isPersonalizedHomePage && <Footer />}
         </>
     );
 }
