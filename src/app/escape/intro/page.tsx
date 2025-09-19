@@ -70,6 +70,10 @@ function EscapeIntroPageInner() {
     } | null>(null);
     const [showBadge, setShowBadge] = useState<boolean>(false);
     const [fadeToBlack, setFadeToBlack] = useState<boolean>(false);
+    const [endingFlowStarted, setEndingFlowStarted] = useState<boolean>(false);
+    const [showFinalMessageInBook, setShowFinalMessageInBook] = useState<boolean>(false);
+    const [showGalleryInPage, setShowGalleryInPage] = useState<boolean>(false);
+    const [showBadgeInPage, setShowBadgeInPage] = useState<boolean>(false);
 
     // --- 수정된 부분: 사진 미션 관련 상태 추가 ---
     const [photoFiles, setPhotoFiles] = useState<File[]>([]); // 업로드할 실제 파일(2장 요구)
@@ -169,6 +173,12 @@ function EscapeIntroPageInner() {
     const numFlipPages = 11;
 
     const handleCloseBook = () => {
+        // 종료 전 모든 엔딩/배지/갤러리 상태 정리
+        setShowBadge(false);
+        setShowEnding(false);
+        setShowGalleryInPage(false);
+        setShowFinalMessageInBook(false);
+        setFadeToBlack(false);
         setIsClosing(true);
         setTimeout(() => {
             router.push("/");
@@ -304,7 +314,8 @@ function EscapeIntroPageInner() {
                 setNextStoryText(chapters[nextIdx]?.story_text || "이야기 내용이 없습니다.");
                 setShowStoryModal(true);
             } else {
-                // 마지막 질문 이후: 한 장 더 넘기는 효과 후 엔딩 페이지 표시
+                if (endingFlowStarted) return;
+                setEndingFlowStarted(true);
                 setIsEndFlip(true);
                 setTimeout(async () => {
                     setIsEndFlip(false);
@@ -313,21 +324,16 @@ function EscapeIntroPageInner() {
                             credentials: "include",
                         });
                         const data = await res.json();
-                        if (res.ok && Array.isArray(data?.urls)) {
-                            setGalleryUrls(data.urls);
-                        }
+                        if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
                     } catch {}
-                    setShowEnding(true);
-                    // 엔딩 모달 이후 화면 페이드아웃 + 배지 표시
-                    setTimeout(async () => {
-                        setFadeToBlack(true);
-                        try {
-                            const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
-                            const bd = await br.json();
-                            if (br.ok && bd?.badge) setBadge(bd.badge);
-                        } catch {}
-                        setTimeout(() => setShowBadge(true), 1000);
-                    }, 1200);
+                    // 페이지 내 갤러리/마무리/배지 단계로 전환 (모달 사용 안 함)
+                    setShowGalleryInPage(true);
+                    // 배지도 페이지에서 노출
+                    try {
+                        const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
+                        const bd = await br.json();
+                        if (br.ok && bd?.badge) setBadge(bd.badge);
+                    } catch {}
                 }, 800);
             }
         } catch (error: any) {
@@ -607,7 +613,7 @@ body {
                                         {currentChapter.chapter_number === 1 && (
                                             <button
                                                 onClick={() => router.push("/escape")}
-                                                className="px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
+                                                className="hover:cursor-pointer px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
                                             >
                                                 escape로 이동
                                             </button>
@@ -641,7 +647,7 @@ body {
                                 {currentChapterIdx > 0 && (
                                     <button
                                         onClick={goToPrevChapter}
-                                        className="mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
+                                        className="hover:cursor-pointer mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
                                     >
                                         ← 이전 챕터
                                     </button>
@@ -662,145 +668,181 @@ body {
                     >
                         {animationFinished && currentChapter && chapters.length > 0 && (
                             <div className="w-full h-full p-6 flex flex-col">
-                                <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
-                                    🎯 미션
-                                </h2>
-                                <div className="mb-4">
-                                    <h3 className="text-lg font-bold mb-2 text-gray-800">📖 이야기</h3>
-                                    <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                                        {currentChapter.story_text || "이야기 내용이 없습니다."}
-                                    </div>
-                                </div>
-                                <div className="flex-1 flex flex-col">
-                                    <h3 className="text-lg font-bold mb-2 text-gray-800">❓ 질문</h3>
-                                    <div className="flex-1 bg-blue-50 rounded p-4 border-2 border-blue-200">
-                                        <div className="text-lg font-semibold text-blue-900 mb-3">
-                                            {currentChapter.mission_payload?.question || "질문이 없습니다."}
+                                {!showFinalMessageInBook ? (
+                                    <>
+                                        <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
+                                            🎯 미션
+                                        </h2>
+                                        <div className="mb-4">
+                                            <h3 className="text-lg font-bold mb-2 text-gray-800">📖 이야기</h3>
+                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border">
+                                                {currentChapter.story_text || "이야기 내용이 없습니다."}
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 flex flex-col">
+                                            <h3 className="text-lg font-bold mb-2 text-gray-800">❓ 질문</h3>
+                                            <div className="flex-1 bg-blue-50 rounded p-4 border-2 border-blue-200">
+                                                <div className="text-lg font-semibold text-blue-900 mb-3">
+                                                    {currentChapter.mission_payload?.question || "질문이 없습니다."}
+                                                </div>
+
+                                                {/* --- 수정된 부분: 미션 타입별 UI 렌더링 --- */}
+                                                {String(currentChapter.mission_type || "").toUpperCase() ===
+                                                "PUZZLE_ANSWER" ? (
+                                                    <div className="space-y-3">
+                                                        <input
+                                                            type="text"
+                                                            value={puzzleAnswer}
+                                                            onChange={(e) => setPuzzleAnswer(e.target.value)}
+                                                            placeholder="정답을 입력하세요"
+                                                            className="w-full px-3 py-2 rounded border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-700"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                            onTouchStart={(e) => e.stopPropagation()}
+                                                        />
+                                                        {currentChapter.mission_payload?.answer && (
+                                                            <div className="text-xs text-blue-900/70 select-none pointer-events-none">
+                                                                힌트: 정답은{" "}
+                                                                {String(currentChapter.mission_payload.answer).length}자
+                                                                입니다.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : String(currentChapter.mission_type || "").toUpperCase() ===
+                                                  "PHOTO" ? (
+                                                    <div className="space-y-3">
+                                                        {!photoUploaded ? (
+                                                            <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-blue-300 bg-white cursor-pointer hover:bg-blue-50">
+                                                                <input
+                                                                    type="file"
+                                                                    accept="image/*"
+                                                                    multiple
+                                                                    className="hidden"
+                                                                    onChange={(e) => {
+                                                                        const files = Array.from(e.target.files || []);
+                                                                        if (files.length > 0) {
+                                                                            setPhotoFiles(files.slice(0, 5));
+                                                                            const first = files[0];
+                                                                            const url = URL.createObjectURL(first);
+                                                                            setPhotoPreviewUrl(url);
+                                                                            const enough = files.length >= 2;
+                                                                            setPhotoUploaded(enough);
+                                                                            setValidationError(
+                                                                                enough
+                                                                                    ? ""
+                                                                                    : "사진 2장을 업로드해 주세요."
+                                                                            );
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <span className="text-blue-800 text-sm">
+                                                                    사진 업로드 (2장)
+                                                                </span>
+                                                            </label>
+                                                        ) : (
+                                                            <div className="flex items-center gap-3">
+                                                                {photoPreviewUrl && (
+                                                                    <img
+                                                                        src={photoPreviewUrl}
+                                                                        alt="preview"
+                                                                        className="w-20 h-20 object-cover rounded border"
+                                                                    />
+                                                                )}
+                                                                <button
+                                                                    className="px-3 py-1.5 rounded-md border bg-white hover:bg-gray-50 text-sm"
+                                                                    onClick={() => {
+                                                                        setPhotoPreviewUrl(null);
+                                                                        setPhotoUploaded(false);
+                                                                        setPhotoFiles([]);
+                                                                    }}
+                                                                >
+                                                                    다시 선택
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                        {photoFiles.length < 2 && (
+                                                            <div className="text-xs text-red-600 select-none pointer-events-none">
+                                                                사진 2장을 업로드해 주세요.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : currentChapter.mission_payload?.options ? (
+                                                    <div className="space-y-2">
+                                                        {currentChapter.mission_payload.options.map(
+                                                            (option: string, index: number) => (
+                                                                <div
+                                                                    key={index}
+                                                                    role="button"
+                                                                    tabIndex={0}
+                                                                    onClick={() => setSelectedOptionIndex(index)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "Enter" || e.key === " ")
+                                                                            setSelectedOptionIndex(index);
+                                                                    }}
+                                                                    className={`bg-white p-2 rounded border transition-colors cursor-pointer ${
+                                                                        selectedOptionIndex === index
+                                                                            ? "border-blue-600 bg-blue-50"
+                                                                            : "border-blue-300 hover:bg-blue-100"
+                                                                    }`}
+                                                                >
+                                                                    <span className="font-medium text-blue-800">
+                                                                        {index + 1}. {option}
+                                                                    </span>
+                                                                </div>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                ) : null}
+                                                {/* --- */}
+                                            </div>
                                         </div>
 
-                                        {/* --- 수정된 부분: 미션 타입별 UI 렌더링 --- */}
-                                        {String(currentChapter.mission_type || "").toUpperCase() === "PUZZLE_ANSWER" ? (
-                                            <div className="space-y-3">
-                                                <input
-                                                    type="text"
-                                                    value={puzzleAnswer}
-                                                    onChange={(e) => setPuzzleAnswer(e.target.value)}
-                                                    placeholder="정답을 입력하세요"
-                                                    className="w-full px-3 py-2 rounded border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-700"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    onTouchStart={(e) => e.stopPropagation()}
-                                                />
-                                                {currentChapter.mission_payload?.answer && (
-                                                    <div className="text-xs text-blue-900/70 select-none pointer-events-none">
-                                                        힌트: 정답은{" "}
-                                                        {String(currentChapter.mission_payload.answer).length}자 입니다.
-                                                    </div>
-                                                )}
+                                        <div className="mt-4 flex justify-between items-center">
+                                            <span className="text-sm text-red-600 h-5">{validationError}</span>
+                                            {currentChapterIdx < chapters.length - 1 ? (
+                                                <button
+                                                    onClick={goToNextChapter}
+                                                    className="hover:cursor-pointer px-4 py-2 text-base rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors shadow font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    disabled={!canProceed || isSubmitting}
+                                                >
+                                                    {isSubmitting ? "처리 중..." : "다음 챕터 →"}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!canProceed || isSubmitting) return;
+                                                        await goToNextChapter();
+                                                    }}
+                                                    className="hover:cursor-pointer px-4 py-2 text-base rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow font-medium"
+                                                    disabled={!canProceed || isSubmitting}
+                                                >
+                                                    마무리
+                                                </button>
+                                            )}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex-1 flex flex-col">
+                                        <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
+                                            📖 마무리
+                                        </h2>
+                                        <div className="flex-1 bg-white rounded p-4 border">
+                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                {chapters[chapters.length - 1]?.story_text ||
+                                                    story?.synopsis ||
+                                                    "여정을 함께해 주셔서 감사합니다."}
                                             </div>
-                                        ) : String(currentChapter.mission_type || "").toUpperCase() === "PHOTO" ? (
-                                            <div className="space-y-3">
-                                                {!photoUploaded ? (
-                                                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-blue-300 bg-white cursor-pointer hover:bg-blue-50">
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            multiple
-                                                            className="hidden"
-                                                            onChange={(e) => {
-                                                                const files = Array.from(e.target.files || []);
-                                                                if (files.length > 0) {
-                                                                    setPhotoFiles(files.slice(0, 5));
-                                                                    const first = files[0];
-                                                                    const url = URL.createObjectURL(first);
-                                                                    setPhotoPreviewUrl(url);
-                                                                    const enough = files.length >= 2;
-                                                                    setPhotoUploaded(enough);
-                                                                    setValidationError(
-                                                                        enough ? "" : "사진 2장을 업로드해 주세요."
-                                                                    );
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span className="text-blue-800 text-sm">사진 업로드 (2장)</span>
-                                                    </label>
-                                                ) : (
-                                                    <div className="flex items-center gap-3">
-                                                        {photoPreviewUrl && (
-                                                            <img
-                                                                src={photoPreviewUrl}
-                                                                alt="preview"
-                                                                className="w-20 h-20 object-cover rounded border"
-                                                            />
-                                                        )}
-                                                        <button
-                                                            className="px-3 py-1.5 rounded-md border bg-white hover:bg-gray-50 text-sm"
-                                                            onClick={() => {
-                                                                setPhotoPreviewUrl(null);
-                                                                setPhotoUploaded(false);
-                                                                setPhotoFiles([]);
-                                                            }}
-                                                        >
-                                                            다시 선택
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {photoFiles.length < 2 && (
-                                                    <div className="text-xs text-red-600 select-none pointer-events-none">
-                                                        사진 2장을 업로드해 주세요.
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : currentChapter.mission_payload?.options ? (
-                                            <div className="space-y-2">
-                                                {currentChapter.mission_payload.options.map(
-                                                    (option: string, index: number) => (
-                                                        <div
-                                                            key={index}
-                                                            role="button"
-                                                            tabIndex={0}
-                                                            onClick={() => setSelectedOptionIndex(index)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter" || e.key === " ")
-                                                                    setSelectedOptionIndex(index);
-                                                            }}
-                                                            className={`bg-white p-2 rounded border transition-colors cursor-pointer ${
-                                                                selectedOptionIndex === index
-                                                                    ? "border-blue-600 bg-blue-50"
-                                                                    : "border-blue-300 hover:bg-blue-100"
-                                                            }`}
-                                                        >
-                                                            <span className="font-medium text-blue-800">
-                                                                {index + 1}. {option}
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
-                                        ) : null}
-                                        {/* --- */}
+                                        </div>
+                                        <div className="mt-4 flex justify-end">
+                                            <button
+                                                className="px-4 py-2 text-base rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow font-medium"
+                                                onClick={handleCloseBook}
+                                            >
+                                                책 덮고 종료
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div className="mt-4 flex justify-between items-center">
-                                    <span className="text-sm text-red-600 h-5">{validationError}</span>
-                                    {currentChapterIdx < chapters.length - 1 ? (
-                                        <button
-                                            onClick={goToNextChapter}
-                                            className="px-4 py-2 text-base rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors shadow font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                            disabled={!canProceed || isSubmitting}
-                                        >
-                                            {isSubmitting ? "처리 중..." : "다음 챕터 →"}
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={handleCloseBook}
-                                            className="px-4 py-2 text-base rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow font-medium"
-                                        >
-                                            책 덮고 종료
-                                        </button>
-                                    )}
-                                </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -827,58 +869,38 @@ body {
                     </div>
                 )}
 
-                {/* 엔딩 페이지: 사진 액자 + 끝 인사 + 책 덮기 */}
-                {showEnding && (
-                    <div className="parchment-modal">
-                        <div className="parchment animate-fade-in-up">
-                            {galleryUrls.length > 0 && (
-                                <>
-                                    <div className="parchment-title">
-                                        <span>🖼️</span>
-                                        <span>추억 액자</span>
-                                    </div>
-                                    <div className="parchment-body">
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                            {galleryUrls.map((u, i) => (
-                                                <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
-                                                    <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
-                                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                        <img
-                                                            src={u}
-                                                            alt={`photo-${i}`}
-                                                            className="w-full h-full object-cover rounded"
-                                                        />
-                                                    </div>
+                {/* 엔딩 섹션: 페이지 내부에 사진 액자/마무리/배지 */}
+                {animationFinished && chapters.length > 0 && showGalleryInPage && (
+                    <div className="absolute inset-0 z-[1200] pointer-events-none">
+                        <div className="absolute right-0 top-0 bottom-0 w-1/2 p-6 pointer-events-auto">
+                            <div className="bg-white/90 rounded-xl border shadow p-4 h-full overflow-auto">
+                                <div className="text-lg font-bold mb-3">🖼️ 추억 액자</div>
+                                {galleryUrls.length > 0 ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                        {galleryUrls.map((u, i) => (
+                                            <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
+                                                <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
+                                                    <img
+                                                        src={u}
+                                                        alt={`photo-${i}`}
+                                                        className="w-full h-full object-cover rounded"
+                                                    />
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </>
-                            )}
-                            <div className="parchment-body mt-3 text-center">
-                                <div className="text-lg font-semibold text-[#3f2d20] whitespace-pre-wrap">
-                                    {endingMessage}
-                                </div>
-                            </div>
-                            <div className="parchment-actions">
-                                <div className="flex items-center gap-2">
+                                ) : (
+                                    <div className="text-sm text-gray-600">업로드된 사진이 없습니다.</div>
+                                )}
+                                <div className="mt-4 flex justify-end gap-2">
                                     <button
-                                        className="btn-ghost"
-                                        onClick={async () => {
-                                            try {
-                                                await fetch("/api/escape/clear-progress", {
-                                                    method: "POST",
-                                                    headers: { "Content-Type": "application/json" },
-                                                    credentials: "include",
-                                                    body: JSON.stringify({ storyId }),
-                                                });
-                                            } catch {}
+                                        className="btn-vintage"
+                                        onClick={() => {
+                                            setShowGalleryInPage(false);
+                                            setShowFinalMessageInBook(true);
                                         }}
                                     >
-                                        완료 데이터 삭제
-                                    </button>
-                                    <button className="btn-vintage" onClick={handleCloseBook}>
-                                        책 덮고 종료
+                                        마무리 보기
                                     </button>
                                 </div>
                             </div>
@@ -886,37 +908,35 @@ body {
                     </div>
                 )}
 
-                {/* 화면 페이드아웃 */}
-                {fadeToBlack && <div className="fixed inset-0 bg-black/90 z-[1500] transition-opacity" />}
-
-                {/* 배지 증정 모달 */}
-                {showBadge && (
-                    <div className="parchment-modal z-[1600]">
-                        <div className="parchment animate-fade-in-up text-center">
-                            <div className="parchment-title items-center justify-center">
-                                <span>🏅</span>
-                                <span>배지 획득</span>
-                            </div>
-                            <div className="parchment-body flex flex-col items-center gap-4">
+                {/* 배지: 페이지 내부 오른쪽 하단 카드 */}
+                {animationFinished && chapters.length > 0 && !showGalleryInPage && showFinalMessageInBook && (
+                    <div className="absolute inset-0 z-[1200] pointer-events-none">
+                        <div className="absolute right-6 bottom-6 w-[320px] pointer-events-auto">
+                            <div className="bg-white/95 rounded-xl border shadow p-4">
+                                <div className="text-base font-bold mb-2 flex items-center gap-2">
+                                    <span>🏅</span>
+                                    <span>배지 획득</span>
+                                </div>
                                 {badge?.image_url && (
-                                    // eslint-disable-next-line @next/next/no-img-element
                                     <img
                                         src={badge.image_url}
                                         alt={badge?.name || "badge"}
-                                        className="w-36 h-36 object-contain"
+                                        className="w-28 h-28 object-contain mx-auto"
                                     />
                                 )}
-                                <div className="text-xl font-bold text-[#3f2d20]">{badge?.name || "새로운 배지"}</div>
+                                <div className="text-center text-sm font-semibold mt-2">
+                                    {badge?.name || "새로운 배지"}
+                                </div>
                                 {badge?.description && (
-                                    <div className="text-sm text-[#3f2d20] opacity-80 whitespace-pre-wrap">
+                                    <div className="text-center text-xs text-gray-700 mt-1 whitespace-pre-wrap">
                                         {badge.description}
                                     </div>
                                 )}
-                            </div>
-                            <div className="parchment-actions">
-                                <button className="btn-vintage" onClick={handleCloseBook}>
-                                    책 덮고 종료
-                                </button>
+                                <div className="mt-3 flex justify-end">
+                                    <button className="btn-vintage" onClick={handleCloseBook}>
+                                        책 덮고 종료
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

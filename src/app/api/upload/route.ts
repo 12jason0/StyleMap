@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const runtime = "nodejs";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getS3Bucket, getS3Client, getS3PublicUrl } from "@/lib/s3";
 
