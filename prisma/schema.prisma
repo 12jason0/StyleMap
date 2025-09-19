@@ -27,6 +27,7 @@ model User {
   bookings            Booking[]
   // --- ⬇️ 추가된 부분 ⬇️ ---
   missionSubmissions  MissionSubmission[]
+  userBadges          UserBadge[]
 
   @@index([provider, socialId])
   @@map("users")
@@ -238,6 +239,7 @@ model Badge {
   description String?
   image_url   String? @db.VarChar(500)
   stories     Story[] @relation("StoryRewardBadge")
+  userBadges  UserBadge[]
 
   @@map("badges")
 }
@@ -312,4 +314,18 @@ model MissionSubmission {
   chapter StoryChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
   @@map("mission_submissions")
+}
+
+// --- 사용자 배지 수여 기록 ---
+model UserBadge {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  badge_id   Int
+  awarded_at DateTime @default(now())
+
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badge_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, badge_id])
+  @@map("user_badges")
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import jwt from "jsonwebtoken";
+import { getJwtSecret } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // 찜 목록 조회
@@ -12,8 +13,7 @@ export async function GET(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET missing");
-        const decoded = jwt.verify(token, process.env.JWT_SECRET) as { userId: string };
+        const decoded = jwt.verify(token, getJwtSecret()) as { userId: string };
         const userId = decoded.userId;
 
         const favorites = await (prisma as any).userFavorite.findMany({
@@ -32,7 +32,19 @@ export async function GET(request: NextRequest) {
                 },
             },
         });
-        return NextResponse.json(favorites);
+        // 프론트에서 기대하는 평탄화된 형태로 변환
+        const mapped = favorites.map((f: any) => ({
+            id: f.id,
+            course_id: f.course_id,
+            created_at: f.created_at,
+            title: f.course?.title ?? null,
+            description: f.course?.description ?? null,
+            imageUrl: f.course?.imageUrl ?? null,
+            price: f.course?.price ?? null,
+            rating: f.course?.rating ?? null,
+            concept: f.course?.concept ?? null,
+        }));
+        return NextResponse.json(mapped);
     } catch (error) {
         console.error("Error fetching favorites:", error);
         return NextResponse.json({ error: "Failed to fetch favorites" }, { status: 500 });
@@ -48,8 +60,7 @@ export async function POST(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET missing");
-        const decoded = jwt.verify(token, process.env.JWT_SECRET) as { userId: string };
+        const decoded = jwt.verify(token, getJwtSecret()) as { userId: string };
         const userId = decoded.userId;
 
         const body = await request.json();
@@ -80,8 +91,7 @@ export async function DELETE(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET missing");
-        const decoded = jwt.verify(token, process.env.JWT_SECRET) as { userId: string };
+        const decoded = jwt.verify(token, getJwtSecret()) as { userId: string };
         const userId = decoded.userId;
 
         const { searchParams } = new URL(request.url);

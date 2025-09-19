@@ -333,6 +333,19 @@ function EscapeIntroPageInner() {
                         const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
                         const bd = await br.json();
                         if (br.ok && bd?.badge) setBadge(bd.badge);
+                        // 배지 존재 시 사용자에게 수여 기록
+                        if (br.ok && bd?.badge?.id) {
+                            const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+                            await fetch("/api/users/badges", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                },
+                                credentials: "include",
+                                body: JSON.stringify({ badgeId: bd.badge.id }),
+                            });
+                        }
                     } catch {}
                 }, 800);
             }
@@ -549,6 +562,24 @@ body {
     to { 
         perspective: 2000px; 
         transform: scale(0.5) rotateX(60deg) rotateZ(30deg); 
+    } 
+}
+/* --- Closing sequence: flip pages back while book moves away --- */
+.book.closing .page { 
+    animation: turn-page-close 800ms ease-in forwards; 
+    --increment: calc(var(--duration) / (var(--pages) * 2));
+    /* reverse order so the last pages close first */
+    animation-delay: calc((var(--pages) - var(--id, 0)) * var(--increment) / 2);
+}
+.book.closing .page.static { 
+    animation: turn-page-close 800ms ease-in forwards; 
+}
+@keyframes turn-page-close { 
+    from { 
+        transform: translateZ(calc((var(--pages) - var(--id, 0)) * -1px)) rotateY(-180deg); 
+    } 
+    to { 
+        transform: translateZ(calc(var(--id, 0) * -1px)) rotateY(0); 
     } 
 }
 .animate-fade-in-up {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 
+// --- 데이터 타입 정의 ---
 interface UserInfo {
     name: string;
     email: string;
@@ -45,12 +46,28 @@ interface Favorite {
     created_at: string;
 }
 
+// 뱃지 데이터 타입을 추가합니다.
+interface UserBadgeItem {
+    id: number;
+    name: string;
+    image_url?: string | null;
+    description?: string | null;
+    awarded_at: string;
+}
+
+declare global {
+    interface Window {
+        Kakao?: any;
+    }
+}
+
 const MyPage = () => {
     const router = useRouter();
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
+    const [badges, setBadges] = useState<UserBadgeItem[]>([]); // 뱃지 상태 추가
     const [activeTab, setActiveTab] = useState("profile");
     const [loading, setLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -69,12 +86,14 @@ const MyPage = () => {
         fetchUserPreferences();
         fetchBookings();
         fetchFavorites();
+        fetchBadges(); // 뱃지 데이터 가져오기 호출
+
         // URL 쿼리에서 tab 파라미터를 읽어 기본 탭 설정
         try {
             const url = new URL(window.location.href);
             const tab = url.searchParams.get("tab");
-            if (tab === "favorites" || tab === "profile" || tab === "preferences" || tab === "bookings") {
-                setActiveTab(tab);
+            if (["profile", "preferences", "bookings", "favorites", "badges"].includes(tab || "")) {
+                setActiveTab(tab || "profile");
             }
         } catch {}
     }, []);
@@ -106,13 +125,34 @@ const MyPage = () => {
         }
     };
 
+    const fetchBadges = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+
+            const res = await fetch("/api/users/badges", {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!res.ok) {
+                console.error("Failed to fetch badges, status:", res.status);
+                setBadges([]);
+                return;
+            }
+            const data = await res.json();
+            if (Array.isArray(data)) setBadges(data);
+        } catch (error) {
+            console.error("Error fetching badges:", error);
+            setBadges([]);
+        }
+    };
+
     const fetchUserPreferences = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                router.push("/login");
-                return;
-            }
+            if (!token) return;
 
             const response = await fetch("/api/users/preferences", {
                 headers: {
@@ -131,10 +171,7 @@ const MyPage = () => {
     const fetchBookings = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                router.push("/login");
-                return;
-            }
+            if (!token) return;
 
             const response = await fetch("/api/users/bookings", {
                 headers: {
@@ -144,16 +181,13 @@ const MyPage = () => {
 
             if (response.ok) {
                 const data = await response.json();
-                console.log("예약 내역 응답:", data);
                 setBookings(data.bookings || []);
             } else {
-                // 예약 내역 조회 실패 시 빈 배열로 설정
                 console.log("예약 내역 조회 실패, 빈 배열로 설정");
                 setBookings([]);
             }
         } catch (error) {
             console.error("Failed to fetch bookings:", error);
-            // 오류 발생 시에도 빈 배열로 설정
             setBookings([]);
         }
     };
@@ -161,10 +195,7 @@ const MyPage = () => {
     const fetchFavorites = async () => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                router.push("/login");
-                return;
-            }
+            if (!token) return;
 
             const response = await fetch("/api/users/favorites", {
                 headers: {
@@ -176,13 +207,11 @@ const MyPage = () => {
                 const data = await response.json();
                 setFavorites(data || []);
             } else {
-                // 찜 목록 조회 실패 시 빈 배열로 설정
                 console.log("찜 목록 조회 실패, 빈 배열로 설정");
                 setFavorites([]);
             }
         } catch (error) {
             console.error("Failed to fetch favorites:", error);
-            // 오류 발생 시에도 빈 배열로 설정
             setFavorites([]);
         }
     };
@@ -190,10 +219,7 @@ const MyPage = () => {
     const removeFavorite = async (courseId: number) => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                router.push("/login");
-                return;
-            }
+            if (!token) return;
 
             const response = await fetch(`/api/users/favorites?courseId=${courseId}`, {
                 method: "DELETE",
@@ -203,7 +229,6 @@ const MyPage = () => {
             });
 
             if (response.ok) {
-                // 찜 목록에서 제거
                 setFavorites((prev) => prev.filter((fav) => fav.course_id !== courseId));
             } else {
                 console.error("Failed to remove favorite");
@@ -219,7 +244,6 @@ const MyPage = () => {
 
     const handleLogout = () => {
         localStorage.removeItem("authToken");
-        // 커스텀 이벤트 발생시켜 헤더 상태 업데이트
         window.dispatchEvent(new Event("authTokenChange"));
         setShowLogoutModal(false);
         router.push("/");
@@ -245,10 +269,7 @@ const MyPage = () => {
 
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) {
-                router.push("/login");
-                return;
-            }
+            if (!token) return;
 
             const response = await fetch("/api/users/profile", {
                 method: "PUT",
@@ -262,7 +283,6 @@ const MyPage = () => {
             const data = await response.json();
 
             if (response.ok) {
-                // 사용자 정보 업데이트
                 setUserInfo({
                     ...userInfo!,
                     name: editForm.name,
@@ -372,7 +392,6 @@ const MyPage = () => {
 
                 {userPreferences ? (
                     <div className="space-y-6">
-                        {/* 여행 스타일 */}
                         {userPreferences.travelStyle && userPreferences.travelStyle.length > 0 && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
@@ -391,7 +410,6 @@ const MyPage = () => {
                             </div>
                         )}
 
-                        {/* 예산 */}
                         {userPreferences.budgetRange && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
@@ -406,7 +424,6 @@ const MyPage = () => {
                             </div>
                         )}
 
-                        {/* 선호 지역 */}
                         {userPreferences.locationPreferences && userPreferences.locationPreferences.length > 0 && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
@@ -568,6 +585,132 @@ const MyPage = () => {
         </div>
     );
 
+    const [selectedBadge, setSelectedBadge] = useState<UserBadgeItem | null>(null);
+    const [receiverName, setReceiverName] = useState<string>("");
+
+    const ensureKakaoSdk = async (): Promise<any | null> => {
+        if (typeof window === "undefined") return null;
+        if (!window.Kakao) {
+            await new Promise<void>((resolve, reject) => {
+                const script = document.createElement("script");
+                script.src = "https://developers.kakao.com/sdk/js/kakao.js";
+                script.async = true;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error("Kakao SDK load failed"));
+                document.head.appendChild(script);
+            });
+        }
+        const Kakao = window.Kakao;
+        try {
+            if (Kakao && !Kakao.isInitialized?.()) {
+                const key =
+                    process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY || (process as any).env?.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+                if (!key) return Kakao; // 키 없으면 초기화 생략, 아래에서 기본 공유로 폴백
+                Kakao.init(key);
+            }
+        } catch {}
+        return Kakao || null;
+    };
+
+    const shareBadgeToKakao = async (badge: UserBadgeItem) => {
+        try {
+            const Kakao = await ensureKakaoSdk();
+            const link = typeof location !== "undefined" ? location.href : "";
+            const imageUrl = badge.image_url || "/images/maker.png";
+            const bragText = `${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! ${
+                receiverName ? `${receiverName}님도 할 수 있어요! ` : ""
+            }StyleMap에서 함께 도전해요 ✨`;
+            if (Kakao && Kakao.Share) {
+                Kakao.Share.sendDefault({
+                    objectType: "feed",
+                    content: {
+                        title: "배지 자랑하기",
+                        description: bragText,
+                        imageUrl,
+                        link: { webUrl: link, mobileWebUrl: link },
+                    },
+                    buttons: [{ title: "자세히 보기", link: { webUrl: link, mobileWebUrl: link } }],
+                });
+                return;
+            }
+            // 폴백: 시스템 공유 or 클립보드
+            const shareText = `${bragText} ${link}`;
+            if (navigator.share) {
+                try {
+                    if (imageUrl) {
+                        const res = await fetch(imageUrl, { mode: "cors" }).catch(() => null as any);
+                        if (res && res.ok) {
+                            const blob = await res.blob();
+                            const file = new File([blob], "badge.jpg", { type: blob.type || "image/jpeg" });
+                            const can = (navigator as any).canShare?.({ files: [file] });
+                            if (can) {
+                                await (navigator as any).share({
+                                    title: "배지 자랑하기",
+                                    text: shareText,
+                                    files: [file],
+                                });
+                                return;
+                            }
+                        }
+                    }
+                    await navigator.share({ title: "배지 자랑하기", text: shareText, url: link });
+                    return;
+                } catch {}
+            } else {
+                await navigator.clipboard.writeText(shareText);
+                alert("링크가 클립보드에 복사되었습니다.");
+            }
+        } catch {
+            const shareText = `${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! ${
+                typeof location !== "undefined" ? location.href : ""
+            }`;
+            await navigator.clipboard.writeText(shareText);
+            alert("링크가 클립보드에 복사되었습니다.");
+        }
+    };
+
+    const renderBadgesTab = () => (
+        <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                <div className="flex items-center justify-between mb-4 md:mb-6">
+                    <h3 className="text-xl md:text-2xl font-bold text-gray-900">내 뱃지</h3>
+                </div>
+                {badges.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                        {badges.map((b) => (
+                            <div
+                                key={b.id}
+                                className="border border-gray-200 rounded-xl p-4 flex flex-col items-center text-center bg-white hover:shadow-md transition-shadow cursor-pointer"
+                                onClick={() => setSelectedBadge(b)}
+                            >
+                                {b.image_url ? (
+                                    <img src={b.image_url} alt={b.name} className="w-20 h-20 object-contain mb-3" />
+                                ) : (
+                                    <div className="w-20 h-20 mb-3 rounded-full bg-yellow-100 flex items-center justify-center text-3xl">
+                                        🏅
+                                    </div>
+                                )}
+                                <div className="text-sm font-semibold text-gray-900 mb-1">{b.name}</div>
+                                {b.description && (
+                                    <div className="text-xs text-gray-600 line-clamp-2 mb-1">{b.description}</div>
+                                )}
+                                <div className="text-[11px] text-gray-400">
+                                    {new Date(b.awarded_at).toLocaleDateString()}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-10">
+                        <div className="text-6xl mb-3">🏅</div>
+                        <div className="text-lg font-semibold text-gray-900 mb-1">아직 획득한 뱃지가 없어요</div>
+                        <div className="text-gray-600">스토리를 완료하고 배지를 모아보세요!</div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -588,7 +731,6 @@ const MyPage = () => {
             <Header />
 
             <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 pt-20 md:pt-24">
-                {/* 헤더 섹션 */}
                 <div className="text-center mb-6 md:mb-8">
                     <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-1 md:mb-2 tracking-tight">
                         마이페이지
@@ -596,7 +738,6 @@ const MyPage = () => {
                     <p className="text-sm md:text-[17px] text-gray-600">내 정보와 활동을 관리해보세요</p>
                 </div>
 
-                {/* 탭 네비게이션 */}
                 <div className="flex justify-center mb-6 md:mb-8">
                     <div className="bg-white rounded-xl shadow-lg p-1">
                         <div className="flex space-x-1">
@@ -605,6 +746,7 @@ const MyPage = () => {
                                 { id: "preferences", label: "선호도", icon: "🎯" },
                                 { id: "bookings", label: "예약내역", icon: "📋" },
                                 { id: "favorites", label: "내 여행 보관함", icon: "💖" },
+                                { id: "badges", label: "뱃지", icon: "🏅" },
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
@@ -623,14 +765,13 @@ const MyPage = () => {
                     </div>
                 </div>
 
-                {/* 탭 컨텐츠 */}
                 {activeTab === "profile" && renderProfileTab()}
                 {activeTab === "preferences" && renderPreferencesTab()}
                 {activeTab === "bookings" && renderBookingsTab()}
                 {activeTab === "favorites" && renderFavoritesTab()}
+                {activeTab === "badges" && renderBadgesTab()}
             </main>
 
-            {/* 프로필 수정 모달 */}
             {showEditModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
@@ -752,7 +893,67 @@ const MyPage = () => {
                 </div>
             )}
 
-            {/* 로그아웃 확인 모달 */}
+            {selectedBadge && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-[90vw] max-w-md mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">{selectedBadge.name}</h3>
+                            <button
+                                className="hover:cursor-pointer text-gray-400 hover:text-gray-600 text-2xl"
+                                onClick={() => setSelectedBadge(null)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="flex flex-col items-center text-center">
+                            {selectedBadge.image_url ? (
+                                <img
+                                    src={selectedBadge.image_url}
+                                    alt={selectedBadge.name}
+                                    className="w-40 h-40 object-contain mb-3"
+                                />
+                            ) : (
+                                <div className="w-40 h-40 mb-3 rounded-full bg-yellow-100 flex items-center justify-center text-6xl">
+                                    🏅
+                                </div>
+                            )}
+                            {selectedBadge.description && (
+                                <div className="text-sm text-gray-700 whitespace-pre-wrap mb-3">
+                                    {selectedBadge.description}
+                                </div>
+                            )}
+                            <div className="text-xs text-gray-400 mb-4">
+                                획득일: {new Date(selectedBadge.awarded_at).toLocaleDateString()}
+                            </div>
+                            <input
+                                type="text"
+                                value={receiverName}
+                                onChange={(e) => setReceiverName(e.target.value)}
+                                placeholder="받는 분 이름 (선택)"
+                                className="w-full mb-3 px-3 py-2 rounded-lg border text-sm"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"
+                                    onClick={() => selectedBadge && shareBadgeToKakao(selectedBadge)}
+                                >
+                                    자랑하기
+                                </button>
+                                <button
+                                    className="hover:cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                                    onClick={() => {
+                                        setSelectedBadge(null);
+                                        setReceiverName("");
+                                    }}
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showLogoutModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
