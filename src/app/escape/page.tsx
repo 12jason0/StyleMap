@@ -145,6 +145,23 @@ export default function escapePage() {
         })();
     }, []);
 
+    // URL 쿼리로 전달된 startId가 있으면 자동으로 인라인 플레이 시작
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const startId = Number(params.get("startId"));
+            if (Number.isFinite(startId) && startId > 0) {
+                openInlinePlay(startId);
+                // 한 번만 처리되도록 쿼리 정리
+                const url = new URL(window.location.href);
+                url.searchParams.delete("startId");
+                window.history.replaceState({}, "", url.toString());
+            }
+        } catch {}
+    }, []);
+
+    // (모바일 링크 모달 제거로 모바일 감지 로직도 제거)
+
     // 로그인 상태 동기화 (Header와 동일한 기준: localStorage.authToken)
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -280,11 +297,8 @@ export default function escapePage() {
             writeProgress(next);
             // 서버 동기화는 기존 로직과 동일하게 챕터 로드 시점에 처리됨
         }
-        // 모달/인라인 닫고 상세 플레이 페이지로 이동
-        setSelectedStoryId(null);
-        setModalMode(null);
-        setShowInlinePlay(false);
-        router.push(`/escape/${storyId}`);
+        // 인트로 페이지로 이동
+        router.push(`/escape/intro?id=${storyId}`);
     };
 
     const handleSubmitMission = () => {
@@ -464,7 +478,9 @@ export default function escapePage() {
                                     <div className="mt-2">
                                         {!isLoggedIn ? (
                                             <div
-                                                onClick={() => handleStartStory(s.id)}
+                                                onClick={() => {
+                                                    handleStartStory(s.id);
+                                                }}
                                                 role="button"
                                                 tabIndex={0}
                                                 className="relative group/ticket w-full md:w-[320px] hover:cursor-pointer overflow-hidden border-y-2 border-sky-500"
@@ -487,7 +503,7 @@ export default function escapePage() {
                                         ) : pr?.status === "completed" ? (
                                             <button
                                                 onClick={() => openPlay(s.id)}
-                                                className="inline-flex justify-center w-full md:w-[420px] px-10 py-4 border-2 border-green-500 text-green-700 bg-transparent rounded-full text-base md:text-lg font-extrabold hover:bg-green-50 transition-colors duration-200 hover:cursor-pointer"
+                                                className="inline-flex justify-center w-full md:w-[420px] px-10 py-4 rounded-full text-base md:text-lg font-extrabold hover:cursor-pointer btn-secondary"
                                             >
                                                 다시 보기
                                             </button>
@@ -497,9 +513,13 @@ export default function escapePage() {
                                                     !!isLoggedIn && !!pr && !!resumeReadyMap[String(s.id)];
                                                 return (
                                                     <div
-                                                        onClick={() =>
-                                                            canContinue ? openInlinePlay(s.id) : handleStartStory(s.id)
-                                                        }
+                                                        onClick={() => {
+                                                            if (canContinue) {
+                                                                openInlinePlay(s.id);
+                                                            } else {
+                                                                handleStartStory(s.id);
+                                                            }
+                                                        }}
                                                         role="button"
                                                         tabIndex={0}
                                                         className="relative group/ticket w-full md:w-[320px] hover:cursor-pointer"
@@ -710,6 +730,8 @@ export default function escapePage() {
                     </div>
                 </section>
             )}
+
+            {/* 링크 모달 제거됨 */}
 
             {/* 상세 모달 */}
             {selectedStory && modalMode === "details" && (

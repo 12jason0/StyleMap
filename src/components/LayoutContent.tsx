@@ -14,9 +14,17 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
 
     return (
         <>
-            {!isEscapeIntroPage && <Header />}
+            <div className={isEscapeIntroPage ? "hidden" : undefined}>
+                <Header />
+            </div>
             <main className="flex-1">{children}</main>
-            {!isEscapeIntroPage && !isMapPage && !isAuthPage && !isPersonalizedHomePage && <Footer />}
+            <div
+                className={
+                    isEscapeIntroPage || isMapPage || isAuthPage || isPersonalizedHomePage ? "hidden" : undefined
+                }
+            >
+                <Footer />
+            </div>
         </>
     );
 }

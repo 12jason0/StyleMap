@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
         }
 
         const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`;
-        // 로컬 개발 환경용
 
         const tokenParams = new URLSearchParams({
             grant_type: "authorization_code",

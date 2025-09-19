@@ -8,23 +8,25 @@ datasource db {
 }
 
 model User {
-  id                Int                 @id @default(autoincrement())
-  email             String?             @unique @db.VarChar(191)
-  password          String?             @db.VarChar(255)
-  nickname          String              @db.VarChar(50)
-  profileImageUrl   String?
-  socialId          String?             @db.VarChar(255)
-  provider          String              @default("local") @db.VarChar(20)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  mbti              String?             @db.VarChar(20)
-  age               Int?
-  reviews           Review[]
-  courses           Courses[]
+  id                  Int                 @id @default(autoincrement())
+  email               String?             @unique @db.VarChar(191)
+  password            String?             @db.VarChar(255)
+  nickname            String              @db.VarChar(50)
+  profileImageUrl     String?
+  socialId            String?             @db.VarChar(255)
+  provider            String              @default("local") @db.VarChar(20)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  mbti                String?             @db.VarChar(20)
+  age                 Int?
+  reviews             Review[]
+  courses             Courses[]
   user_story_progress UserStoryProgress[]
-  preferences       UserPreferences?
-  user_favorites    UserFavorite[]
-  bookings          Booking[]
+  preferences         UserPreferences?
+  user_favorites      UserFavorite[]
+  bookings            Booking[]
+  // --- ⬇️ 추가된 부분 ⬇️ ---
+  missionSubmissions  MissionSubmission[]
 
   @@index([provider, socialId])
   @@map("users")
@@ -63,43 +65,43 @@ model Courses {
 }
 
 model Review {
-  id         Int      @id @default(autoincrement())
-  userId     Int      @map("userId")
-  courseId   Int      @map("courseId")
-  rating     Int
-  comment    String?  @db.Text
-  createdAt  DateTime @default(now()) @map("createdAt")
-  updatedAt  DateTime @updatedAt @map("updatedAt")
-  course     Courses  @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("userId")
+  courseId  Int      @map("courseId")
+  rating    Int
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
+  course    Courses  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("reviews")
 }
 
 model Booking {
-  id            Int      @id @default(autoincrement())
-  user_id       Int
-  course_id     Int
-  course_title  String   @db.VarChar(255)
-  booking_date  DateTime @db.Date
-  status        String   @db.VarChar(45)
-  price         String   @db.VarChar(50)
-  participants  Int
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  course        Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  course_id    Int
+  course_title String   @db.VarChar(255)
+  booking_date DateTime @db.Date
+  status       String   @db.VarChar(45)
+  price        String   @db.VarChar(50)
+  participants Int
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  course       Courses  @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@map("bookings")
 }
 
 model UserPreferences {
-  id           Int      @id @default(autoincrement())
-  userId       Int      @unique @map("user_id")
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  preferences  Json
-  createdAt    DateTime @default(now()) @map("createdAt")
-  updatedAt    DateTime @updatedAt @map("updatedAt")
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferences Json
+  createdAt   DateTime @default(now()) @map("createdAt")
+  updatedAt   DateTime @updatedAt @map("updatedAt")
 
   @@map("user_preferences")
 }
@@ -121,7 +123,7 @@ model UserFavorite {
 model CourseTag {
   id        Int       @id @default(autoincrement())
   name      String    @unique @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("createdAt")
+  createdAt DateTime  @default(now()) @map("createdAt")
   courses   Courses[] @relation("CourseTagToCourses")
 
   @@map("course_tags")
@@ -241,39 +243,41 @@ model Badge {
 }
 
 model Story {
-  id                     Int                 @id @default(autoincrement())
-  title                  String              @db.VarChar(255)
-  synopsis               String?
-  region                 String?             @db.VarChar(100)
-  estimated_duration_min Int?
-  price                  String?             @db.VarChar(100)
-  reward_badge_id        Int?
-  is_active              Boolean             @default(true)
-  created_at             DateTime            @default(now())
-  updated_at             DateTime            @updatedAt
-  imageUrl               String?
-  level                  Int?                @default(1)
-  reward_badge           Badge?              @relation("StoryRewardBadge", fields: [reward_badge_id], references: [id])
-  chapters               StoryChapter[]
-  userStoryProgress      UserStoryProgress[]
+  id                       Int                   @id @default(autoincrement())
+  title                    String                @db.VarChar(255)
+  synopsis                 String?
+  region                   String?               @db.VarChar(100)
+  estimated_duration_min   Int?
+  price                    String?               @db.VarChar(100)
+  reward_badge_id          Int?
+  is_active                Boolean               @default(true)
+  created_at               DateTime              @default(now())
+  updated_at               DateTime              @updatedAt
+  imageUrl                 String?
+  level                    Int?                  @default(1)
+  reward_badge             Badge?                @relation("StoryRewardBadge", fields: [reward_badge_id], references: [id])
+  chapters                 StoryChapter[]
+  userStoryProgress        UserStoryProgress[]
 
   @@map("stories")
 }
 
 model StoryChapter {
-  id              Int      @id @default(autoincrement())
+  id              Int                 @id @default(autoincrement())
   story_id        Int
   chapter_number  Int
-  title           String   @db.VarChar(255)
-  location_name   String?  @db.VarChar(255)
+  title           String              @db.VarChar(255)
+  location_name   String?             @db.VarChar(255)
   address         String?
   latitude        Float?
   longitude       Float?
   story_text      String?
-  mission_type    String?  @db.VarChar(50)
+  mission_type    String?             @db.VarChar(50)
   mission_payload Json?
   puzzle_text     String?
-  story           Story    @relation(fields: [story_id], references: [id])
+  story           Story               @relation(fields: [story_id], references: [id])
+  // --- ⬇️ 추가된 부분 ⬇️ ---
+  submissions     MissionSubmission[]
 
   @@unique([story_id, chapter_number])
   @@map("storychapters")
@@ -292,4 +296,20 @@ model UserStoryProgress {
 
   @@unique([user_id, story_id])
   @@map("userstoryprogress")
+}
+
+// --- ⬇️ 추가된 모델 ⬇️ ---
+model MissionSubmission {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @map("user_id")
+  chapterId   Int          @map("chapter_id")
+  photoUrl    String?      @map("photo_url") @db.Text
+  textAnswer  String?      @map("text_answer") @db.Text
+  isCorrect   Boolean      @default(false) @map("is_correct")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter StoryChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@map("mission_submissions")
 }
