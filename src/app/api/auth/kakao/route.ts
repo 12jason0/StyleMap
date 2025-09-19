@@ -70,8 +70,10 @@ export async function POST(request: NextRequest) {
         const socialId = String(id);
         const nickname = properties?.nickname || kakao_account?.profile?.nickname;
         const profileImageUrl = properties?.profile_image || kakao_account?.profile?.profile_image_url;
-        // [수정된 부분] email이 undefined일 경우를 대비해 null을 할당합니다.
         const email = kakao_account?.email || null;
+
+        let user;
+        let message = "카카오 로그인이 완료되었습니다.";
 
         const existing = await (prisma as any).user.findFirst({
             where: { provider: "kakao", socialId },
@@ -79,43 +81,45 @@ export async function POST(request: NextRequest) {
         });
 
         if (existing) {
-            const token = jwt.sign(
-                { userId: existing.id, email: existing.email, name: existing.nickname },
-                JWT_SECRET,
-                {
-                    expiresIn: "7d",
-                }
-            );
-            return NextResponse.json({
-                success: true,
-                message: "카카오 로그인이 완료되었습니다.",
-                token,
-                user: { id: existing.id, email: existing.email, name: existing.nickname },
+            user = existing;
+        } else {
+            user = await (prisma as any).user.create({
+                data: {
+                    email,
+                    nickname: nickname || `user_${socialId}`,
+                    socialId,
+                    profileImageUrl,
+                    provider: "kakao",
+                    createdAt: new Date(),
+                },
+                select: { id: true, email: true, nickname: true },
             });
+            message = "카카오 회원가입이 완료되었습니다.";
         }
 
-        const created = await (prisma as any).user.create({
-            data: {
-                email,
-                nickname: nickname || `user_${socialId}`,
-                socialId,
-                profileImageUrl,
-                provider: "kakao",
-                createdAt: new Date(),
-            },
-            select: { id: true, email: true, nickname: true },
-        });
-
-        const token = jwt.sign({ userId: created.id, email: created.email, name: created.nickname }, JWT_SECRET, {
+        const token = jwt.sign({ userId: user.id, email: user.email, name: user.nickname }, JWT_SECRET, {
             expiresIn: "7d",
         });
 
-        return NextResponse.json({
+        const responsePayload = {
             success: true,
-            message: "카카오 회원가입이 완료되었습니다.",
+            message,
             token,
-            user: { id: created.id, email: created.email, name: created.nickname },
+            user: { id: user.id, email: user.email, name: user.nickname },
+        };
+
+        // --- ⬇️ 수정된 부분 ⬇️ ---
+        // JSON 응답과 함께 httpOnly 쿠키를 설정합니다.
+        const res = NextResponse.json(responsePayload);
+        res.cookies.set("auth", token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            maxAge: 60 * 60 * 24 * 7, // 7일
         });
+        return res;
+        // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
     } catch (error) {
         console.error("카카오 로그인 API 전체 오류:", error);
         return NextResponse.json(
