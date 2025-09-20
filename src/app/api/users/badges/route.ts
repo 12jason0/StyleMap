@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserIdFromRequest, getJwtSecret } from "@/lib/auth";
 import jwt from "jsonwebtoken";
-
+export const dynamic = "force-dynamic";
 // Bearer 토큰 또는 'auth' 쿠키에서 사용자 ID를 가져오는 헬퍼 함수
 function resolveUserId(request: NextRequest): number | null {
     const fromHeader = getUserIdFromRequest(request);
