@@ -586,12 +586,7 @@ const MyPage = () => {
     );
 
     const [selectedBadge, setSelectedBadge] = useState<UserBadgeItem | null>(null);
-    // 카카오 친구 선택 상태
-    type KakaoFriend = { uuid: string; nickname: string; profile_thumbnail_image?: string };
-    const [selectedFriend, setSelectedFriend] = useState<KakaoFriend | null>(null);
-    const [showFriendPicker, setShowFriendPicker] = useState(false);
-    const [friendList, setFriendList] = useState<KakaoFriend[]>([]);
-    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [receiverName, setReceiverName] = useState<string>("");
 
     const ensureKakaoSdk = async (): Promise<any | null> => {
         if (typeof window === "undefined") return null;
@@ -622,35 +617,9 @@ const MyPage = () => {
             const Kakao = await ensureKakaoSdk();
             const link = typeof location !== "undefined" ? location.href : "";
             const imageUrl = badge.image_url || "/images/maker.png";
-            const nameTag = selectedFriend?.nickname ? `${selectedFriend.nickname}님, ` : "";
-            const bragText = `${nameTag}${userInfo?.name || "저"}는 '${
-                badge.name
-            }' 배지를 획득했어요! StyleMap에서 함께 도전해요 ✨`;
-            // 친구 지정 발송 시도 (권한 필요)
-            if (Kakao?.API && selectedFriend?.uuid && Kakao?.Auth?.getAccessToken?.()) {
-                try {
-                    await Kakao.API.request({
-                        url: "/v1/api/talk/friends/message/default/send",
-                        data: {
-                            receiver_uuids: [selectedFriend.uuid],
-                            template_object: {
-                                object_type: "feed",
-                                content: {
-                                    title: "배지 자랑하기",
-                                    description: bragText,
-                                    image_url: imageUrl,
-                                    link: { web_url: link, mobile_web_url: link },
-                                },
-                                buttons: [{ title: "자세히 보기", link: { web_url: link, mobile_web_url: link } }],
-                            },
-                        },
-                    });
-                    alert("카카오톡으로 전송했습니다.");
-                    return;
-                } catch {
-                    // 실패 시 기본 공유로 폴백
-                }
-            }
+            const bragText = `${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! ${
+                receiverName ? `${receiverName}님도 할 수 있어요! ` : ""
+            }StyleMap에서 함께 도전해요 ✨`;
             if (Kakao && Kakao.Share) {
                 Kakao.Share.sendDefault({
                     objectType: "feed",
@@ -692,8 +661,7 @@ const MyPage = () => {
                 alert("링크가 클립보드에 복사되었습니다.");
             }
         } catch {
-            const nameTag = selectedFriend?.nickname ? `${selectedFriend.nickname}님, ` : "";
-            const shareText = `${nameTag}${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! ${
+            const shareText = `${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! ${
                 typeof location !== "undefined" ? location.href : ""
             }`;
             await navigator.clipboard.writeText(shareText);
@@ -701,41 +669,7 @@ const MyPage = () => {
         }
     };
 
-    // 카카오 친구 목록 열기
-    const openKakaoFriendPicker = async () => {
-        try {
-            const Kakao = await ensureKakaoSdk();
-            if (!Kakao) return alert("카카오 SDK 로드 실패");
-            if (!Kakao.Auth.getAccessToken?.()) {
-                await new Promise<void>((resolve, reject) => {
-                    Kakao.Auth.login({ scope: "friends", success: () => resolve(), fail: reject });
-                });
-            }
-            setFriendsLoading(true);
-            const resp = await new Promise<any>((resolve, reject) => {
-                Kakao.API.request({
-                    url: "/v1/api/talk/friends",
-                    data: { limit: 100 },
-                    success: resolve,
-                    fail: reject,
-                });
-            });
-            const list: KakaoFriend[] = Array.isArray(resp?.elements)
-                ? resp.elements.map((e: any) => ({
-                      uuid: e.uuid,
-                      nickname: e.profile_nickname || e.profileNickname || e.nickname || "친구",
-                      profile_thumbnail_image: e.profile_thumbnail_image || e.profileThumbnailImage,
-                  }))
-                : [];
-            setFriendList(list);
-            setShowFriendPicker(true);
-        } catch (err) {
-            console.warn("Kakao friends fetch failed", err);
-            alert("카카오 친구 목록을 불러오지 못했습니다. 권한/승인 상태를 확인해주세요.");
-        } finally {
-            setFriendsLoading(false);
-        }
-    };
+    // (공유 선택창에서 수신자 이름을 콜백으로 제공하지 않아 자동 주입은 불가합니다)
 
     const renderBadgesTab = () => (
         <div className="space-y-6">
@@ -993,45 +927,13 @@ const MyPage = () => {
                             <div className="text-xs text-gray-400 mb-4">
                                 획득일: {new Date(selectedBadge.awarded_at).toLocaleDateString()}
                             </div>
-                            <div className="w-full mb-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-sm text-gray-600">받는 친구</span>
-                                    <button
-                                        className="hover:cursor-pointer px-3 py-1.5 rounded-lg border bg-white hover:bg-gray-50 text-sm"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            openKakaoFriendPicker();
-                                        }}
-                                    >
-                                        친구 선택
-                                    </button>
-                                </div>
-                                {selectedFriend ? (
-                                    <div className="flex items-center gap-2 p-2 border rounded-lg">
-                                        {selectedFriend.profile_thumbnail_image ? (
-                                            <img
-                                                src={selectedFriend.profile_thumbnail_image}
-                                                alt="profile"
-                                                className="w-8 h-8 rounded-full"
-                                            />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-gray-200" />
-                                        )}
-                                        <span className="text-sm font-medium">{selectedFriend.nickname}</span>
-                                        <button
-                                            className="ml-auto text-xs text-gray-500 hover:text-gray-700"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setSelectedFriend(null);
-                                            }}
-                                        >
-                                            해제
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="text-xs text-gray-500">선택된 친구가 없습니다.</div>
-                                )}
-                            </div>
+                            <input
+                                type="text"
+                                value={receiverName}
+                                onChange={(e) => setReceiverName(e.target.value)}
+                                placeholder="받는 분 이름 (선택)"
+                                className="w-full mb-3 px-3 py-2 rounded-lg border text-sm"
+                            />
                             <div className="flex gap-2">
                                 <button
                                     className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"
@@ -1043,59 +945,13 @@ const MyPage = () => {
                                     className="hover:cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
                                     onClick={() => {
                                         setSelectedBadge(null);
-                                        setSelectedFriend(null);
+                                        setReceiverName("");
                                     }}
                                 >
                                     닫기
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {showFriendPicker && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-2xl shadow-xl p-4 w-[90vw] max-w-md max-h-[80vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-lg font-bold">카카오 친구 선택</h4>
-                            <button
-                                className="text-2xl text-gray-400 hover:text-gray-600"
-                                onClick={() => setShowFriendPicker(false)}
-                            >
-                                ×
-                            </button>
-                        </div>
-                        {friendsLoading ? (
-                            <div className="text-center py-8 text-gray-600">불러오는 중...</div>
-                        ) : friendList.length > 0 ? (
-                            <ul className="space-y-2">
-                                {friendList.map((f) => (
-                                    <li key={f.uuid}>
-                                        <button
-                                            className="w-full flex items-center gap-3 p-2 border rounded-lg hover:bg-gray-50 text-left"
-                                            onClick={() => {
-                                                setSelectedFriend(f);
-                                                setShowFriendPicker(false);
-                                            }}
-                                        >
-                                            {f.profile_thumbnail_image ? (
-                                                <img
-                                                    src={f.profile_thumbnail_image}
-                                                    alt="profile"
-                                                    className="w-8 h-8 rounded-full"
-                                                />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-gray-200" />
-                                            )}
-                                            <span className="text-sm font-medium">{f.nickname}</span>
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <div className="text-sm text-gray-600">표시할 친구가 없습니다.</div>
-                        )}
                     </div>
                 </div>
             )}
