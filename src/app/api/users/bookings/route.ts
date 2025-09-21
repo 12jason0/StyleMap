@@ -23,52 +23,6 @@ function resolveUserId(request: NextRequest): number | null {
 }
 // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
 
-export async function GET(request: NextRequest) {
-    try {
-        console.log("예약 내역 조회 시작");
-
-        // --- ⬇️ 수정된 부분 ⬇️ ---
-        // 통일된 인증 헬퍼 함수 사용
-        const userId = resolveUserId(request);
-        // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
-
-        if (!userId) {
-            console.log("인증 정보 없음");
-            return NextResponse.json({ error: "인증 정보가 필요합니다." }, { status: 401 });
-        }
-
-        console.log("사용자 ID:", userId);
-
-        const bookingsArray = await prisma.booking.findMany({
-            where: { user_id: userId },
-            orderBy: { booking_date: "desc" },
-            select: {
-                id: true,
-                course_title: true,
-                booking_date: true,
-                status: true,
-                price: true,
-                participants: true,
-            },
-        });
-
-        console.log("조회된 예약 내역:", bookingsArray);
-
-        const formattedBookings = bookingsArray.map((b) => ({
-            id: b.id,
-            courseTitle: b.course_title || "알 수 없는 코스",
-            date: new Date(b.booking_date).toLocaleDateString("ko-KR"),
-            status: b.status,
-            price: b.price,
-            participants: b.participants,
-        }));
-
-        return NextResponse.json({
-            success: true,
-            bookings: formattedBookings,
-        });
-    } catch (error) {
-        console.error("예약 내역 조회 오류:", error);
-        return NextResponse.json({ error: "예약 내역 조회 중 오류가 발생했습니다." }, { status: 500 });
-    }
+export async function GET() {
+    return NextResponse.json({ bookings: [] });
 }

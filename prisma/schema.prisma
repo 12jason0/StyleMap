@@ -28,6 +28,7 @@ model User {
   // --- ⬇️ 추가된 부분 ⬇️ ---
   missionSubmissions  MissionSubmission[]
   userBadges          UserBadge[]
+  completedCourses        CompletedCourse[] // ✅ '완료한 코스' 관계 추가
 
   @@index([provider, socialId])
   @@map("users")
@@ -61,8 +62,22 @@ model Courses {
   tags                   CourseTag[]    @relation("CourseTagToCourses")
   bookings               Booking[]
   contacts               Contact[]
+  completedBy         CompletedCourse[]
 
   @@map("courses")
+}
+
+// ✅ 신규 추가: 완료한 코스 테이블
+model CompletedCourse {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  courseId    Int
+  completedAt DateTime @default(now()) // 코스를 완료한 시각
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Courses @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("CompletedCourses")
 }
 
 model Review {

@@ -11,16 +11,19 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     // const isCourseDetailPage = pathname.startsWith("/courses/");
     const isPersonalizedHomePage = pathname === "/personalized-home";
     const isEscapeIntroPage = pathname.startsWith("/escape/intro");
+    const isCourseStartPage = pathname.startsWith("/courses/") && pathname.endsWith("/start");
 
     return (
         <>
-            <div className={isEscapeIntroPage ? "hidden" : undefined}>
+            <div className={isEscapeIntroPage || isCourseStartPage ? "hidden" : undefined}>
                 <Header />
             </div>
             <main className="flex-1">{children}</main>
             <div
                 className={
-                    isEscapeIntroPage || isMapPage || isAuthPage || isPersonalizedHomePage ? "hidden" : undefined
+                    isEscapeIntroPage || isMapPage || isAuthPage || isPersonalizedHomePage || isCourseStartPage
+                        ? "hidden"
+                        : undefined
                 }
             >
                 <Footer />

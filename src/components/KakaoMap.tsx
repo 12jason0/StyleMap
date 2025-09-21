@@ -370,7 +370,7 @@ export default function KakaoMap({
     }, []);
 
     return (
-        <div className={`relative ${className}`} style={style}>
+        <div className={`relative ${className}`} style={{ ...style, width: "100%", height: "100%" }}>
             {/* 경로 API 경고 배너 (프로덕션 주의) */}
             {/* 안내 배너 제거 요청에 따라 출력하지 않습니다. */}
             <div ref={mapRef} className="w-full h-full" style={{ minHeight: "300px" }} />

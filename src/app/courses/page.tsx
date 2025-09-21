@@ -1,5 +1,5 @@
 "use client";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation"; // useRouter 추가
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -25,6 +25,7 @@ interface Course {
 
 function CoursesPageInner() {
     const searchParams = useSearchParams();
+    const router = useRouter(); // useRouter 훅 사용
     const concept = searchParams.get("concept");
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
@@ -92,43 +93,20 @@ function CoursesPageInner() {
         fetchCourses();
     }, [concept]);
 
-    const handleBooking = async (courseId: string) => {
-        try {
-            const token = localStorage.getItem("authToken");
-            if (!token) {
-                alert("로그인이 필요합니다.");
-                return;
-            }
+    // ✅ "코스 시작하기" 버튼을 위한 새로운 핸들러
+    const handleStartCourse = (e: React.MouseEvent, courseId: string) => {
+        e.stopPropagation(); // Link의 기본 동작을 막기 위해 이벤트 전파 중단
 
-            const response = await fetch("/api/bookings", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    courseId,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || "예약에 실패했습니다.");
-            }
-
-            alert("코스 예약이 완료되었습니다!");
-
-            // 코스 목록 새로고침
-            const url = concept
-                ? `/api/courses?concept=${encodeURIComponent(concept)}&imagePolicy=all-or-one-missing`
-                : "/api/courses?imagePolicy=all-or-one-missing";
-            const coursesResponse = await fetch(url);
-            const coursesData = await coursesResponse.json();
-            setCourses(coursesData);
-        } catch (err) {
-            console.error("Error booking course:", err);
-            alert(err instanceof Error ? err.message : "예약에 실패했습니다.");
+        // 로그인 여부 확인
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+            alert("로그인이 필요합니다.");
+            router.push("/login");
+            return;
         }
+
+        // 새로운 가이드 페이지로 이동
+        router.push(`/courses/${courseId}/start`);
     };
 
     if (loading) {
@@ -258,11 +236,9 @@ function CoursesPageInner() {
                                     <span className="text-sm text-blue-600 font-medium">
                                         👥 지금 {course.participants}명 진행중
                                     </span>
+                                    {/* ✅ 버튼 onClick 이벤트 수정 */}
                                     <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleBooking(course.id);
-                                        }}
+                                        onClick={(e) => handleStartCourse(e, course.id)}
                                         className="btn-primary rounded-full text-sm active:scale-95"
                                     >
                                         코스 시작하기

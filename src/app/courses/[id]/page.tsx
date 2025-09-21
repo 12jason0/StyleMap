@@ -258,7 +258,7 @@ export default function CourseDetailPage() {
             const last = localStorage.getItem(key);
             const now = Date.now();
             if (!last || now - parseInt(last) > 10 * 60 * 1000) {
-                fetch(`/api/courses/${courseId}/view`, { method: "POST" }).catch(() => {});
+                fetch(`/api/courses/${courseId}/view`, { method: "POST", keepalive: true }).catch(() => {});
                 localStorage.setItem(key, String(now));
             }
         } catch {}
@@ -406,6 +406,11 @@ export default function CourseDetailPage() {
 
             console.log("Fetching course data for ID:", courseId);
             console.log("Course ID type:", typeof courseId);
+
+            // ✅ 수정된 부분: request.url 대신 window.location.href 사용
+            if (typeof window !== "undefined") {
+                console.log("API: Request URL:", window.location.href);
+            }
 
             // 캐시 확인 (임시로 비활성화)
             const cacheKey = `course_${courseId}`;
@@ -1030,6 +1035,20 @@ export default function CourseDetailPage() {
                                                 <span className="font-semibold">{courseData.duration}</span>
                                             </div>
                                             <div className="border-t pt-4 space-y-3">
+                                                <button
+                                                    onClick={() => {
+                                                        const token = localStorage.getItem("authToken");
+                                                        if (!token) {
+                                                            alert("로그인이 필요합니다.");
+                                                            router.push("/login");
+                                                            return;
+                                                        }
+                                                        router.push(`/courses/${courseId}/start`);
+                                                    }}
+                                                    className={`w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700`}
+                                                >
+                                                    🚀 코스 시작하기
+                                                </button>
                                                 <button
                                                     onClick={handleSaveCourse}
                                                     className={`hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 ${

@@ -81,7 +81,9 @@ function EscapeIntroPageInner() {
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // 제출(업로드+DB저장) 중 로딩 상태
     const [photoUploaded, setPhotoUploaded] = useState<boolean>(false); // 사진이 선택되었는지 여부
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null); // 미리보기용 URL
+    const [lastUploadedUrls, setLastUploadedUrls] = useState<string[]>([]); // 이번 세션에서 막 업로드한 사진
     // ---
+    // 전체 화면 갤러리는 사용하지 않음 (책 페이지 내에서만 표시)
 
     // --- 사용자 현재 위치(경로 표시용) ---
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -326,6 +328,8 @@ function EscapeIntroPageInner() {
                 if (!uploadResponse.ok) throw new Error(uploadResult.message || "사진 업로드에 실패했습니다.");
 
                 submissionPayload.photoUrls = uploadResult.photo_urls;
+                // 방금 업로드한 사진은 엔딩(책 페이지 내부)에서만 보여주기 위해 저장
+                if (Array.isArray(uploadResult.photo_urls)) setLastUploadedUrls(uploadResult.photo_urls);
             } else if (missionType === "PUZZLE_ANSWER") {
                 submissionPayload.textAnswer = puzzleAnswer;
             }
@@ -996,23 +1000,26 @@ body {
                         <div className="absolute right-0 top-0 bottom-0 w-1/2 p-6 pointer-events-auto">
                             <div className="bg-white/90 rounded-xl border shadow p-3 sm:p-4 h-full overflow-auto">
                                 <div className="text-lg font-bold mb-3">🖼️ 추억 액자</div>
-                                {galleryUrls.length > 0 ? (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                                        {galleryUrls.map((u, i) => (
-                                            <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
-                                                <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
-                                                    <img
-                                                        src={u}
-                                                        alt={`photo-${i}`}
-                                                        className="w-full h-full object-cover rounded"
-                                                    />
+                                {(() => {
+                                    const urls = lastUploadedUrls.length > 0 ? lastUploadedUrls : galleryUrls;
+                                    return urls && urls.length > 0 ? (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                                            {urls.map((u, i) => (
+                                                <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
+                                                    <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
+                                                        <img
+                                                            src={u}
+                                                            alt={`photo-${i}`}
+                                                            className="w-full h-full object-cover rounded"
+                                                        />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-sm text-gray-600">업로드된 사진이 없습니다.</div>
-                                )}
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-gray-600">업로드된 사진이 없습니다.</div>
+                                    );
+                                })()}
                                 <div className="mt-4 flex justify-end gap-2">
                                     <button
                                         className="btn-vintage"
@@ -1093,6 +1100,7 @@ body {
                     </div>
                 )}
             </div>
+            {/* 전체 화면 갤러리 오버레이는 사용하지 않습니다 (책 페이지 내 갤러리만 사용) */}
         </div>
     );
 }

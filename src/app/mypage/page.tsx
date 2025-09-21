@@ -65,8 +65,20 @@ const MyPage = () => {
     const router = useRouter();
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
-    const [bookings, setBookings] = useState<Booking[]>([]);
+    // 예약 기능 제거
+    // const [bookings, setBookings] = useState<Booking[]>([]);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
+    const [completed, setCompleted] = useState<
+        Array<{
+            course_id: number;
+            title: string;
+            description: string;
+            imageUrl: string;
+            rating: number;
+            concept: string;
+            completedAt?: string | null;
+        }>
+    >([]);
     const [badges, setBadges] = useState<UserBadgeItem[]>([]); // 뱃지 상태 추가
     const [activeTab, setActiveTab] = useState("profile");
     const [loading, setLoading] = useState(true);
@@ -84,15 +96,16 @@ const MyPage = () => {
     useEffect(() => {
         fetchUserInfo();
         fetchUserPreferences();
-        fetchBookings();
+        // 예약 기능 제거
         fetchFavorites();
         fetchBadges(); // 뱃지 데이터 가져오기 호출
+        fetchCompleted();
 
         // URL 쿼리에서 tab 파라미터를 읽어 기본 탭 설정
         try {
             const url = new URL(window.location.href);
             const tab = url.searchParams.get("tab");
-            if (["profile", "preferences", "bookings", "favorites", "badges"].includes(tab || "")) {
+            if (["profile", "preferences", "favorites", "completed", "badges"].includes(tab || "")) {
                 setActiveTab(tab || "profile");
             }
         } catch {}
@@ -168,29 +181,7 @@ const MyPage = () => {
         }
     };
 
-    const fetchBookings = async () => {
-        try {
-            const token = localStorage.getItem("authToken");
-            if (!token) return;
-
-            const response = await fetch("/api/users/bookings", {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setBookings(data.bookings || []);
-            } else {
-                console.log("예약 내역 조회 실패, 빈 배열로 설정");
-                setBookings([]);
-            }
-        } catch (error) {
-            console.error("Failed to fetch bookings:", error);
-            setBookings([]);
-        }
-    };
+    // const fetchBookings = async () => {};
 
     const fetchFavorites = async () => {
         try {
@@ -213,6 +204,24 @@ const MyPage = () => {
         } catch (error) {
             console.error("Failed to fetch favorites:", error);
             setFavorites([]);
+        }
+    };
+
+    const fetchCompleted = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            const res = await fetch("/api/users/completions", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setCompleted(Array.isArray(data) ? data : []);
+            } else {
+                setCompleted([]);
+            }
+        } catch (e) {
+            setCompleted([]);
         }
     };
 
@@ -459,57 +468,7 @@ const MyPage = () => {
         </div>
     );
 
-    const renderBookingsTab = () => (
-        <div className="space-y-6">
-            {/* 예약 내역 */}
-            <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-                <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">예약 내역</h3>
-
-                {bookings.length > 0 ? (
-                    <div className="space-y-4">
-                        {bookings.map((booking) => (
-                            <div
-                                key={booking.id}
-                                className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                            >
-                                <div className="flex items-center justify-between mb-2 md:mb-3">
-                                    <h4 className="text-base md:text-lg font-semibold text-gray-900">
-                                        {booking.courseTitle}
-                                    </h4>
-                                    <span
-                                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                            booking.status === "예약완료"
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-red-100 text-red-700"
-                                        }`}
-                                    >
-                                        {booking.status}
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between text-xs md:text-sm text-gray-600">
-                                    <span>📅 {booking.date}</span>
-                                    <span>👥 {booking.participants}명</span>
-                                    <span className="font-semibold text-blue-600">{booking.price}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-8">
-                        <div className="text-6xl mb-4">📋</div>
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">예약 내역이 없어요</h4>
-                        <p className="text-gray-600 mb-4">첫 번째 여행을 예약해보세요!</p>
-                        <button
-                            onClick={() => router.push("/courses")}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
-                        >
-                            코스 둘러보기
-                        </button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+    // 예약 탭 제거됨
 
     const renderFavoritesTab = () => (
         <div className="space-y-6">
@@ -746,8 +705,8 @@ const MyPage = () => {
                             {[
                                 { id: "profile", label: "프로필", icon: "👤" },
                                 { id: "preferences", label: "선호도", icon: "🎯" },
-                                { id: "bookings", label: "예약내역", icon: "📋" },
                                 { id: "favorites", label: "내 여행 보관함", icon: "💖" },
+                                { id: "completed", label: "완료한 코스", icon: "✅" },
                                 { id: "badges", label: "뱃지", icon: "🏅" },
                             ].map((tab) => (
                                 <button
@@ -769,9 +728,74 @@ const MyPage = () => {
 
                 {activeTab === "profile" && renderProfileTab()}
                 {activeTab === "preferences" && renderPreferencesTab()}
-                {activeTab === "bookings" && renderBookingsTab()}
+                {/* 예약 탭 제거 */}
                 {activeTab === "favorites" && renderFavoritesTab()}
                 {activeTab === "badges" && renderBadgesTab()}
+                {activeTab === "completed" && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-4 md:mb-6">
+                                <h3 className="text-xl md:text-2xl font-bold text-gray-900">완료한 코스</h3>
+                            </div>
+                            {completed.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {completed.map((c) => (
+                                        <div
+                                            key={c.course_id}
+                                            className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                            onClick={() => router.push(`/courses/${c.course_id}`)}
+                                        >
+                                            <div className="relative">
+                                                {c.imageUrl ? (
+                                                    <img
+                                                        src={c.imageUrl}
+                                                        alt={c.title}
+                                                        className="w-full h-48 object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-48 bg-white" />
+                                                )}
+                                                {c.concept && (
+                                                    <div className="absolute bottom-2 left-2 bg-emerald-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                                                        {c.concept}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="p-4">
+                                                <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-1 line-clamp-2">
+                                                    {c.title}
+                                                </h4>
+                                                <div className="flex items-center justify-between text-xs text-gray-600">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-yellow-400">★</span>
+                                                        <span className="font-medium">{c.rating}</span>
+                                                    </div>
+                                                    {c.completedAt && (
+                                                        <span>{new Date(c.completedAt).toLocaleDateString()}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10">
+                                    <div className="text-6xl mb-3">✅</div>
+                                    <div className="text-lg font-semibold text-gray-900 mb-1">
+                                        아직 완료한 코스가 없어요
+                                    </div>
+                                    <div className="text-gray-600 mb-4">코스를 완료하면 여기에서 확인할 수 있어요</div>
+                                    <button
+                                        onClick={() => router.push("/courses")}
+                                        className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                                    >
+                                        코스 둘러보기
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </main>
 
             {showEditModal && (

@@ -24,6 +24,8 @@ type Course = {
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [currentSlide, setCurrentSlide] = useState(0);
+    const [touchStartX, setTouchStartX] = useState<number | null>(null);
+    const [touchDeltaX, setTouchDeltaX] = useState(0);
     const [, setLoading] = useState(true);
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
@@ -395,7 +397,34 @@ export default function Home() {
 
             <main className="min-h-screen bg-white pt-10">
                 {/* Hero Section - 대형 슬라이드 */}
-                <section className="relative h-[460px] md:h-[520px] overflow-hidden">
+                <section
+                    className="relative h-[460px] md:h-[520px] overflow-hidden"
+                    onTouchStart={(e) => {
+                        if (e.touches && e.touches.length > 0) {
+                            setTouchStartX(e.touches[0].clientX);
+                            setTouchDeltaX(0);
+                        }
+                    }}
+                    onTouchMove={(e) => {
+                        if (touchStartX !== null && e.touches && e.touches.length > 0) {
+                            setTouchDeltaX(e.touches[0].clientX - touchStartX);
+                        }
+                    }}
+                    onTouchEnd={() => {
+                        const threshold = 40; // 스와이프 임계값(px)
+                        const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
+                        if (total === 0) return;
+                        if (touchDeltaX > threshold) {
+                            // 이전 슬라이드
+                            setCurrentSlide((prev) => (prev - 1 + total) % total);
+                        } else if (touchDeltaX < -threshold) {
+                            // 다음 슬라이드
+                            setCurrentSlide((prev) => (prev + 1) % total);
+                        }
+                        setTouchStartX(null);
+                        setTouchDeltaX(0);
+                    }}
+                >
                     {topCourses.map((course, index) => (
                         <div
                             key={course.id}
@@ -498,16 +527,16 @@ export default function Home() {
                     ))}
 
                     {/* 슬라이드 인디케이터 */}
-                    <div className="absolute bottom-4 md:bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2 z-30">
+                    <div className="absolute bottom-3 md:bottom-8 left-1/2 transform -translate-x-1/2 flex gap-1.5 md:gap-2 z-30">
                         {topCourses.map((_, index) => (
                             <button
                                 key={index}
                                 onClick={() => setCurrentSlide(index)}
-                                className={`transition-all duration-300 ${
+                                className={`transition-all duration-300 rounded-full ${
                                     index === currentSlide
-                                        ? "w-12 h-2 bg-white"
-                                        : "w-2 h-2 bg-white/50 hover:bg-white/70"
-                                } rounded-full`}
+                                        ? "w-6 h-1.5 md:w-12 md:h-2 bg-white"
+                                        : "w-1.5 h-1.5 md:w-2 md:h-2 bg-white/50 hover:bg-white/70"
+                                }`}
                             />
                         ))}
                     </div>
