@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getS3Bucket, getS3Client, getS3PublicUrl } from "@/lib/s3";
+import { PutObjectCommand, GetBucketLocationCommand } from "@aws-sdk/client-s3";
+import { getS3Bucket, getS3Client, getS3PublicUrl, buildS3Client } from "@/lib/s3";
 
 export const runtime = "nodejs";
 
@@ -19,7 +19,24 @@ export async function POST(request: NextRequest) {
         //     return NextResponse.json({ message: `사진을 ${requiredFiles}장 업로드해 주세요.` }, { status: 400 });
         // }
 
-        const s3 = getS3Client();
+        async function getAlignedS3() {
+            const baseClient = getS3Client();
+            const bucket = getS3Bucket();
+            try {
+                const result = await baseClient.send(new GetBucketLocationCommand({ Bucket: bucket }));
+                const detectedRegion = result.LocationConstraint || "us-east-1";
+                const configuredRegion = process.env.AWS_REGION;
+                const hasCustomEndpoint = Boolean(process.env.S3_ENDPOINT);
+                if (!hasCustomEndpoint && configuredRegion && configuredRegion !== detectedRegion) {
+                    return buildS3Client(detectedRegion);
+                }
+                return baseClient;
+            } catch (_err) {
+                return baseClient;
+            }
+        }
+
+        const s3 = await getAlignedS3();
         const bucket = getS3Bucket();
 
         const uploadedUrls: string[] = [];
