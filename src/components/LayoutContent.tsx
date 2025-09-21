@@ -12,6 +12,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     const isPersonalizedHomePage = pathname === "/personalized-home";
     const isEscapeIntroPage = pathname.startsWith("/escape/intro");
     const isCourseStartPage = pathname.startsWith("/courses/") && pathname.endsWith("/start");
+    const isOnboardingPage = pathname === "/onboarding";
 
     return (
         <>
@@ -21,7 +22,12 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
             <main className="flex-1">{children}</main>
             <div
                 className={
-                    isEscapeIntroPage || isMapPage || isAuthPage || isPersonalizedHomePage || isCourseStartPage
+                    isEscapeIntroPage ||
+                    isMapPage ||
+                    isAuthPage ||
+                    isPersonalizedHomePage ||
+                    isCourseStartPage ||
+                    isOnboardingPage
                         ? "hidden"
                         : undefined
                 }

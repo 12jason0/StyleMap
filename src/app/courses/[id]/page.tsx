@@ -445,7 +445,6 @@ export default function CourseDetailPage() {
         }
     }, [courseId]);
 
-    // 찜하기/해제 처리
     const handleSaveCourse = async () => {
         try {
             const token = localStorage.getItem("authToken");
@@ -456,6 +455,7 @@ export default function CourseDetailPage() {
             }
 
             if (isSaved) {
+                // 찜 해제 로직 (기존과 동일)
                 const response = await fetch(`/api/users/favorites?courseId=${courseId}`, {
                     method: "DELETE",
                     headers: {
@@ -466,14 +466,14 @@ export default function CourseDetailPage() {
                 if (response.ok) {
                     setIsSaved(false);
                     showToast("찜 목록에서 제거되었습니다.", "success");
-                    // 전역 이벤트로 헤더 동기화
                     window.dispatchEvent(new CustomEvent("favoritesChanged"));
                 } else {
                     showToast("찜 삭제에 실패했습니다.", "error");
                 }
             } else {
+                // 찜 추가 로직 (method: 'POST' 추가)
                 const response = await fetch("/api/users/favorites", {
-                    method: "POST",
+                    method: "POST", // 이 부분을 추가합니다.
                     headers: {
                         "Content-Type": "application/json",
                         Authorization: `Bearer ${token}`,
@@ -484,7 +484,6 @@ export default function CourseDetailPage() {
                 if (response.ok) {
                     setIsSaved(true);
                     showToast("찜 목록에 추가되었습니다.", "success");
-                    // 전역 이벤트로 헤더 동기화
                     window.dispatchEvent(new CustomEvent("favoritesChanged"));
                 } else {
                     const errorData = await response.json();
@@ -526,7 +525,10 @@ export default function CourseDetailPage() {
             await ensureKakao();
             const w = window as any;
             const Kakao = w.Kakao;
-            const jsKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined;
+            const jsKey =
+                (process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined) ||
+                (process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY as string | undefined) ||
+                (process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY as string | undefined);
             if (!Kakao) throw new Error("Kakao SDK not available");
             if (!Kakao.isInitialized()) {
                 if (!jsKey) throw new Error("NEXT_PUBLIC_KAKAO_JS_KEY missing");

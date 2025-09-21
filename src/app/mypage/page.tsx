@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 
-// --- 데이터 타입 정의 ---
+// --- 수정된 부분: 데이터 타입 정의 ---
+// API 응답 데이터 구조에 맞게 타입을 명확하게 수정했습니다.
+
 interface UserInfo {
     name: string;
     email: string;
@@ -34,19 +36,24 @@ interface Booking {
     participants: number;
 }
 
-interface Favorite {
+// 1. Course의 타입을 먼저 정의합니다.
+interface CourseInfoForFavorite {
     id: number;
-    course_id: number;
     title: string;
     description: string;
     imageUrl: string;
     price: string;
     rating: number;
     concept: string;
-    created_at: string;
 }
 
-// 뱃지 데이터 타입을 추가합니다.
+// 2. Favorite 타입이 CourseInfoForFavorite를 포함하도록 수정합니다.
+interface Favorite {
+    id: number; // 찜(favorite)의 고유 ID
+    course_id: number; // 강좌의 ID
+    course: CourseInfoForFavorite; // 중첩된 강좌 정보
+}
+
 interface UserBadgeItem {
     id: number;
     name: string;
@@ -65,8 +72,6 @@ const MyPage = () => {
     const router = useRouter();
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [userPreferences, setUserPreferences] = useState<UserPreferences | null>(null);
-    // 예약 기능 제거
-    // const [bookings, setBookings] = useState<Booking[]>([]);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [completed, setCompleted] = useState<
         Array<{
@@ -79,7 +84,7 @@ const MyPage = () => {
             completedAt?: string | null;
         }>
     >([]);
-    const [badges, setBadges] = useState<UserBadgeItem[]>([]); // 뱃지 상태 추가
+    const [badges, setBadges] = useState<UserBadgeItem[]>([]);
     const [activeTab, setActiveTab] = useState("profile");
     const [loading, setLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
@@ -96,12 +101,10 @@ const MyPage = () => {
     useEffect(() => {
         fetchUserInfo();
         fetchUserPreferences();
-        // 예약 기능 제거
         fetchFavorites();
-        fetchBadges(); // 뱃지 데이터 가져오기 호출
+        fetchBadges();
         fetchCompleted();
 
-        // URL 쿼리에서 tab 파라미터를 읽어 기본 탭 설정
         try {
             const url = new URL(window.location.href);
             const tab = url.searchParams.get("tab");
@@ -180,8 +183,6 @@ const MyPage = () => {
             console.error("Failed to fetch user preferences:", error);
         }
     };
-
-    // const fetchBookings = async () => {};
 
     const fetchFavorites = async () => {
         try {
@@ -321,7 +322,6 @@ const MyPage = () => {
 
     const renderProfileTab = () => (
         <div className="space-y-6">
-            {/* 프로필 정보 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">프로필 정보</h3>
                 {userInfo ? (
@@ -354,8 +354,6 @@ const MyPage = () => {
                     </div>
                 )}
             </div>
-
-            {/* 계정 관리 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">계정 관리</h3>
                 <div className="space-y-4">
@@ -387,7 +385,6 @@ const MyPage = () => {
 
     const renderPreferencesTab = () => (
         <div className="space-y-6">
-            {/* 선호도 정보 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                 <div className="flex items-center justify-between mb-4 md:mb-6">
                     <h3 className="text-xl md:text-2xl font-bold text-gray-900">내 선호도</h3>
@@ -398,7 +395,6 @@ const MyPage = () => {
                         수정하기
                     </button>
                 </div>
-
                 {userPreferences ? (
                     <div className="space-y-6">
                         {userPreferences.travelStyle && userPreferences.travelStyle.length > 0 && (
@@ -418,7 +414,6 @@ const MyPage = () => {
                                 </div>
                             </div>
                         )}
-
                         {userPreferences.budgetRange && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
@@ -432,7 +427,6 @@ const MyPage = () => {
                                 </span>
                             </div>
                         )}
-
                         {userPreferences.locationPreferences && userPreferences.locationPreferences.length > 0 && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
@@ -468,11 +462,10 @@ const MyPage = () => {
         </div>
     );
 
-    // 예약 탭 제거됨
-
+    // --- 수정된 부분: renderFavoritesTab ---
+    // API 응답 구조에 맞춰 favorite.course.title 처럼 중첩된 객체에 접근하도록 수정했습니다.
     const renderFavoritesTab = () => (
         <div className="space-y-6">
-            {/* 찜 목록 */}
             <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">내 여행 보관함</h3>
 
@@ -485,10 +478,10 @@ const MyPage = () => {
                                 onClick={() => router.push(`/courses/${favorite.course_id}`)}
                             >
                                 <div className="relative">
-                                    {favorite.imageUrl ? (
+                                    {favorite.course.imageUrl ? (
                                         <img
-                                            src={favorite.imageUrl}
-                                            alt={favorite.title}
+                                            src={favorite.course.imageUrl}
+                                            alt={favorite.course.title}
                                             className="w-full h-48 object-cover"
                                         />
                                     ) : (
@@ -504,23 +497,25 @@ const MyPage = () => {
                                         ×
                                     </button>
                                     <div className="absolute bottom-2 left-2 bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                                        {favorite.concept}
+                                        {favorite.course.concept}
                                     </div>
                                 </div>
                                 <div className="p-4">
                                     <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                                        {favorite.title}
+                                        {favorite.course.title}
                                     </h4>
                                     <p className="text-gray-600 text-xs md:text-sm mb-3 line-clamp-2">
-                                        {favorite.description}
+                                        {favorite.course.description}
                                     </p>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1">
                                             <span className="text-yellow-400">★</span>
-                                            <span className="text-xs md:text-sm font-medium">{favorite.rating}</span>
+                                            <span className="text-xs md:text-sm font-medium">
+                                                {favorite.course.rating}
+                                            </span>
                                         </div>
                                         <span className="text-blue-600 font-semibold text-sm md:text-base">
-                                            {favorite.price}
+                                            {favorite.course.price}
                                         </span>
                                     </div>
                                 </div>
@@ -545,7 +540,6 @@ const MyPage = () => {
     );
 
     const [selectedBadge, setSelectedBadge] = useState<UserBadgeItem | null>(null);
-    // 수신자 이름 입력은 사용하지 않습니다
 
     const ensureKakaoSdk = async (): Promise<any | null> => {
         if (typeof window === "undefined") return null;
@@ -564,7 +558,7 @@ const MyPage = () => {
             if (Kakao && !Kakao.isInitialized?.()) {
                 const key =
                     process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY || (process as any).env?.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
-                if (!key) return Kakao; // 키 없으면 초기화 생략, 아래에서 기본 공유로 폴백
+                if (!key) return Kakao;
                 Kakao.init(key);
             }
         } catch {}
@@ -592,7 +586,6 @@ const MyPage = () => {
                 });
                 return;
             }
-            // 폴백: 시스템 공유 or 클립보드
             const shareText = `${bragText} ${link}`;
             if (navigator.share) {
                 try {
@@ -627,8 +620,6 @@ const MyPage = () => {
             alert("링크가 클립보드에 복사되었습니다.");
         }
     };
-
-    // (공유 선택창에서 수신자 이름을 콜백으로 제공하지 않아 자동 주입은 불가합니다)
 
     const renderBadgesTab = () => (
         <div className="space-y-6">
@@ -728,7 +719,6 @@ const MyPage = () => {
 
                 {activeTab === "profile" && renderProfileTab()}
                 {activeTab === "preferences" && renderPreferencesTab()}
-                {/* 예약 탭 제거 */}
                 {activeTab === "favorites" && renderFavoritesTab()}
                 {activeTab === "badges" && renderBadgesTab()}
                 {activeTab === "completed" && (
@@ -951,7 +941,6 @@ const MyPage = () => {
                             <div className="text-xs text-gray-400 mb-4">
                                 획득일: {new Date(selectedBadge.awarded_at).toLocaleDateString()}
                             </div>
-                            {/* 수신자 입력 칸 제거 */}
                             <div className="flex gap-2">
                                 <button
                                     className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"

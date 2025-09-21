@@ -17,43 +17,62 @@ function resolveUserId(request: NextRequest): number | null {
     return null;
 }
 
+// 👇 추가된 GET 핸들러
 export async function GET(request: NextRequest) {
     try {
         const userId = resolveUserId(request);
-        if (!userId) return NextResponse.json([], { status: 200 });
+        if (!userId) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
 
-        const rows = await (prisma as any).userFavorite.findMany({
-            where: { user_id: userId },
-            orderBy: { created_at: "desc" },
+        const favorites = await (prisma as any).userFavorite.findMany({
+            where: {
+                user_id: userId,
+            },
             include: {
-                course: {
-                    include: { course_places: { include: { places: true } } },
-                },
+                course: true, // 강좌 정보 포함
             },
         });
 
-        const data = rows.map((row: any) => {
-            const c = row.course || {};
-            const firstPlace = c.course_places?.[0]?.places || {};
-            return {
-                id: row.id,
-                course_id: c.id,
-                title: c.title || "제목 없음",
-                description: c.description || "",
-                imageUrl: c.imageUrl || firstPlace.imageUrl || "",
-                price: c.price || "",
-                rating: Number(c.rating) || 0,
-                concept: c.concept || "",
-                created_at: row.created_at,
-            };
-        });
-
-        return NextResponse.json(data, { status: 200 });
+        return NextResponse.json(favorites);
     } catch (error: any) {
-        return NextResponse.json({ error: error?.message || "favorites error" }, { status: 500 });
+        return NextResponse.json({ error: error?.message || "An error occurred" }, { status: 500 });
     }
 }
 
+export async function POST(request: NextRequest) {
+    try {
+        const userId = resolveUserId(request);
+        if (!userId) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
+        const body = await request.json();
+        const courseId = Number(body.courseId);
+
+        if (!Number.isFinite(courseId)) {
+            return NextResponse.json({ error: "courseId가 필요합니다." }, { status: 400 });
+        }
+
+        const existing = await (prisma as any).userFavorite.findFirst({
+            where: { user_id: userId, course_id: courseId },
+        });
+
+        if (existing) {
+            return NextResponse.json({ error: "Already favorited" }, { status: 409 });
+        }
+
+        await (prisma as any).userFavorite.create({
+            data: {
+                user_id: userId,
+                course_id: courseId,
+            },
+        });
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error?.message || "create error" }, { status: 500 });
+    }
+}
 export async function DELETE(request: NextRequest) {
     try {
         const userId = resolveUserId(request);
