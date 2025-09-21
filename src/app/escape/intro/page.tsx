@@ -74,6 +74,7 @@ function EscapeIntroPageInner() {
     const [showFinalMessageInBook, setShowFinalMessageInBook] = useState<boolean>(false);
     const [showGalleryInPage, setShowGalleryInPage] = useState<boolean>(false);
     const [showBadgeInPage, setShowBadgeInPage] = useState<boolean>(false);
+    const [toast, setToast] = useState<string | null>(null);
 
     // --- 수정된 부분: 사진 미션 관련 상태 추가 ---
     const [photoFiles, setPhotoFiles] = useState<File[]>([]); // 업로드할 실제 파일(2장 요구)
@@ -237,7 +238,6 @@ function EscapeIntroPageInner() {
     const goToNextChapter = async () => {
         if (!currentChapter || isSubmitting) return;
 
-        // 1. 미션 완료 여부 확인
         if (!canProceed) {
             setValidationError("미션을 완료해야 다음으로 진행할 수 있어요.");
             return;
@@ -245,19 +245,15 @@ function EscapeIntroPageInner() {
 
         setIsSubmitting(true);
         setValidationError("");
+        setToast("미션 결과를 제출하는 중..."); // 로딩 토스트 추가
 
         try {
             const missionType = String(currentChapter.mission_type || "").toUpperCase();
-
-            // DB에 저장할 데이터 준비
             let submissionPayload: any = {
-                // TODO: 실제 로그인된 사용자 ID를 동적으로 가져와야 합니다.
-                userId: 1,
                 chapterId: currentChapter.id,
                 isCorrect: true,
             };
 
-            // 2. 미션 타입에 따라 처리 분기
             if (missionType === "PHOTO") {
                 if (photoFiles.length < 2) {
                     throw new Error("사진 2장을 업로드해 주세요.");
@@ -273,28 +269,19 @@ function EscapeIntroPageInner() {
             } else if (missionType === "PUZZLE_ANSWER") {
                 submissionPayload.textAnswer = puzzleAnswer;
             }
-            // (선택적) 객관식 미션도 DB에 저장하려면 여기에 로직 추가
 
-            // 3. 미션 결과 DB 저장 API 호출
             const submitResponse = await fetch("/api/submit-mission", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                // 쿠키 기반 인증이므로 별도 Authorization 헤더는 불필요
                 credentials: "include",
-                body: JSON.stringify({
-                    chapterId: submissionPayload.chapterId,
-                    isCorrect: submissionPayload.isCorrect,
-                    textAnswer: submissionPayload.textAnswer,
-                    photoUrls: submissionPayload.photoUrls,
-                }),
+                body: JSON.stringify(submissionPayload),
             });
 
             const submitResult = await submitResponse.json();
             if (!submitResponse.ok) throw new Error(submitResult.message || "미션 결과 저장에 실패했습니다.");
 
-            console.log("미션 결과 저장 성공:", submitResult.data);
+            setToast("미션 완료!"); // 성공 토스트
 
-            // 4. 로컬 스토리지에 진행도 저장 (완료 표시)
             try {
                 const raw = localStorage.getItem(STORAGE_KEY);
                 const obj = raw ? JSON.parse(raw) : {};
@@ -307,7 +294,6 @@ function EscapeIntroPageInner() {
                 console.error("로컬 스토리지 저장 실패:", e);
             }
 
-            // 5. 다음 챕터로 이동 준비
             const nextIdx = currentChapterIdx + 1;
             if (nextIdx < chapters.length) {
                 setPendingNextIndex(nextIdx);
@@ -326,14 +312,11 @@ function EscapeIntroPageInner() {
                         const data = await res.json();
                         if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
                     } catch {}
-                    // 페이지 내 갤러리/마무리/배지 단계로 전환 (모달 사용 안 함)
                     setShowGalleryInPage(true);
-                    // 배지도 페이지에서 노출
                     try {
                         const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
                         const bd = await br.json();
                         if (br.ok && bd?.badge) setBadge(bd.badge);
-                        // 배지 존재 시 사용자에게 수여 기록
                         if (br.ok && bd?.badge?.id) {
                             const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
                             await fetch("/api/users/badges", {
@@ -352,11 +335,11 @@ function EscapeIntroPageInner() {
         } catch (error: any) {
             console.error("미션 처리 중 에러:", error);
             setValidationError(error.message || "오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+            setToast(null); // 오류 발생 시 로딩 토스트 제거
         } finally {
             setIsSubmitting(false);
         }
     };
-    // ---
 
     const goToPrevChapter = () => {
         if (currentChapterIdx > 0) {
