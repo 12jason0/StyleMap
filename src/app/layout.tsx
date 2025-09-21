@@ -24,6 +24,15 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="ko">
+            <head>
+                {/* Pretendard & SUIT Variable 폰트 로드 (CDN) */}
+                <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+                <link
+                    rel="stylesheet"
+                    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css"
+                />
+                <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/variable/stylesheet.css" />
+            </head>
             <body className={`${inter.variable} antialiased min-h-screen flex flex-col typography-smooth`}>
                 {/* Google tag (gtag.js) */}
                 <Script src="https://www.googletagmanager.com/gtag/js?id=G-R3EYQNXY13" strategy="afterInteractive" />
