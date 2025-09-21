@@ -83,6 +83,24 @@ function EscapeIntroPageInner() {
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null); // 미리보기용 URL
     // ---
 
+    // --- 사용자 현재 위치(경로 표시용) ---
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+    useEffect(() => {
+        if (typeof window === "undefined" || !navigator?.geolocation) return;
+        const onOk = (pos: GeolocationPosition) => {
+            const { latitude, longitude } = pos.coords;
+            setUserLocation({ lat: latitude, lng: longitude });
+        };
+        const onErr = () => {
+            setUserLocation(null);
+        };
+        navigator.geolocation.getCurrentPosition(onOk, onErr, {
+            enableHighAccuracy: true,
+            maximumAge: 60_000,
+            timeout: 8_000,
+        });
+    }, []);
+
     // --- 지도 컴포넌트 동적 로딩 ---
     const KakaoMap = useMemo(
         () =>
@@ -96,6 +114,28 @@ function EscapeIntroPageInner() {
             }),
         []
     );
+
+    // 책 오픈 애니메이션이 끝난 뒤에 지도 컴포넌트를 마운트하도록 약간 지연
+    const [mountMapAfterOpen, setMountMapAfterOpen] = useState<boolean>(false);
+    useEffect(() => {
+        if (!animationFinished) return;
+        const t = setTimeout(() => setMountMapAfterOpen(true), 150);
+        return () => clearTimeout(t);
+    }, [animationFinished]);
+
+    // 모바일 판단 및 지도 모달 상태
+    const [isMobile, setIsMobile] = useState<boolean>(false);
+    const [showMapModal, setShowMapModal] = useState<boolean>(false);
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const mq = window.matchMedia("(max-width: 768px)");
+        const update = () => setIsMobile(mq.matches);
+        update();
+        mq.addEventListener?.("change", update);
+        return () => mq.removeEventListener?.("change", update);
+    }, []);
+
+    // 책이 열린 뒤 모바일이면 지도를 모달로 자동 오픈 (currentChapter 정의 이후에서 다시 설정)
 
     // --- Effect Hooks ---
     // ✅✅✅ 이 부분이 수정되었습니다 ✅✅✅
@@ -171,7 +211,27 @@ function EscapeIntroPageInner() {
           ]
         : [];
 
+    // 경로 표시를 위해 현재 위치를 시작점으로 포함
+    const mapPlaces = userLocation
+        ? [
+              {
+                  id: -1,
+                  name: "현재 위치",
+                  latitude: userLocation.lat,
+                  longitude: userLocation.lng,
+              },
+              ...currentPlace,
+          ]
+        : currentPlace;
+
     const numFlipPages = 11;
+
+    // 책이 열린 뒤 모바일이면 지도를 모달로 자동 오픈
+    useEffect(() => {
+        if (animationFinished && mountMapAfterOpen && isMobile && currentChapter && chapters.length > 0) {
+            setShowMapModal(true);
+        }
+    }, [animationFinished, mountMapAfterOpen, isMobile, currentChapter, chapters.length]);
 
     const handleCloseBook = () => {
         // 종료 전 모든 엔딩/배지/갤러리 상태 정리
@@ -420,7 +480,7 @@ function EscapeIntroPageInner() {
     }
 
     return (
-        <div className="fixed inset-0 bg-[aliceblue] flex items-center justify-center pl-[20vw] md:pl-[24vw]">
+        <div className="fixed inset-0 bg-[aliceblue] flex items-center justify-center pl-0 sm:pl-[12vw] md:pl-[24vw]">
             <style>
                 {`
 @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");
@@ -441,11 +501,12 @@ body {
     background-color: aliceblue; 
 }
 .book { 
-    width: 52vh; 
-    height: 78vh; 
+    width: 88vw; 
+    max-width: 520px;
+    aspect-ratio: 2/3;
     border-radius: 0 24px 24px 0; 
     transform-style: preserve-3d; 
-    transform: scale(0.5) rotateX(60deg) rotateZ(30deg); 
+    transform: scale(0.92) rotateX(10deg) rotateZ(0deg); 
     animation: move-book var(--duration) ease-in-out forwards; 
     animation-delay: var(--initial-delay); 
 }
@@ -521,11 +582,11 @@ body {
 }
 @keyframes move-book { 
     from { 
-        perspective: 2000px; 
-        transform: scale(0.5) rotateX(60deg) rotateZ(30deg); 
+        perspective: 1200px; 
+        transform: scale(0.86) rotateX(16deg) rotateZ(0deg); 
     } 
     to { 
-        perspective: 5000px; 
+        perspective: 2200px; 
         transform: scale(1) rotateX(0deg) rotateZ(0deg); 
     } 
 }
@@ -579,11 +640,11 @@ body {
     }
 }
 .parchment-modal { position: fixed; inset: 0; z-index: 1400; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.45); }
-.parchment { position: relative; width: min(92vw, 820px); max-height: 80vh; overflow: hidden; border-radius: 22px; padding: 22px 22px 18px 22px; background: radial-gradient(120% 60% at 0% 0%, rgba(120, 84, 40, .18), transparent 55%), radial-gradient(120% 60% at 100% 0%, rgba(120, 84, 40, .18), transparent 55%), radial-gradient(120% 60% at 0% 100%, rgba(120, 84, 40, .18), transparent 55%), radial-gradient(120% 60% at 100% 100%, rgba(120, 84, 40, .18), transparent 55%), linear-gradient(180deg, #f6efe1 0%, #efe5ce 100%); border: 3px solid rgba(105, 73, 37, .35); box-shadow: 0 20px 40px rgba(0,0,0,.35), inset 0 0 80px rgba(60, 42, 25, .25), inset 0 0 8px rgba(255, 255, 255, .35); }
+.parchment { position: relative; width: min(94vw, 820px); max-height: 82vh; overflow: hidden; border-radius: 18px; padding: 18px 16px 14px 16px; background: radial-gradient(120% 60% at 0% 0%, rgba(120, 84, 40, .18), transparent 55%), radial-gradient(120% 60% at 100% 0%, rgba(120, 84, 40, .18), transparent 55%), radial-gradient(120% 60% at 0% 100%, rgba(120, 84, 40, .18), transparent 55%), radial-gradient(120% 60% at 100% 100%, rgba(120, 84, 40, .18), transparent 55%), linear-gradient(180deg, #f6efe1 0%, #efe5ce 100%); border: 3px solid rgba(105, 73, 37, .35); box-shadow: 0 20px 40px rgba(0,0,0,.35), inset 0 0 80px rgba(60, 42, 25, .25), inset 0 0 8px rgba(255, 255, 255, .35); }
 .parchment:before { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background-image: repeating-linear-gradient(0deg, rgba(0,0,0,.025) 0, rgba(0,0,0,.025) 1px, transparent 1px, transparent 3px), repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0, rgba(0,0,0,.02) 1px, transparent 1px, transparent 3px); mix-blend-mode: multiply; }
 .parchment:after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 120px rgba(0,0,0,.35), inset 0 0 18px rgba(120,80,40,.45); }
-.parchment-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; color: #3f2d20; letter-spacing: .5px; margin-bottom: 12px; }
-.parchment-body { background: rgba(255,255,255,.35); border: 1px solid rgba(124, 92, 55, .35); border-radius: 14px; padding: 14px; color: #2b2117; max-height: 54vh; overflow: auto; }
+.parchment-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: #3f2d20; letter-spacing: .5px; margin-bottom: 10px; }
+.parchment-body { background: rgba(255,255,255,.35); border: 1px solid rgba(124, 92, 55, .35); border-radius: 12px; padding: 12px; color: #2b2117; max-height: 56vh; overflow: auto; }
 .parchment-actions { display: flex; justify-content: end; gap: 10px; margin-top: 14px; }
 .btn-ghost { background: #fff; border: 1px solid rgba(60,42,25,.35); border-radius: 10px; padding: 8px 14px; cursor: pointer; }
 .btn-ghost:hover { background: #faf7f0; }
@@ -617,57 +678,62 @@ body {
                             opacity: animationFinished ? 1 : 0,
                         }}
                     >
-                        {animationFinished && currentChapter && chapters.length > 0 && (
-                            <div
-                                className="w-full h-full p-6 flex flex-col content-flip"
-                                style={{ transformOrigin: "center" }}
-                            >
-                                <div className="relative mb-4 border-b-2 pb-3">
-                                    <div className="flex items-center justify-center gap-3">
-                                        {currentChapter.chapter_number === 1 && (
-                                            <button
-                                                onClick={() => router.push("/escape")}
-                                                className="hover:cursor-pointer px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
-                                            >
-                                                escape로 이동
-                                            </button>
-                                        )}
-                                        <h2 className="text-xl font-bold text-gray-900">
-                                            Chapter {currentChapter.chapter_number}. {currentChapter.title || "스토리"}
-                                        </h2>
+                        {animationFinished &&
+                            mountMapAfterOpen &&
+                            currentChapter &&
+                            chapters.length > 0 &&
+                            !isMobile && (
+                                <div
+                                    className="w-full h-full p-6 flex flex-col content-flip"
+                                    style={{ transformOrigin: "center" }}
+                                >
+                                    <div className="relative mb-4 border-b-2 pb-3">
+                                        <div className="flex items-center justify-center gap-3">
+                                            {currentChapter.chapter_number === 1 && (
+                                                <button
+                                                    onClick={() => router.push("/escape")}
+                                                    className="hover:cursor-pointer px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
+                                                >
+                                                    escape로 이동
+                                                </button>
+                                            )}
+                                            <h2 className="text-xl font-bold text-gray-900">
+                                                Chapter {currentChapter.chapter_number}.{" "}
+                                                {currentChapter.title || "스토리"}
+                                            </h2>
+                                        </div>
                                     </div>
+                                    <div className="relative flex-1 rounded-lg overflow-hidden border-2 border-gray-300 shadow-md mb-4">
+                                        <KakaoMap
+                                            places={mapPlaces as any}
+                                            userLocation={userLocation as any}
+                                            selectedPlace={null}
+                                            onPlaceClick={() => {}}
+                                            className="w-full h-full"
+                                            drawPath={!!userLocation}
+                                            routeMode="driving"
+                                        />
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded border">
+                                        <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
+                                            📍 위치
+                                        </h3>
+                                        <p className="text-base text-gray-900">
+                                            <strong>{currentChapter.location_name || "위치 정보"}</strong>
+                                            <br />
+                                            {currentChapter.address || "주소 정보 없음"}
+                                        </p>
+                                    </div>
+                                    {currentChapterIdx > 0 && (
+                                        <button
+                                            onClick={goToPrevChapter}
+                                            className="hover:cursor-pointer mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
+                                        >
+                                            ← 이전 챕터
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="relative flex-1 rounded-lg overflow-hidden border-2 border-gray-300 shadow-md mb-4">
-                                    <KakaoMap
-                                        places={currentPlace as any}
-                                        userLocation={null}
-                                        selectedPlace={null}
-                                        onPlaceClick={() => {}}
-                                        className="w-full h-full"
-                                        drawPath={false}
-                                        routeMode="simple"
-                                    />
-                                </div>
-                                <div className="bg-gray-50 p-4 rounded border">
-                                    <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
-                                        📍 위치
-                                    </h3>
-                                    <p className="text-base text-gray-900">
-                                        <strong>{currentChapter.location_name || "위치 정보"}</strong>
-                                        <br />
-                                        {currentChapter.address || "주소 정보 없음"}
-                                    </p>
-                                </div>
-                                {currentChapterIdx > 0 && (
-                                    <button
-                                        onClick={goToPrevChapter}
-                                        className="hover:cursor-pointer mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
-                                    >
-                                        ← 이전 챕터
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                            )}
                     </div>
 
                     {/* 오른쪽 페이지 (미션) */}
@@ -687,6 +753,16 @@ body {
                                         <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
                                             🎯 미션
                                         </h2>
+                                        {isMobile && (
+                                            <div className="flex justify-end -mt-2 mb-2">
+                                                <button
+                                                    onClick={() => setShowMapModal(true)}
+                                                    className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
+                                                >
+                                                    지도 보기
+                                                </button>
+                                            </div>
+                                        )}
                                         <div className="mb-4">
                                             <h3 className="text-lg font-bold mb-2 text-gray-800">📖 이야기</h3>
                                             <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border">
@@ -883,14 +959,45 @@ body {
                     </div>
                 )}
 
+                {/* 모바일: 지도 모달 */}
+                {isMobile && showMapModal && (
+                    <div
+                        className="fixed inset-0 z-[1400] bg-black/50 flex items-center justify-center p-4"
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <div className="bg-white rounded-2xl w-full max-w-md h-[78vh] overflow-hidden relative">
+                            <div className="absolute top-3 right-3 z-10">
+                                <button
+                                    onClick={() => setShowMapModal(false)}
+                                    className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-black/80 text-white"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                            <div className="w-full h-full">
+                                <KakaoMap
+                                    places={mapPlaces as any}
+                                    userLocation={userLocation as any}
+                                    selectedPlace={null}
+                                    onPlaceClick={() => {}}
+                                    className="w-full h-full"
+                                    drawPath={!!userLocation}
+                                    routeMode="driving"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* 엔딩 섹션: 페이지 내부에 사진 액자/마무리/배지 */}
                 {animationFinished && chapters.length > 0 && showGalleryInPage && (
                     <div className="absolute inset-0 z-[1200] pointer-events-none">
                         <div className="absolute right-0 top-0 bottom-0 w-1/2 p-6 pointer-events-auto">
-                            <div className="bg-white/90 rounded-xl border shadow p-4 h-full overflow-auto">
+                            <div className="bg-white/90 rounded-xl border shadow p-3 sm:p-4 h-full overflow-auto">
                                 <div className="text-lg font-bold mb-3">🖼️ 추억 액자</div>
                                 {galleryUrls.length > 0 ? (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                                         {galleryUrls.map((u, i) => (
                                             <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
                                                 <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
@@ -925,9 +1032,9 @@ body {
                 {/* 배지: 페이지 내부 오른쪽 하단 카드 */}
                 {animationFinished && chapters.length > 0 && !showGalleryInPage && showFinalMessageInBook && (
                     <div className="absolute inset-0 z-[1200] pointer-events-none">
-                        <div className="absolute right-6 bottom-6 w-[320px] pointer-events-auto">
+                        <div className="absolute right-4 bottom-4 w-[86vw] sm:w-[360px] pointer-events-auto">
                             <div className="bg-white/95 rounded-xl border shadow p-4">
-                                <div className="text-base font-bold mb-2 flex items-center gap-2">
+                                <div className="text-base sm:text-lg font-bold mb-2 flex items-center gap-2">
                                     <span>🏅</span>
                                     <span>배지 획득</span>
                                 </div>
@@ -938,7 +1045,7 @@ body {
                                         className="w-28 h-28 object-contain mx-auto"
                                     />
                                 )}
-                                <div className="text-center text-sm font-semibold mt-2">
+                                <div className="text-center text-sm sm:text-base font-semibold mt-2">
                                     {badge?.name || "새로운 배지"}
                                 </div>
                                 {badge?.description && (

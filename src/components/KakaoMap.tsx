@@ -248,9 +248,18 @@ export default function KakaoMap({
                         polylineRef.current = simpleLine;
                         return;
                     }
-                    const res = await fetch(`/api/directions?coords=${encodeURIComponent(coordStr)}&mode=foot`, {
-                        cache: "no-store",
-                    });
+                    const modeParam =
+                        routeMode === "walking" || routeMode === "foot"
+                            ? "walking"
+                            : routeMode === "simple"
+                            ? "walking"
+                            : "driving";
+                    const res = await fetch(
+                        `/api/directions?coords=${encodeURIComponent(coordStr)}&mode=${modeParam}`,
+                        {
+                            cache: "no-store",
+                        }
+                    );
                     const data = await res.json();
                     if (data?.success && Array.isArray(data.coordinates)) {
                         const path = data.coordinates.map(
