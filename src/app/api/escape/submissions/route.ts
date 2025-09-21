@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { getUserIdFromRequest, getJwtSecret } from "@/lib/auth";
+import jwt from "jsonwebtoken";
+
+// Bearer 토큰 또는 'auth' 쿠키에서 사용자 ID를 가져오는 헬퍼 함수
+function resolveUserId(request: NextRequest): number | null {
+    const fromHeader = getUserIdFromRequest(request);
+    if (fromHeader && Number.isFinite(Number(fromHeader))) {
+        return Number(fromHeader);
+    }
+    const token = request.cookies.get("auth")?.value;
+    if (!token) return null;
+    try {
+        const payload = jwt.verify(token, getJwtSecret()) as { userId?: number | string };
+        if (payload?.userId) return Number(payload.userId);
+    } catch {}
+    return null;
+}
 
 export async function GET(request: NextRequest) {
     try {
-        const userIdStr = getUserIdFromRequest(request);
-        if (!userIdStr) {
+        const userId = resolveUserId(request); // <-- 수정된 부분
+        if (!userId) {
             return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
         }
-        const userId = Number(userIdStr);
+
         const { searchParams } = new URL(request.url);
         const storyId = Number(searchParams.get("storyId"));
         if (!Number.isFinite(storyId)) {

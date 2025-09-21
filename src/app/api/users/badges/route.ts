@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { getUserIdFromRequest, getJwtSecret } from "@/lib/auth";
 import jwt from "jsonwebtoken";
 export const dynamic = "force-dynamic";
+
 // Bearer 토큰 또는 'auth' 쿠키에서 사용자 ID를 가져오는 헬퍼 함수
 function resolveUserId(request: NextRequest): number | null {
     const fromHeader = getUserIdFromRequest(request);
@@ -26,12 +27,11 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
         }
 
-        // 'include'를 사용하여 한 번의 쿼리로 관련된 배지 데이터를 함께 가져옵니다.
         const userBadges = await prisma.userBadge.findMany({
             where: { user_id: userId },
             orderBy: { awarded_at: "desc" },
             include: {
-                badge: true, // Prisma가 관련된 Badge 객체도 함께 가져오도록 설정
+                badge: true,
             },
         });
 
@@ -39,9 +39,8 @@ export async function GET(request: NextRequest) {
             return NextResponse.json([]);
         }
 
-        // 데이터를 원하는 형식으로 매핑하고, 연결된 배지가 없는 경우를 필터링합니다.
         const result = userBadges
-            .filter((userBadge) => userBadge.badge) // 배지 정보가 없는 레코드는 제외 (안전장치)
+            .filter((userBadge) => userBadge.badge)
             .map((userBadge) => ({
                 id: userBadge.badge.id,
                 name: userBadge.badge.name,
@@ -56,3 +55,41 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ message: error?.message || "배지 조회에 실패했습니다." }, { status: 500 });
     }
 }
+
+// --- ⬇️ 추가된 부분: 새로운 배지를 수여하는 POST 엔드포인트 ⬇️ ---
+export async function POST(request: NextRequest) {
+    try {
+        const userId = resolveUserId(request);
+        if (!userId) {
+            return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
+        }
+
+        const { badgeId } = await request.json();
+        if (!badgeId) {
+            return NextResponse.json({ message: "badgeId가 필요합니다." }, { status: 400 });
+        }
+
+        // 이미 해당 배지가 있는지 확인 (중복 방지)
+        const existing = await prisma.userBadge.findFirst({
+            where: { user_id: userId, badge_id: Number(badgeId) },
+        });
+
+        if (existing) {
+            return NextResponse.json({ message: "이미 획득한 배지입니다." });
+        }
+
+        // 새 배지 추가
+        await prisma.userBadge.create({
+            data: {
+                user_id: userId,
+                badge_id: Number(badgeId),
+            },
+        });
+
+        return NextResponse.json({ success: true, message: "배지가 수여되었습니다." }, { status: 201 });
+    } catch (error: any) {
+        console.error("배지 수여 실패:", error);
+        return NextResponse.json({ message: error?.message || "배지 수여에 실패했습니다." }, { status: 500 });
+    }
+}
+// --- ⬆️ 여기까지 추가되었습니다 ⬆️ ---
