@@ -586,7 +586,7 @@ const MyPage = () => {
     );
 
     const [selectedBadge, setSelectedBadge] = useState<UserBadgeItem | null>(null);
-    const [receiverName, setReceiverName] = useState<string>("");
+    // 수신자 이름 입력은 사용하지 않습니다
 
     const ensureKakaoSdk = async (): Promise<any | null> => {
         if (typeof window === "undefined") return null;
@@ -617,9 +617,9 @@ const MyPage = () => {
             const Kakao = await ensureKakaoSdk();
             const link = typeof location !== "undefined" ? location.href : "";
             const imageUrl = badge.image_url || "/images/maker.png";
-            const bragText = `${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! ${
-                receiverName ? `${receiverName}님도 할 수 있어요! ` : ""
-            }StyleMap에서 함께 도전해요 ✨`;
+            const bragText = `${userInfo?.name || "저"}는 '${
+                badge.name
+            }' 배지를 획득했어요! StyleMap에서 함께 도전해요 ✨`;
             if (Kakao && Kakao.Share) {
                 Kakao.Share.sendDefault({
                     objectType: "feed",
@@ -927,13 +927,7 @@ const MyPage = () => {
                             <div className="text-xs text-gray-400 mb-4">
                                 획득일: {new Date(selectedBadge.awarded_at).toLocaleDateString()}
                             </div>
-                            <input
-                                type="text"
-                                value={receiverName}
-                                onChange={(e) => setReceiverName(e.target.value)}
-                                placeholder="받는 분 이름 (선택)"
-                                className="w-full mb-3 px-3 py-2 rounded-lg border text-sm"
-                            />
+                            {/* 수신자 입력 칸 제거 */}
                             <div className="flex gap-2">
                                 <button
                                     className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"
@@ -945,7 +939,6 @@ const MyPage = () => {
                                     className="hover:cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
                                     onClick={() => {
                                         setSelectedBadge(null);
-                                        setReceiverName("");
                                     }}
                                 >
                                     닫기
