@@ -352,8 +352,16 @@ export default function CourseDetailPage() {
             const response = await fetch(`/api/reviews?courseId=${courseId}`);
             const data = await response.json();
 
-            if (response.ok) {
-                setReviews(data.reviews || []);
+            if (response.ok && Array.isArray(data)) {
+                setReviews(
+                    data.map((r: any) => ({
+                        id: r.id,
+                        rating: r.rating,
+                        userName: r.user?.nickname || "익명",
+                        createdAt: r.createdAt,
+                        content: r.comment,
+                    }))
+                );
             } else {
                 console.error("후기 목록 가져오기 실패:", data.error);
                 setReviewsError(data.error || "후기 목록을 가져오는데 실패했습니다.");

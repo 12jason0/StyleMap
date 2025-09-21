@@ -15,7 +15,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
 
     return (
         <>
-            <div className={isEscapeIntroPage || isCourseStartPage ? "hidden" : undefined}>
+            <div className={isEscapeIntroPage ? "hidden" : undefined}>
                 <Header />
             </div>
             <main className="flex-1">{children}</main>

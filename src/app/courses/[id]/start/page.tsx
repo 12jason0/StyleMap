@@ -126,7 +126,7 @@ function GuidePageInner() {
     }
 
     return (
-        <div className="flex flex-col h-screen bg-gray-50 text-black pt-16 pb-16">
+        <div className="flex flex-col h-screen bg-white text-black pt-16">
             {/* 지도 영역 */}
             <div className="flex-1 relative min-w-0">
                 <KakaoMap
@@ -135,6 +135,8 @@ function GuidePageInner() {
                     selectedPlace={null}
                     onPlaceClick={() => {}}
                     className="w-full h-full"
+                    drawPath={!!userLocation}
+                    routeMode="driving"
                 />
 
                 {/* 패널 토글 버튼 */}
@@ -147,7 +149,7 @@ function GuidePageInner() {
 
                 {/* 지도 위 하단 모달 패널 */}
                 {showPanel && (
-                    <div className="absolute inset-x-0 bottom-16 z-10 px-4 pb-[env(safe-area-inset-bottom)]">
+                    <div className="absolute inset-x-0 bottom-20 z-10 px-4 pb-[env(safe-area-inset-bottom)]">
                         <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white rounded-2xl shadow-xl border p-4">
                             <div className="mb-3">
                                 <h2 className="text-xl font-bold">{currentPlace.name}</h2>

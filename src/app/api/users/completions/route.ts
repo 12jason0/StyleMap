@@ -99,7 +99,12 @@ export async function GET(request: NextRequest) {
                     completedAt: row.completedAt || null,
                 };
             });
-            return NextResponse.json(mapped);
+            // 동일 코스 중복 제거 (최근 완료 우선)
+            const uniqueByCourse = new Map<number, any>();
+            for (const item of mapped) {
+                if (!uniqueByCourse.has(item.course_id)) uniqueByCourse.set(item.course_id, item);
+            }
+            return NextResponse.json(Array.from(uniqueByCourse.values()));
         } catch (e) {
             // 2) 하위 호환: preferences JSON에서 조회
             const existing = await prisma.userPreferences.findUnique({
@@ -138,7 +143,11 @@ export async function GET(request: NextRequest) {
                         completedAt: rec.completedAt || null,
                     };
                 });
-            return NextResponse.json(result);
+            const uniqueByCourse = new Map<number, any>();
+            for (const item of result) {
+                if (!uniqueByCourse.has(item.course_id)) uniqueByCourse.set(item.course_id, item);
+            }
+            return NextResponse.json(Array.from(uniqueByCourse.values()));
         }
     } catch (error: any) {
         return NextResponse.json({ error: error?.message || "completions get failed" }, { status: 500 });

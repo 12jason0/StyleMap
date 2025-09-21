@@ -203,6 +203,13 @@ export default function KakaoMap({
                 bounds.extend(position);
             });
 
+            // 사용자 현재 위치도 경계에 포함하여 두 지점이 모두 보이도록 처리
+            if (userLocation) {
+                try {
+                    bounds.extend(new kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+                } catch {}
+            }
+
             // 지도 범위/중심 조정
             if (places.length > 0) {
                 if (!selectedPlace) {
@@ -220,8 +227,8 @@ export default function KakaoMap({
                 }
             }
 
-            // 경로 그리기
-            if (drawPath && places.length >= 2) {
+            // 경로 그리기: 사용자 위치가 있으면 (현재 위치 -> 첫 장소)도 허용
+            if (drawPath && ((userLocation && places.length >= 1) || places.length >= 2)) {
                 const sortedForPath = [...places].sort((a: any, b: any) => {
                     const aOrder = typeof a?.order === "number" ? a.order : Number.MAX_SAFE_INTEGER;
                     const bOrder = typeof b?.order === "number" ? b.order : Number.MAX_SAFE_INTEGER;
@@ -230,9 +237,11 @@ export default function KakaoMap({
                 });
 
                 try {
-                    const coords = sortedForPath.map((p) => {
+                    const coords: [number, number][] = [];
+                    if (userLocation) coords.push([userLocation.lng, userLocation.lat]);
+                    sortedForPath.forEach((p) => {
                         const pos = resolvedPositionsRef.current[p.id];
-                        return [pos.getLng(), pos.getLat()];
+                        coords.push([pos.getLng(), pos.getLat()]);
                     });
                     const coordStr = coords.map((c) => `${c[0]},${c[1]}`).join(";");
                     if (routeMode === "simple") {
@@ -279,9 +288,11 @@ export default function KakaoMap({
                 } catch {}
 
                 // 실패 시 직선 연결 폴백 (도보 그린)
-                const fallbackPath = sortedForPath.map((p) => {
+                const fallbackPath: any[] = [];
+                if (userLocation) fallbackPath.push(new kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+                sortedForPath.forEach((p) => {
                     const pos = resolvedPositionsRef.current[p.id];
-                    return new kakao.maps.LatLng(pos.getLat(), pos.getLng());
+                    fallbackPath.push(new kakao.maps.LatLng(pos.getLat(), pos.getLng()));
                 });
                 const fallbackPolyline = new kakao.maps.Polyline({
                     path: fallbackPath,
