@@ -340,9 +340,12 @@ export default function escapePage() {
         const nextMap = { ...progressMap, [String(selectedStory.id)]: nextProgress };
         setProgressMap(nextMap);
         writeProgress(nextMap);
+        const authToken = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
         fetch("/api/escape/progress", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify(nextProgress),
         }).catch(() => {});
         setAnswer("");
@@ -360,7 +363,7 @@ export default function escapePage() {
 
     return (
         <div className="min-h-screen bg-white text-black">
-            <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
+            <section className="max-w-7xl mx-auto px-4 pt-20 md:pt-24 pb-12">
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold">Escape 미션</h1>
                     <button
@@ -748,7 +751,7 @@ export default function escapePage() {
                     aria-modal="true"
                 >
                     <div
-                        className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+                        className="bg-white rounded-2xl w-full max-w-4xl h-[100vh] md:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-4">
@@ -979,7 +982,7 @@ export default function escapePage() {
                     aria-modal="true"
                 >
                     <div
-                        className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+                        className="bg-white rounded-2xl w-full max-w-4xl h-[100vh] md:max-h-[90vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-4">
@@ -1095,7 +1098,7 @@ export default function escapePage() {
             )}
 
             {toast && (
-                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-4 py-3 rounded-lg shadow-lg z-50">
+                <div className="fixed left-1/2 -translate-x-1/2 bg-black text-white text-sm px-4 py-3 rounded-lg shadow-lg z-50 bottom-4 md:bottom-6 pb-[env(safe-area-inset-bottom)]">
                     {toast}
                 </div>
             )}
