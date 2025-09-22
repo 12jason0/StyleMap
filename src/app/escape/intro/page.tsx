@@ -321,10 +321,27 @@ function EscapeIntroPageInner() {
                     throw new Error("사진 2장을 업로드해 주세요.");
                 }
                 const formData = new FormData();
-                photoFiles.forEach((f) => formData.append("photos", f));
+
+                // --- 👇 디버깅 로그 추가 시작 👇 ---
+                console.log("[Client Debug] Preparing to upload files...");
+                photoFiles.forEach((file, index) => {
+                    console.log(
+                        `[Client Debug] File ${index + 1}: name="${file.name}", size=${file.size}, type="${file.type}"`
+                    );
+                    formData.append("photos", file);
+                });
+                console.log("[Client Debug] FormData created. Sending request to /api/upload");
+                // --- 👆 디버깅 로그 추가 끝 👆 ---
 
                 const uploadResponse = await fetch("/api/upload", { method: "POST", body: formData });
-                const uploadResult = await uploadResponse.json();
+
+                // --- 👇 디버깅 로그 추가 시작 👇 ---
+                console.log(`[Client Debug] Received response from /api/upload with status: ${uploadResponse.status}`);
+                const responseText = await uploadResponse.text(); // 응답을 텍스트로 먼저 받아서 확인
+                console.log(`[Client Debug] Response body: ${responseText}`);
+                // --- 👆 디버깅 로그 추가 끝 👆 ---
+
+                const uploadResult = JSON.parse(responseText); // 텍스트를 JSON으로 파싱
                 if (!uploadResponse.ok) throw new Error(uploadResult.message || "사진 업로드에 실패했습니다.");
 
                 submissionPayload.photoUrls = uploadResult.photo_urls;
@@ -398,6 +415,8 @@ function EscapeIntroPageInner() {
             }
         } catch (error: any) {
             console.error("미션 처리 중 에러:", error);
+            console.log(`[Client Debug] An error occurred: ${error.message}`);
+            console.log(`[Client Debug] Error stack: ${error.stack}`);
             setValidationError(error.message || "오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
             setToast(null); // 오류 발생 시 로딩 토스트 제거
         } finally {
