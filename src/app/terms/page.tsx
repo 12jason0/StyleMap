@@ -119,6 +119,10 @@ export default function TermsOfServicePage() {
                                 외설 또는 폭력적인 메시지, 화상, 음성 기타 공서양속에 반하는 정보를 서비스에 공개 또는
                                 게시하는 행위
                             </li>
+                            <li className="font-semibold text-blue-800 bg-blue-50 p-2 rounded-md">
+                                사진 등 콘텐츠 업로드 시, 타인의 저작권, 초상권 등 제3자의 권리를 침해하는 콘텐츠를
+                                게시하는 행위. 회원이 게시하는 모든 콘텐츠에 대한 법적 책임은 회원 본인에게 있습니다.
+                            </li>
                         </ul>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제8조 (서비스의 중단)</h2>

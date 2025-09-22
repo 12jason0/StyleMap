@@ -69,10 +69,18 @@ export default function PrivacyPolicyPage() {
                                 <strong>선택 항목:</strong> 프로필 이미지, 여행 선호도 정보 (MBTI, 선호 지역 등)
                             </li>
                         </ul>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">2. 미션 참여 등 특정 기능 이용 시</h3>
+                        <ul className="list-disc pl-6 mb-4 text-gray-700">
+                            <li>
+                                <strong>'Escape 미션' 사진 업로드:</strong> 미션 수행을 위해 이용자가 직접 촬영하거나
+                                선택하여 업로드하는 사진 파일. 해당 사진은 서비스 내 '추억 액자'와 같은 기능으로
+                                본인에게 다시 보여질 수 있습니다.
+                            </li>
+                        </ul>
 
                         {/* [수정된 부분] 자동 수집 항목을 더 구체화합니다. */}
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                            2. 서비스 이용과정에서 자동 생성 및 수집되는 정보
+                            3. 서비스 이용과정에서 자동 생성 및 수집되는 정보
                         </h3>
                         <ul className="list-disc pl-6 mb-6 text-gray-700">
                             <li>

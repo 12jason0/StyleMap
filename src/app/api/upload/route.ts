@@ -6,6 +6,26 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
     try {
+        // 1) 업로드 프록시 모드: FORWARD_UPLOAD_URL(또는 UPLOAD_FORWARD_URL)이 설정되어 있으면 해당 주소로 그대로 전달
+        const forwardUrl = process.env.FORWARD_UPLOAD_URL || process.env.UPLOAD_FORWARD_URL;
+        if (forwardUrl) {
+            const originalForm = await request.formData();
+            const forwardForm = new FormData();
+            for (const [key, value] of originalForm.entries()) {
+                forwardForm.append(key, value as any);
+            }
+
+            const resp = await fetch(forwardUrl, { method: "POST", body: forwardForm as any });
+            const contentType = resp.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+                const data = await resp.json().catch(() => ({}));
+                return NextResponse.json(data, { status: resp.status });
+            }
+            const text = await resp.text();
+            return new NextResponse(text, { status: resp.status });
+        }
+
+        // 2) 기본 모드: 서버에서 S3로 직접 업로드
         const form = await request.formData();
         const files = form.getAll("photos") as File[];
 
