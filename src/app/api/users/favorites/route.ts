@@ -21,9 +21,8 @@ function resolveUserId(request: NextRequest): number | null {
 export async function GET(request: NextRequest) {
     try {
         const userId = resolveUserId(request);
-        if (!userId) {
-            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
-        }
+        // 비로그인 사용자는 빈 배열 반환(클라이언트 에러 방지)
+        if (!userId) return NextResponse.json([], { status: 200 });
 
         const favorites = await (prisma as any).userFavorite.findMany({
             where: {

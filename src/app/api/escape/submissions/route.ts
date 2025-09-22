@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
             select: { photoUrl: true },
         });
 
-        const urls = submissions.map((s) => s.photoUrl!).filter(Boolean);
+        const urls = submissions.map((s: { photoUrl: string | null }) => s.photoUrl!).filter(Boolean) as string[];
         return NextResponse.json({ success: true, urls });
     } catch (error: any) {
         return NextResponse.json({ message: error?.message || "조회 실패" }, { status: 500 });

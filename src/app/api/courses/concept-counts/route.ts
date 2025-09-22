@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest) {
@@ -18,7 +19,7 @@ export async function GET(_request: NextRequest) {
 
         return NextResponse.json(counts, {
             headers: {
-                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", // 5분 캐시, 10분 stale-while-revalidate
+                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
             },
         });
     } catch (error) {
