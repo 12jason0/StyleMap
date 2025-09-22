@@ -567,12 +567,18 @@ body {
     padding: 5%; 
     border: 12px double var(--color-cover-text); 
     text-align: center; 
+    overflow: hidden;
 }
 .cover h1, .cover h2 { 
     font-weight: 300; 
 }
 .cover h1 { 
     text-transform: uppercase; 
+}
+.cover h1, .cover h2 {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
 }
 .cover img { 
     width: 50%; 
@@ -751,7 +757,7 @@ body {
                         }}
                     >
                         {animationFinished && currentChapter && chapters.length > 0 && (
-                            <div className="w-full h-full p-6 flex flex-col">
+                            <div className="w-full h-full p-6 flex flex-col overflow-hidden">
                                 {!showFinalMessageInBook ? (
                                     <>
                                         <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
@@ -769,14 +775,14 @@ body {
                                         )}
                                         <div className="mb-4">
                                             <h3 className="text-lg font-bold mb-2 text-gray-800">📖 이야기</h3>
-                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border">
+                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border break-words max-h-56 md:max-h-72 overflow-auto">
                                                 {currentChapter.story_text || "이야기 내용이 없습니다."}
                                             </div>
                                         </div>
-                                        <div className="flex-1 flex flex-col">
+                                        <div className="flex-1 min-h-0 flex flex-col">
                                             <h3 className="text-lg font-bold mb-2 text-gray-800">❓ 질문</h3>
-                                            <div className="flex-1 bg-blue-50 rounded p-4 border-2 border-blue-200">
-                                                <div className="text-lg font-semibold text-blue-900 mb-3">
+                                            <div className="flex-1 bg-blue-50 rounded p-4 border-2 border-blue-200 overflow-auto">
+                                                <div className="text-lg font-semibold text-blue-900 mb-3 break-words">
                                                     {currentChapter.mission_payload?.question || "질문이 없습니다."}
                                                 </div>
 

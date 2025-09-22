@@ -62,21 +62,28 @@ export async function GET(request: NextRequest) {
         // 이미지 정책 적용: 코스 내 장소 이미지가 하나도 없거나 전부 있는 코스만 허용
         const imagePolicyApplied = filterCoursesByImagePolicy(results as any[], imagePolicy);
 
-        // [수정됨] 복잡한 이미지 필터링 로직을 제거하고 조회된 결과를 바로 포맷팅합니다.
-        const formattedCourses = imagePolicyApplied.map((course: any) => ({
-            id: String(course.id),
-            title: course.title || "제목 없음",
-            description: course.description || "",
-            duration: course.duration || "",
-            location: course.region || "",
-            price: course.price || "",
-            imageUrl: course.imageUrl || "",
-            concept: course.concept || "",
-            rating: Number(course.rating) || 0,
-            reviewCount: 0, // 이 값은 나중에 별도 로직으로 채워야 합니다.
-            participants: course.current_participants || 0,
-            viewCount: course.view_count || 0,
-        }));
+        // 이미지가 비어 있으면 코스의 첫 장소 이미지나 기본 플레이스홀더로 대체
+        const formattedCourses = imagePolicyApplied.map((course: any) => {
+            const firstPlaceImage = Array.isArray(course?.course_places)
+                ? course.course_places.find((cp: any) => cp?.places?.imageUrl)?.places?.imageUrl
+                : undefined;
+            const resolvedImageUrl = course.imageUrl || firstPlaceImage || "/images/maker.png";
+
+            return {
+                id: String(course.id),
+                title: course.title || "제목 없음",
+                description: course.description || "",
+                duration: course.duration || "",
+                location: course.region || "",
+                price: course.price || "",
+                imageUrl: resolvedImageUrl,
+                concept: course.concept || "",
+                rating: Number(course.rating) || 0,
+                reviewCount: 0, // 이 값은 나중에 별도 로직으로 채워야 합니다.
+                participants: course.current_participants || 0,
+                viewCount: course.view_count || 0,
+            };
+        });
 
         console.log("API: Returning formatted courses:", formattedCourses.length);
 
