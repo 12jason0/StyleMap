@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useState } from "react";
 export const dynamic = "force-dynamic";
 import dynamicImport from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
+import imageCompression from "browser-image-compression";
 
 // --- 타입 정의 ---
 type Story = {
@@ -307,7 +308,7 @@ function EscapeIntroPageInner() {
 
         setIsSubmitting(true);
         setValidationError("");
-        setToast("미션 결과를 제출하는 중..."); // 로딩 토스트 추가
+        setToast("미션 결과를 제출하는 중...");
 
         try {
             const missionType = String(currentChapter.mission_type || "").toUpperCase();
@@ -320,32 +321,37 @@ function EscapeIntroPageInner() {
                 if (photoFiles.length < 2) {
                     throw new Error("사진 2장을 업로드해 주세요.");
                 }
+
+                // --- ✨ 여기가 최종 해결책입니다 ✨ ---
+                setToast("사진을 압축하고 있어요...");
+                const options = {
+                    maxSizeMB: 1.5, // 이미지 최대 용량 1.5MB
+                    maxWidthOrHeight: 1920, // 최대 해상도 1920px
+                    useWebWorker: true, // 웹 워커를 사용해 UI 차단 방지
+                };
+
+                // Promise.all을 사용해 여러 이미지를 병렬로 압축합니다.
+                const compressedFiles = await Promise.all(photoFiles.map((file) => imageCompression(file, options)));
+                console.log("Image compression successful.");
+                // --- ✨ 압축 로직 끝 ---
+
                 const formData = new FormData();
-
-                // --- 👇 디버깅 로그 추가 시작 👇 ---
-                console.log("[Client Debug] Preparing to upload files...");
-                photoFiles.forEach((file, index) => {
-                    console.log(
-                        `[Client Debug] File ${index + 1}: name="${file.name}", size=${file.size}, type="${file.type}"`
-                    );
-                    formData.append("photos", file);
+                compressedFiles.forEach((file) => {
+                    // 압축된 파일을 FormData에 추가합니다.
+                    formData.append("photos", file, file.name);
                 });
-                console.log("[Client Debug] FormData created. Sending request to /api/upload");
-                // --- 👆 디버깅 로그 추가 끝 👆 ---
 
+                setToast("사진을 업로드하는 중...");
                 const uploadResponse = await fetch("/api/upload", { method: "POST", body: formData });
 
-                // --- 👇 디버깅 로그 추가 시작 👇 ---
-                console.log(`[Client Debug] Received response from /api/upload with status: ${uploadResponse.status}`);
-                const responseText = await uploadResponse.text(); // 응답을 텍스트로 먼저 받아서 확인
-                console.log(`[Client Debug] Response body: ${responseText}`);
-                // --- 👆 디버깅 로그 추가 끝 👆 ---
+                if (!uploadResponse.ok) {
+                    // 서버 응답이 실패했을 경우, 응답 텍스트를 에러 메시지로 사용
+                    const errorText = await uploadResponse.text();
+                    throw new Error(`업로드 실패: ${errorText}`);
+                }
 
-                const uploadResult = JSON.parse(responseText); // 텍스트를 JSON으로 파싱
-                if (!uploadResponse.ok) throw new Error(uploadResult.message || "사진 업로드에 실패했습니다.");
-
+                const uploadResult = await uploadResponse.json();
                 submissionPayload.photoUrls = uploadResult.photo_urls;
-                // 방금 업로드한 사진은 엔딩(책 페이지 내부)에서만 보여주기 위해 저장
                 if (Array.isArray(uploadResult.photo_urls)) setLastUploadedUrls(uploadResult.photo_urls);
             } else if (missionType === "PUZZLE_ANSWER") {
                 submissionPayload.textAnswer = puzzleAnswer;
@@ -361,7 +367,7 @@ function EscapeIntroPageInner() {
             const submitResult = await submitResponse.json();
             if (!submitResponse.ok) throw new Error(submitResult.message || "미션 결과 저장에 실패했습니다.");
 
-            setToast("미션 완료!"); // 성공 토스트
+            setToast("미션 완료!");
 
             try {
                 const raw = localStorage.getItem(STORAGE_KEY);
@@ -415,10 +421,8 @@ function EscapeIntroPageInner() {
             }
         } catch (error: any) {
             console.error("미션 처리 중 에러:", error);
-            console.log(`[Client Debug] An error occurred: ${error.message}`);
-            console.log(`[Client Debug] Error stack: ${error.stack}`);
             setValidationError(error.message || "오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-            setToast(null); // 오류 발생 시 로딩 토스트 제거
+            setToast(null);
         } finally {
             setIsSubmitting(false);
         }
