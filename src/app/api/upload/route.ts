@@ -1,12 +1,13 @@
 import { NextResponse, NextRequest } from "next/server";
 import { PutObjectCommand, GetBucketLocationCommand } from "@aws-sdk/client-s3";
 import { getS3Bucket, getS3Client, getS3PublicUrl, buildS3Client } from "@/lib/s3";
+import { randomBytes } from "crypto"; // crypto 모듈 추가
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
     try {
-        // 1) 업로드 프록시 모드: FORWARD_UPLOAD_URL(또는 UPLOAD_FORWARD_URL)이 설정되어 있으면 해당 주소로 그대로 전달
+        // 1) 업로드 프록시 모드: FORWARD_UPLOAD_URL이 설정되어 있으면 해당 주소로 그대로 전달
         const forwardUrl = process.env.FORWARD_UPLOAD_URL || process.env.UPLOAD_FORWARD_URL;
         if (forwardUrl) {
             const originalForm = await request.formData();
@@ -33,12 +34,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: "업로드할 파일이 없습니다." }, { status: 400 });
         }
 
-        // Escape 미션에서는 2장을 요구하지만, 다른 곳에서도 재사용될 수 있도록 유연하게 처리
-        // const requiredFiles = 2;
-        // if (files.length < requiredFiles) {
-        //     return NextResponse.json({ message: `사진을 ${requiredFiles}장 업로드해 주세요.` }, { status: 400 });
-        // }
-
         async function getAlignedS3() {
             const baseClient = getS3Client();
             const bucket = getS3Bucket();
@@ -60,12 +55,19 @@ export async function POST(request: NextRequest) {
         const bucket = getS3Bucket();
 
         const uploadedUrls: string[] = [];
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+        for (const file of files) {
             const arrayBuffer = await file.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
-            const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-            const key = `uploads/${new Date().toISOString().slice(0, 10)}/${Date.now()}-${i}.${ext}`;
+
+            // --- ✨ 여기가 수정된 부분입니다 ✨ ---
+            // 1. 파일 확장자를 안전하게 추출하고 정리합니다. (알파벳, 숫자만 남김)
+            const originalExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+            const ext = originalExt.replace(/[^a-z0-9]/g, "");
+
+            // 2. 안전하고 고유한 새 파일 이름을 생성합니다.
+            const uniqueFileName = `${Date.now()}-${randomBytes(8).toString("hex")}.${ext}`;
+            const key = `uploads/${new Date().toISOString().slice(0, 10)}/${uniqueFileName}`;
+            // --- ✨ 수정 끝 ---
 
             await s3.send(
                 new PutObjectCommand({
