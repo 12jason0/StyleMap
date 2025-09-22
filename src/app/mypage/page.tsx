@@ -86,6 +86,18 @@ const MyPage = () => {
     >([]);
     const [badges, setBadges] = useState<UserBadgeItem[]>([]);
     const [activeTab, setActiveTab] = useState("profile");
+    const [casefiles, setCasefiles] = useState<
+        Array<{
+            story_id: number;
+            title: string;
+            synopsis: string;
+            region?: string | null;
+            imageUrl?: string | null;
+            completedAt?: string | null;
+            badge?: { id: number; name: string; image_url?: string | null } | null;
+            photoCount?: number;
+        }>
+    >([]);
     const [loading, setLoading] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
     const [editForm, setEditForm] = useState({
@@ -97,6 +109,10 @@ const MyPage = () => {
     const [editLoading, setEditLoading] = useState(false);
     const [editError, setEditError] = useState("");
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [selectedCaseStoryId, setSelectedCaseStoryId] = useState<number | null>(null);
+    const [selectedCaseTitle, setSelectedCaseTitle] = useState("");
+    const [casePhotoUrls, setCasePhotoUrls] = useState<string[]>([]);
+    const [casePhotoLoading, setCasePhotoLoading] = useState(false);
 
     useEffect(() => {
         fetchUserInfo();
@@ -104,6 +120,7 @@ const MyPage = () => {
         fetchFavorites();
         fetchBadges();
         fetchCompleted();
+        fetchCasefiles();
 
         try {
             const url = new URL(window.location.href);
@@ -181,6 +198,48 @@ const MyPage = () => {
             }
         } catch (error) {
             console.error("Failed to fetch user preferences:", error);
+        }
+    };
+
+    const fetchCasefiles = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            const res = await fetch("/api/users/casefiles", {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setCasefiles(Array.isArray(data) ? data : []);
+            } else {
+                setCasefiles([]);
+            }
+        } catch {
+            setCasefiles([]);
+        }
+    };
+
+    const openCaseModal = async (storyId: number, title: string) => {
+        setSelectedCaseStoryId(storyId);
+        setSelectedCaseTitle(title);
+        setCasePhotoUrls([]);
+        setCasePhotoLoading(true);
+        try {
+            const token = localStorage.getItem("authToken");
+            const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const urls = Array.isArray(data) ? data : Array.isArray((data as any)?.urls) ? (data as any).urls : [];
+                setCasePhotoUrls(urls);
+            } else {
+                setCasePhotoUrls([]);
+            }
+        } catch {
+            setCasePhotoUrls([]);
+        } finally {
+            setCasePhotoLoading(false);
         }
     };
 
@@ -698,6 +757,7 @@ const MyPage = () => {
                                 { id: "preferences", label: "선호도", icon: "🎯" },
                                 { id: "favorites", label: "내 여행 보관함", icon: "💖" },
                                 { id: "completed", label: "완료한 코스", icon: "✅" },
+                                { id: "casefiles", label: "사건 파일", icon: "🗂️" },
                                 { id: "badges", label: "뱃지", icon: "🏅" },
                             ].map((tab) => (
                                 <button
@@ -783,6 +843,109 @@ const MyPage = () => {
                                     </button>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+                {activeTab === "casefiles" && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                            <div className="flex items-center justify-between mb-4 md:mb-6">
+                                <h3 className="text-xl md:text-2xl font-bold text-gray-900">완료한 사건 파일</h3>
+                            </div>
+                            {casefiles.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {casefiles.map((f) => (
+                                        <div
+                                            key={f.story_id}
+                                            className="group relative rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-lg transition-all cursor-pointer"
+                                            onClick={() => openCaseModal(f.story_id, f.title)}
+                                        >
+                                            <div className="relative h-60">
+                                                {f.imageUrl ? (
+                                                    <img
+                                                        src={f.imageUrl}
+                                                        alt={f.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-gray-100" />
+                                                )}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                                                <div className="absolute bottom-0 left-0 right-0 p-4">
+                                                    <h4 className="text-white font-bold text-lg line-clamp-2">
+                                                        {f.title}
+                                                    </h4>
+                                                    <div className="mt-1 flex items-center justify-between text-xs text-white/80">
+                                                        <span>{f.region || ""}</span>
+                                                        <span>
+                                                            {f.completedAt
+                                                                ? new Date(f.completedAt).toLocaleDateString()
+                                                                : ""}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute left-0 top-0 bottom-0 w-2 bg-black/10" />
+                                                {f.badge?.name && (
+                                                    <div className="absolute top-3 right-3 bg-amber-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                                                        {f.badge.name}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10">
+                                    <div className="text-6xl mb-3">🗂️</div>
+                                    <div className="text-lg font-semibold text-gray-900 mb-1">
+                                        아직 완료한 사건 파일이 없어요
+                                    </div>
+                                    <div className="text-gray-600">Escape 스토리를 완료하면 여기에서 볼 수 있어요</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {selectedCaseStoryId !== null && (
+                    <div
+                        className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-xl">
+                            <div className="flex items-center justify-between p-4 border-b">
+                                <h3 className="text-lg md:text-xl font-bold text-gray-900">{selectedCaseTitle}</h3>
+                                <button
+                                    onClick={() => {
+                                        setSelectedCaseStoryId(null);
+                                        setCasePhotoUrls([]);
+                                    }}
+                                    className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                            <div className="p-4 overflow-y-auto">
+                                {casePhotoLoading ? (
+                                    <div className="py-16 text-center text-gray-600">불러오는 중...</div>
+                                ) : casePhotoUrls.length > 0 ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                                        {casePhotoUrls.map((u, i) => (
+                                            <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
+                                                <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
+                                                    <img
+                                                        src={u}
+                                                        alt={`upload-${i}`}
+                                                        className="w-full h-full object-cover rounded"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="py-16 text-center text-gray-600">업로드된 사진이 없습니다.</div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}

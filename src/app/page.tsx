@@ -467,7 +467,7 @@ export default function Home() {
                                     <h3 className="text-2xl md:text-4xl font-bold text-white mb-4">{course.title}</h3>
 
                                     <p
-                                        className="text-base md:text-xl text-white/90 mb-6"
+                                        className="text-base md:text-xl text-white/90 mb-1"
                                         style={{
                                             display: "-webkit-box",
                                             WebkitLineClamp: 2,
@@ -479,7 +479,7 @@ export default function Home() {
                                     </p>
 
                                     <div
-                                        className="flex items-center gap-6 mb-6 md:mb-8"
+                                        className="flex items-center gap-6 mb-3 md:mb-8"
                                         aria-label="StyleMap Hero Stats"
                                     >
                                         <div className="flex flex-col items-center">
@@ -517,7 +517,7 @@ export default function Home() {
 
                                     <button
                                         onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="hover:cursor-pointer px-6 py-3 md:px-8 md:py-4 bg-sky-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
+                                        className="hover:cursor-pointer px-5 py-2 md:px-8 md:py-4 bg-sky-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
                                     >
                                         코스 시작하기 →
                                     </button>
@@ -535,7 +535,7 @@ export default function Home() {
                                 className={`transition-all duration-300 rounded-full ${
                                     index === currentSlide
                                         ? "w-6 h-1.5 md:w-12 md:h-2 bg-white"
-                                        : "w-1.5 h-1.5 md:w-2 md:h-2 bg-white/50 hover:bg-white/70"
+                                        : "w-1 h-1 md:w-2 md:h-2 bg-white/50 hover:bg-white/70"
                                 }`}
                             />
                         ))}
@@ -704,9 +704,9 @@ export default function Home() {
                                     <Link
                                         key={course.id}
                                         href={`/courses/${course.id}`}
-                                        className="snap-start min-w-[260px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black"
+                                        className="snap-start w-[280px] md:w-[340px] lg:w-[380px] min-w-[280px] md:min-w-[340px] lg:min-w-[380px] h-[340px] md:h-[380px] lg:h-[400px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col"
                                     >
-                                        <div className="relative h-44">
+                                        <div className="relative h-36 md:h-40 lg:h-52">
                                             {course.imageUrl ? (
                                                 <Image
                                                     src={course.imageUrl}
@@ -722,14 +722,12 @@ export default function Home() {
                                                 NEW
                                             </span>
                                         </div>
-                                        <div className="p-4">
+                                        <div className="p-4 flex flex-col flex-1">
                                             <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
                                                 {course.title}
                                             </h3>
-                                            <p className="text-sm text-gray-600 line-clamp-1 mb-2">
-                                                {course.description}
-                                            </p>
-                                            <div className="text-xs text-gray-500 flex justify-between">
+                                            <p className="text-sm text-gray-600 line-clamp-1">{course.description}</p>
+                                            <div className="text-xs text-gray-500 flex justify-between mt-auto">
                                                 <span>{course.location}</span>
                                                 <span className="font-semibold text-blue-600">{course.price}</span>
                                             </div>

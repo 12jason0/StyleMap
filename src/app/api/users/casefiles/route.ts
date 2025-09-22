@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/db";
+import jwt from "jsonwebtoken";
+import { getJwtSecret, getUserIdFromRequest } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
+
+function resolveUserId(request: NextRequest): number | null {
+    const fromHeader = getUserIdFromRequest(request);
+    if (fromHeader && Number.isFinite(Number(fromHeader))) return Number(fromHeader);
+    const token = request.cookies.get("auth")?.value;
+    if (!token) return null;
+    try {
+        const payload = jwt.verify(token, getJwtSecret()) as { userId?: number | string };
+        if (payload?.userId) return Number(payload.userId);
+    } catch {}
+    return null;
+}
+
+export async function GET(request: NextRequest) {
+    try {
+        const userId = resolveUserId(request);
+        if (!userId) return NextResponse.json([], { status: 200 });
+
+        // 완료된 스토리 진행 내역 조회
+        const rows = await prisma.userStoryProgress.findMany({
+            where: { user_id: userId, status: "completed" },
+            orderBy: { completed_at: "desc" },
+            include: {
+                story: { include: { reward_badge: true } },
+            },
+        });
+
+        // 스토리별 사진 업로드 수 카운트
+        const storyIds = rows.map((r) => r.story_id);
+        const submissions = await prisma.missionSubmission.groupBy({
+            by: ["chapterId"],
+            where: { userId, photoUrl: { not: null }, chapter: { story_id: { in: storyIds } } },
+            _count: { _all: true },
+        });
+        const chapterIdToCount = new Map<number, number>();
+        for (const s of submissions) {
+            chapterIdToCount.set(
+                s.chapterId as number,
+                (chapterIdToCount.get(s.chapterId as number) || 0) + (s as any)._count?._all || 0
+            );
+        }
+
+        // 챕터 → 스토리 집계는 간단히 스토리 기준으로 카운트 합산
+        const photoCountByStory: Record<number, number> = {};
+        if (storyIds.length > 0) {
+            const chapters = await prisma.storyChapter.findMany({
+                where: { story_id: { in: storyIds } },
+                select: { id: true, story_id: true },
+            });
+            for (const ch of chapters) {
+                const c = chapterIdToCount.get(ch.id) || 0;
+                if (!photoCountByStory[ch.story_id]) photoCountByStory[ch.story_id] = 0;
+                photoCountByStory[ch.story_id] += c;
+            }
+        }
+
+        const result = rows
+            .filter((r) => !!r.story)
+            .map((r) => {
+                const s = r.story as any;
+                const badge = s?.reward_badge;
+                return {
+                    story_id: s.id,
+                    title: s.title as string,
+                    synopsis: (s.synopsis as string) || "",
+                    region: (s.region as string) || null,
+                    imageUrl: (s.imageUrl as string) || (badge?.image_url as string) || null,
+                    completedAt: r.completed_at || null,
+                    badge: badge
+                        ? {
+                              id: badge.id as number,
+                              name: badge.name as string,
+                              image_url: (badge.image_url as string) || null,
+                          }
+                        : null,
+                    photoCount: photoCountByStory[s.id] || 0,
+                };
+            });
+
+        // 동일 스토리 중복 제거(가장 최근 완료 우선)
+        const unique = new Map<number, any>();
+        for (const item of result) if (!unique.has(item.story_id)) unique.set(item.story_id, item);
+
+        return NextResponse.json(Array.from(unique.values()));
+    } catch (error: any) {
+        return NextResponse.json({ error: error?.message || "casefiles get failed" }, { status: 500 });
+    }
+}

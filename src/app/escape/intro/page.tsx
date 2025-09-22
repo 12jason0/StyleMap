@@ -997,25 +997,52 @@ body {
                 {/* 엔딩 섹션: 페이지 내부에 사진 액자/마무리/배지 */}
                 {animationFinished && chapters.length > 0 && showGalleryInPage && (
                     <div className="absolute inset-0 z-[1200] pointer-events-none">
-                        <div className="absolute right-0 top-0 bottom-0 w-1/2 p-6 pointer-events-auto">
+                        <div className="absolute inset-0 p-4 sm:p-6 pointer-events-auto">
                             <div className="bg-white/90 rounded-xl border shadow p-3 sm:p-4 h-full overflow-auto">
                                 <div className="text-lg font-bold mb-3">🖼️ 추억 액자</div>
                                 {(() => {
                                     const urls = lastUploadedUrls.length > 0 ? lastUploadedUrls : galleryUrls;
                                     return urls && urls.length > 0 ? (
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                                            {urls.map((u, i) => (
-                                                <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
-                                                    <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
-                                                        <img
-                                                            src={u}
-                                                            alt={`photo-${i}`}
-                                                            className="w-full h-full object-cover rounded"
-                                                        />
+                                        urls.length === 2 ? (
+                                            <div className="grid grid-cols-2 grid-rows-2 gap-4 sm:gap-6 min-h-[260px] sm:min-h-[320px] place-items-center overflow-visible">
+                                                <div className="col-start-1 row-start-1">
+                                                    <div className="bg-[#a5743a] rounded-xl p-2 shadow-inner transform rotate-[-5deg]">
+                                                        <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
+                                                            <img
+                                                                src={urls[0]}
+                                                                alt={`photo-0`}
+                                                                className="w-40 h-40 sm:w-56 sm:h-56 object-cover rounded"
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
+                                                <div className="col-start-2 row-start-2">
+                                                    <div className="bg-[#a5743a] rounded-xl p-2 shadow-inner transform rotate-[5deg]">
+                                                        <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
+                                                            <img
+                                                                src={urls[1]}
+                                                                alt={`photo-1`}
+                                                                className="w-40 h-40 sm:w-56 sm:h-56 object-cover rounded"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                                                {urls.map((u, i) => (
+                                                    <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
+                                                        <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
+                                                            <img
+                                                                src={u}
+                                                                alt={`photo-${i}`}
+                                                                className="w-full h-full object-cover rounded"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )
                                     ) : (
                                         <div className="text-sm text-gray-600">업로드된 사진이 없습니다.</div>
                                     );
