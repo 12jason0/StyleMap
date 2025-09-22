@@ -54,6 +54,7 @@ function EscapeIntroPageInner() {
     const [puzzleAnswer, setPuzzleAnswer] = useState<string>("");
     const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
     const [validationError, setValidationError] = useState<string>("");
+    const [answerChecked, setAnswerChecked] = useState<boolean>(false);
     const [showStoryModal, setShowStoryModal] = useState<boolean>(false);
     const [pendingNextIndex, setPendingNextIndex] = useState<number | null>(null);
     const [nextStoryText, setNextStoryText] = useState<string>("");
@@ -126,9 +127,12 @@ function EscapeIntroPageInner() {
         return () => clearTimeout(t);
     }, [animationFinished]);
 
-    // 모바일 판단 및 지도 모달 상태
+    // 모바일 판단
     const [isMobile, setIsMobile] = useState<boolean>(false);
+    // 지도 모달
     const [showMapModal, setShowMapModal] = useState<boolean>(false);
+    // 이야기 인트로 모달 (애니메이션 이후 최초 노출)
+    const [showIntroModal, setShowIntroModal] = useState<boolean>(false);
     useEffect(() => {
         if (typeof window === "undefined") return;
         const mq = window.matchMedia("(max-width: 768px)");
@@ -138,7 +142,7 @@ function EscapeIntroPageInner() {
         return () => mq.removeEventListener?.("change", update);
     }, []);
 
-    // 책이 열린 뒤 모바일이면 지도를 모달로 자동 오픈 (currentChapter 정의 이후에서 다시 설정)
+    // 책이 열린 뒤 이야기 인트로 모달 자동 오픈
 
     // --- Effect Hooks ---
     // ✅✅✅ 이 부분이 수정되었습니다 ✅✅✅
@@ -229,12 +233,13 @@ function EscapeIntroPageInner() {
 
     const numFlipPages = 11;
 
-    // 책이 열린 뒤 모바일이면 지도를 모달로 자동 오픈
+    // 애니메이션과 초기 데이터 로딩이 끝난 뒤(책이 다 펼쳐진 후) 약간 지연 후 이야기 모달 노출
     useEffect(() => {
-        if (animationFinished && mountMapAfterOpen && isMobile && currentChapter && chapters.length > 0) {
-            setShowMapModal(true);
+        if (animationFinished && mountMapAfterOpen && currentChapter && chapters.length > 0) {
+            const t = setTimeout(() => setShowIntroModal(true), 80);
+            return () => clearTimeout(t);
         }
-    }, [animationFinished, mountMapAfterOpen, isMobile, currentChapter, chapters.length]);
+    }, [animationFinished, mountMapAfterOpen, currentChapter, chapters.length]);
 
     const handleCloseBook = () => {
         // 종료 전 모든 엔딩/배지/갤러리 상태 정리
@@ -273,11 +278,8 @@ function EscapeIntroPageInner() {
         const payload = currentChapter.mission_payload || {};
         const typeUpper = String(currentChapter.mission_type || "").toUpperCase();
         if (typeUpper === "PUZZLE_ANSWER") {
-            const expected = payload?.answer;
-            if (expected === undefined || expected === null) {
-                return puzzleAnswer.trim().length > 0;
-            }
-            return normalize(puzzleAnswer) === normalize(expected);
+            // 퍼즐은 '정답 확인' 버튼으로 검증 완료되어야 다음 버튼 활성화
+            return answerChecked === true;
         }
         if (typeUpper === "PHOTO") {
             return photoUploaded === true;
@@ -295,7 +297,33 @@ function EscapeIntroPageInner() {
             return normalize(payload.options[selectedOptionIndex]) === normalize(ans);
         }
         return true;
-    }, [currentChapter, puzzleAnswer, selectedOptionIndex, photoUploaded]);
+    }, [currentChapter, puzzleAnswer, selectedOptionIndex, photoUploaded, answerChecked]);
+
+    const handleCheckAnswer = () => {
+        if (!currentChapter) return;
+        const payload = currentChapter.mission_payload || {};
+        const expected = payload?.answer;
+        const user = puzzleAnswer.trim();
+        if (expected === undefined || expected === null) {
+            if (user.length === 0) {
+                setAnswerChecked(false);
+                setValidationError("답을 입력하세요.");
+                return;
+            }
+            setAnswerChecked(true);
+            setValidationError("");
+            setToast("정답입니다!");
+            return;
+        }
+        if (normalize(user) === normalize(expected)) {
+            setAnswerChecked(true);
+            setValidationError("");
+            setToast("정답입니다!");
+        } else {
+            setAnswerChecked(false);
+            setValidationError("정답이 아니에요");
+        }
+    };
 
     // --- 수정된 부분: goToNextChapter 함수 전체를 API 연동 로직으로 변경 ---
     const goToNextChapter = async () => {
@@ -442,6 +470,7 @@ function EscapeIntroPageInner() {
             const obj = raw ? JSON.parse(raw) : {};
             const saved = obj[String(currentChapter.chapter_number)] || {};
             setPuzzleAnswer(typeof saved.answer === "string" ? saved.answer : "");
+            setAnswerChecked(false);
             setSelectedOptionIndex(typeof saved.option === "number" ? saved.option : null);
             setPhotoUploaded(!!saved.photo);
             setPhotoPreviewUrl(null);
@@ -449,6 +478,7 @@ function EscapeIntroPageInner() {
             setValidationError("");
         } catch {
             setPuzzleAnswer("");
+            setAnswerChecked(false);
             setSelectedOptionIndex(null);
             setPhotoUploaded(false);
             setPhotoPreviewUrl(null);
@@ -711,62 +741,57 @@ body {
                             opacity: animationFinished ? 1 : 0,
                         }}
                     >
-                        {animationFinished &&
-                            mountMapAfterOpen &&
-                            currentChapter &&
-                            chapters.length > 0 &&
-                            !isMobile && (
-                                <div
-                                    className="w-full h-full p-6 flex flex-col content-flip"
-                                    style={{ transformOrigin: "center" }}
-                                >
-                                    <div className="relative mb-4 border-b-2 pb-3">
-                                        <div className="flex items-center justify-center gap-3">
-                                            {currentChapter.chapter_number === 1 && (
-                                                <button
-                                                    onClick={() => router.push("/escape")}
-                                                    className="hover:cursor-pointer px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
-                                                >
-                                                    escape로 이동
-                                                </button>
-                                            )}
-                                            <h2 className="text-xl font-bold text-gray-900">
-                                                Chapter {currentChapter.chapter_number}.{" "}
-                                                {currentChapter.title || "스토리"}
-                                            </h2>
-                                        </div>
+                        {animationFinished && mountMapAfterOpen && currentChapter && chapters.length > 0 && (
+                            <div
+                                className="w-full h-full p-6 flex flex-col content-flip"
+                                style={{ transformOrigin: "center" }}
+                            >
+                                <div className="relative mb-4 border-b-2 pb-3">
+                                    <div className="flex items-center justify-center gap-3">
+                                        {currentChapter.chapter_number === 1 && (
+                                            <button
+                                                onClick={() => router.push("/escape")}
+                                                className="hover:cursor-pointer px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
+                                            >
+                                                escape로 이동
+                                            </button>
+                                        )}
+                                        <h2 className="text-xl font-bold text-gray-900">
+                                            Chapter {currentChapter.chapter_number}. {currentChapter.title || "스토리"}
+                                        </h2>
                                     </div>
-                                    <div className="relative flex-1 rounded-lg overflow-hidden border-2 border-gray-300 shadow-md mb-4">
-                                        <KakaoMap
-                                            places={mapPlaces as any}
-                                            userLocation={userLocation as any}
-                                            selectedPlace={null}
-                                            onPlaceClick={() => {}}
-                                            className="w-full h-full"
-                                            drawPath={!!userLocation}
-                                            routeMode="driving"
-                                        />
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded border">
-                                        <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
-                                            📍 위치
-                                        </h3>
-                                        <p className="text-base text-gray-900">
-                                            <strong>{currentChapter.location_name || "위치 정보"}</strong>
-                                            <br />
-                                            {currentChapter.address || "주소 정보 없음"}
-                                        </p>
-                                    </div>
-                                    {currentChapterIdx > 0 && (
-                                        <button
-                                            onClick={goToPrevChapter}
-                                            className="hover:cursor-pointer mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
-                                        >
-                                            ← 이전 챕터
-                                        </button>
-                                    )}
                                 </div>
-                            )}
+                                <div className="relative flex-1 rounded-lg overflow-hidden border-2 border-gray-300 shadow-md mb-4">
+                                    <KakaoMap
+                                        places={mapPlaces as any}
+                                        userLocation={userLocation as any}
+                                        selectedPlace={null}
+                                        onPlaceClick={() => {}}
+                                        className="w-full h-full"
+                                        drawPath={!!userLocation}
+                                        routeMode="driving"
+                                    />
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded border">
+                                    <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
+                                        📍 위치
+                                    </h3>
+                                    <p className="text-base text-gray-900">
+                                        <strong>{currentChapter.location_name || "위치 정보"}</strong>
+                                        <br />
+                                        {currentChapter.address || "주소 정보 없음"}
+                                    </p>
+                                </div>
+                                {currentChapterIdx > 0 && (
+                                    <button
+                                        onClick={goToPrevChapter}
+                                        className="hover:cursor-pointer mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
+                                    >
+                                        ← 이전 챕터
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* 오른쪽 페이지 (미션) */}
@@ -786,22 +811,24 @@ body {
                                         <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
                                             🎯 미션
                                         </h2>
-                                        {isMobile && (
-                                            <div className="flex justify-end -mt-2 mb-2">
+                                        {/* 상단 우측 액션 버튼들: 이야기 다시보기 + (모바일) 지도 보기 */}
+                                        <div className="flex justify-end gap-2 -mt-2 mb-2">
+                                            <button
+                                                onClick={() => setShowIntroModal(true)}
+                                                className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-amber-700 text-white hover:bg-amber-800 transition-colors shadow"
+                                            >
+                                                이야기 보기
+                                            </button>
+                                            {isMobile && (
                                                 <button
                                                     onClick={() => setShowMapModal(true)}
                                                     className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
                                                 >
                                                     지도 보기
                                                 </button>
-                                            </div>
-                                        )}
-                                        <div className="mb-4">
-                                            <h3 className="text-lg font-bold mb-2 text-gray-800">📖 이야기</h3>
-                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-3 rounded border break-words max-h-56 md:max-h-72 overflow-auto">
-                                                {currentChapter.story_text || "이야기 내용이 없습니다."}
-                                            </div>
+                                            )}
                                         </div>
+                                        {/* 초기 모달에서 이야기 노출하므로 책 내 본문은 숨김 */}
                                         <div className="flex-1 min-h-0 flex flex-col">
                                             <h3 className="text-lg font-bold mb-2 text-gray-800">❓ 질문</h3>
                                             <div className="flex-1 bg-blue-50 rounded p-4 border-2 border-blue-200 overflow-auto">
@@ -816,13 +843,28 @@ body {
                                                         <input
                                                             type="text"
                                                             value={puzzleAnswer}
-                                                            onChange={(e) => setPuzzleAnswer(e.target.value)}
+                                                            onChange={(e) => {
+                                                                setPuzzleAnswer(e.target.value);
+                                                                setAnswerChecked(false);
+                                                            }}
                                                             placeholder="정답을 입력하세요"
                                                             className="w-full px-3 py-2 rounded border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-700"
                                                             onClick={(e) => e.stopPropagation()}
                                                             onMouseDown={(e) => e.stopPropagation()}
                                                             onTouchStart={(e) => e.stopPropagation()}
                                                         />
+                                                        <div className="flex justify-end">
+                                                            <button
+                                                                onClick={handleCheckAnswer}
+                                                                className={`px-4 py-2 rounded-lg text-sm font-medium shadow transition-colors ${
+                                                                    answerChecked
+                                                                        ? "bg-green-600 text-white hover:bg-green-700"
+                                                                        : "bg-blue-600 text-white hover:bg-blue-700"
+                                                                }`}
+                                                            >
+                                                                {answerChecked ? "정답 확인됨" : "정답"}
+                                                            </button>
+                                                        </div>
                                                         {currentChapter.mission_payload?.answer && (
                                                             <div className="text-xs text-blue-900/70 select-none pointer-events-none">
                                                                 힌트: 정답은{" "}
@@ -985,9 +1027,42 @@ body {
 
                 {/* 페이지 인디케이터 */}
                 {animationFinished && chapters.length > 0 && (
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1201] pointer-events-auto">
+                    <div className="absolute bottom-6 left-4 md:left-6 z-[1201] pointer-events-auto">
                         <div className="bg-black/80 text-white px-4 py-2 rounded-full text-sm font-medium">
                             {currentChapterIdx + 1} / {chapters.length}
+                        </div>
+                    </div>
+                )}
+
+                {/* 이야기 인트로 모달: 빈티지 스타일 */}
+                {showIntroModal && currentChapter && (
+                    <div
+                        className="fixed inset-0 z-[1400] bg-black/50 flex items-center justify-center p-4"
+                        role="dialog"
+                        aria-modal="true"
+                    >
+                        <div className="relative w-full max-w-md sm:max-w-lg bg-[#f6efe1] rounded-2xl border-2 border-[#a0743a] shadow-2xl overflow-hidden">
+                            <div
+                                className="absolute inset-0 pointer-events-none mix-blend-multiply opacity-80"
+                                style={{
+                                    backgroundImage:
+                                        "radial-gradient(120% 60% at 0% 0%, rgba(120, 84, 40, .10), transparent 55%), radial-gradient(120% 60% at 100% 0%, rgba(120, 84, 40, .10), transparent 55%), radial-gradient(120% 60% at 0% 100%, rgba(120, 84, 40, .10), transparent 55%), radial-gradient(120% 60% at 100% 100%, rgba(120, 84, 40, .10), transparent 55%)",
+                                }}
+                            />
+                            <div className="relative p-5 sm:p-6">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="text-[#3f2d20] font-extrabold tracking-wide">Story Intro</div>
+                                    <button
+                                        onClick={() => setShowIntroModal(false)}
+                                        className="px-3 py-1.5 text-xs rounded bg-[#3f2d20] text-[#f6efe1] hover:opacity-90"
+                                    >
+                                        시작하기
+                                    </button>
+                                </div>
+                                <div className="bg-white/70 border border-[#c9a678] rounded-xl p-4 text-[#2b2117] whitespace-pre-wrap max-h-[56vh] overflow-auto">
+                                    {currentChapter.story_text || "이야기 내용이 없습니다."}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

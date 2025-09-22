@@ -40,6 +40,9 @@ export default function KakaoMap({
     const glowOverlayRef = useRef<any>(null);
     const [isMapReady, setIsMapReady] = useState(false);
 
+    const isFiniteNum = (v: any) => Number.isFinite(Number(v));
+    const isValidLatLng = (lat: any, lng: any) => isFiniteNum(lat) && isFiniteNum(lng);
+
     // 1. 지도 초기화 Hook: 컴포넌트가 처음 마운트될 때 한 번만 실행
     useEffect(() => {
         if (!window.kakao || !mapRef.current || mapInstance.current) return;
@@ -50,14 +53,18 @@ export default function KakaoMap({
             let centerPosition;
             let zoomLevel = 5;
 
-            if (places.length > 0) {
-                // 첫 번째 장소를 중심으로 설정
-                centerPosition = new window.kakao.maps.LatLng(places[0].latitude, places[0].longitude);
-                // 장소가 하나면 더 가까운 줌 레벨로 설정
+            const firstValid = places.find((p: any) => isValidLatLng(p?.latitude, p?.longitude));
+            if (firstValid) {
+                centerPosition = new window.kakao.maps.LatLng(
+                    Number(firstValid.latitude),
+                    Number(firstValid.longitude)
+                );
                 zoomLevel = places.length === 1 ? 2 : 4;
-                console.log(`첫 번째 장소로 포커스: ${places[0].name} (${places[0].latitude}, ${places[0].longitude})`);
-            } else if (userLocation) {
-                centerPosition = new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+                console.log(
+                    `첫 번째 장소로 포커스: ${firstValid.name} (${firstValid.latitude}, ${firstValid.longitude})`
+                );
+            } else if (userLocation && isValidLatLng(userLocation.lat, userLocation.lng)) {
+                centerPosition = new window.kakao.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng));
                 zoomLevel = 3;
             } else {
                 // 기본값: 서울 시청
@@ -128,25 +135,35 @@ export default function KakaoMap({
                         if (status === kakao.maps.services.Status.OK && result[0]) {
                             const lat = Number(result[0].y);
                             const lng = Number(result[0].x);
-                            return resolve(new kakao.maps.LatLng(lat, lng));
+                            if (isValidLatLng(lat, lng)) return resolve(new kakao.maps.LatLng(lat, lng));
                         }
-                        // 실패 시 기존 좌표 사용
-                        resolve(new kakao.maps.LatLng(place.latitude, place.longitude));
+                        // 실패 시 기존 좌표 사용 (유효한 경우에만)
+                        if (isValidLatLng(place.latitude, place.longitude)) {
+                            resolve(new kakao.maps.LatLng(Number(place.latitude), Number(place.longitude)));
+                        } else {
+                            resolve(null);
+                        }
                     });
                 } else {
-                    resolve(new kakao.maps.LatLng(place.latitude, place.longitude));
+                    if (isValidLatLng(place.latitude, place.longitude)) {
+                        resolve(new kakao.maps.LatLng(Number(place.latitude), Number(place.longitude)));
+                    } else {
+                        resolve(null);
+                    }
                 }
             });
         };
 
         (async () => {
             // 기존 마커/라인 초기화는 위에서 수행됨
-            const positions = await Promise.all(places.map((p) => resolveLatLng(p)));
+            const positionsRaw = await Promise.all(places.map((p) => resolveLatLng(p)));
+            const positions = positionsRaw.filter(Boolean);
             resolvedPositionsRef.current = {};
 
             // 마커 생성
-            positions.forEach((position, idx) => {
+            positions.forEach((position: any, idx: number) => {
                 const place = places[idx];
+                if (!position) return;
                 resolvedPositionsRef.current[place.id] = position;
 
                 let markerOptions: any = { position, title: place.name };
@@ -200,25 +217,31 @@ export default function KakaoMap({
                 }
 
                 markersRef.current.push(marker);
-                bounds.extend(position);
+                try {
+                    bounds.extend(position);
+                } catch {}
             });
 
             // 사용자 현재 위치도 경계에 포함하여 두 지점이 모두 보이도록 처리
             if (userLocation) {
                 try {
-                    bounds.extend(new kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+                    if (isValidLatLng(userLocation.lat, userLocation.lng)) {
+                        bounds.extend(new kakao.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng)));
+                    }
                 } catch {}
             }
 
             // 지도 범위/중심 조정
-            if (places.length > 0) {
+            if (positions.length > 0) {
                 if (!selectedPlace) {
                     // 최초에는 전체 보기
-                    if (places.length === 1) {
+                    if (positions.length === 1) {
                         map.setCenter(positions[0]);
                         map.setLevel(2);
                     } else {
-                        map.setBounds(bounds);
+                        try {
+                            map.setBounds(bounds);
+                        } catch {}
                     }
                 } else {
                     const pos = resolvedPositionsRef.current[selectedPlace.id] || positions[0];
@@ -237,12 +260,27 @@ export default function KakaoMap({
                 });
 
                 try {
+                    const isFiniteNum = (v: any) => Number.isFinite(Number(v));
                     const coords: [number, number][] = [];
-                    if (userLocation) coords.push([userLocation.lng, userLocation.lat]);
+                    if (userLocation && isFiniteNum(userLocation.lat) && isFiniteNum(userLocation.lng)) {
+                        coords.push([Number(userLocation.lng), Number(userLocation.lat)]);
+                    }
                     sortedForPath.forEach((p) => {
                         const pos = resolvedPositionsRef.current[p.id];
-                        coords.push([pos.getLng(), pos.getLat()]);
+                        if (!pos) return;
+                        if (typeof pos.getLng === "function" && typeof pos.getLat === "function") {
+                            const lon = Number(pos.getLng());
+                            const lat = Number(pos.getLat());
+                            if (isFiniteNum(lat) && isFiniteNum(lon)) coords.push([lon, lat]);
+                        } else if (isFiniteNum(p?.longitude) && isFiniteNum(p?.latitude)) {
+                            coords.push([Number(p.longitude), Number(p.latitude)]);
+                        }
                     });
+                    // 유효 좌표가 2개 미만이면 경로 생략
+                    if (coords.length < 2) {
+                        // 경로를 그릴 수 없으므로 생략
+                        return;
+                    }
                     const coordStr = coords.map((c) => `${c[0]},${c[1]}`).join(";");
                     if (routeMode === "simple") {
                         const simplePath = coords.map(([lon, lat]) => new kakao.maps.LatLng(lat, lon));
@@ -257,12 +295,8 @@ export default function KakaoMap({
                         polylineRef.current = simpleLine;
                         return;
                     }
-                    const modeParam =
-                        routeMode === "walking" || routeMode === "foot"
-                            ? "walking"
-                            : routeMode === "simple"
-                            ? "walking"
-                            : "driving";
+                    // 기본은 도보 경로를 우선 사용 (요청 사항)
+                    const modeParam = routeMode === "driving" ? "driving" : "walking";
                     const res = await fetch(
                         `/api/directions?coords=${encodeURIComponent(coordStr)}&mode=${modeParam}`,
                         {
@@ -271,38 +305,58 @@ export default function KakaoMap({
                     );
                     const data = await res.json();
                     if (data?.success && Array.isArray(data.coordinates)) {
-                        const path = data.coordinates.map(
-                            ([lon, lat]: [number, number]) => new kakao.maps.LatLng(lat, lon)
-                        );
-                        const polyline = new kakao.maps.Polyline({
-                            path,
-                            strokeWeight: 4,
-                            strokeColor: "#60a5fa",
-                            strokeOpacity: 0.9,
-                            strokeStyle: "solid",
-                        });
-                        polyline.setMap(map);
-                        polylineRef.current = polyline;
-                        return;
+                        const path = (data.coordinates as Array<[number, number]>)
+                            .map((pair) => {
+                                const lon = Number(pair?.[0]);
+                                const lat = Number(pair?.[1]);
+                                return [lon, lat] as [number, number];
+                            })
+                            .filter((pair) => Number.isFinite(pair[0]) && Number.isFinite(pair[1]))
+                            .map((pair) => new kakao.maps.LatLng(pair[1], pair[0]));
+                        if (path.length >= 2) {
+                            const polyline = new kakao.maps.Polyline({
+                                path,
+                                strokeWeight: 4,
+                                strokeColor: "#60a5fa",
+                                strokeOpacity: 0.9,
+                                strokeStyle: "solid",
+                            });
+                            polyline.setMap(map);
+                            polylineRef.current = polyline;
+                            return;
+                        }
                     }
                 } catch {}
 
                 // 실패 시 직선 연결 폴백 (도보 그린)
                 const fallbackPath: any[] = [];
-                if (userLocation) fallbackPath.push(new kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+                if (
+                    userLocation &&
+                    Number.isFinite(Number(userLocation.lat)) &&
+                    Number.isFinite(Number(userLocation.lng))
+                ) {
+                    fallbackPath.push(new kakao.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng)));
+                }
                 sortedForPath.forEach((p) => {
                     const pos = resolvedPositionsRef.current[p.id];
-                    fallbackPath.push(new kakao.maps.LatLng(pos.getLat(), pos.getLng()));
+                    if (!pos) return;
+                    const lat = Number(pos.getLat?.() ?? pos?.lat);
+                    const lon = Number(pos.getLng?.() ?? pos?.lng);
+                    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+                        fallbackPath.push(new kakao.maps.LatLng(lat, lon));
+                    }
                 });
-                const fallbackPolyline = new kakao.maps.Polyline({
-                    path: fallbackPath,
-                    strokeWeight: 4,
-                    strokeColor: "#60a5fa",
-                    strokeOpacity: 0.9,
-                    strokeStyle: "solid",
-                });
-                fallbackPolyline.setMap(map);
-                polylineRef.current = fallbackPolyline;
+                if (fallbackPath.length >= 2) {
+                    const fallbackPolyline = new kakao.maps.Polyline({
+                        path: fallbackPath,
+                        strokeWeight: 4,
+                        strokeColor: "#60a5fa",
+                        strokeOpacity: 0.9,
+                        strokeStyle: "solid",
+                    });
+                    fallbackPolyline.setMap(map);
+                    polylineRef.current = fallbackPolyline;
+                }
             }
 
             // Highlight glow for current/target place
