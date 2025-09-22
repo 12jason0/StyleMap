@@ -28,7 +28,12 @@ export async function GET(request: NextRequest) {
             pairs.join(";")
         )}?overview=full&geometries=geojson`;
 
-        const res = await fetch(osrmUrl, { next: { revalidate: 0 }, cache: "no-store" });
+        // --- ✨ 여기가 수정된 부분입니다 ✨ ---
+        // "cache: 'no-store'" 와 "next: { revalidate: 0 }" 중 하나만 사용합니다.
+        // 여기서는 cache: 'no-store'를 사용하여 캐시를 비활성화합니다.
+        const res = await fetch(osrmUrl, { cache: "no-store" });
+        // --- ✨ 수정 끝 ---
+
         if (!res.ok) {
             const text = await res.text();
             return NextResponse.json(
