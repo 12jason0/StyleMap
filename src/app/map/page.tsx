@@ -29,7 +29,7 @@ interface UserLocation {
 
 declare global {
     interface Window {
-        kakao: any;
+        naver: any;
     }
 }
 
@@ -58,7 +58,7 @@ function MapPageInner() {
 
     // --- 상태 관리 ---
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-    const [isKakaoReady, setIsKakaoReady] = useState(false);
+    const [isNaverReady, setIsNaverReady] = useState(false);
     const [places, setPlaces] = useState<Place[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -98,13 +98,13 @@ function MapPageInner() {
         }
     }, []);
 
-    // Kakao SDK 로드 대기 (스크립트가 늦게 로드되어도 초기화되도록 보장)
+    // Naver SDK 로드 대기 (스크립트가 늦게 로드되어도 초기화되도록 보장)
     useEffect(() => {
         if (typeof window === "undefined") return;
         let attempts = 0;
         const timer = setInterval(() => {
-            if (window.kakao?.maps) {
-                setIsKakaoReady(true);
+            if (window.naver?.maps) {
+                setIsNaverReady(true);
                 clearInterval(timer);
             } else if (++attempts > 50) {
                 // 최대 ~10초 대기 후 중단
@@ -174,67 +174,32 @@ function MapPageInner() {
         }
     }, []);
 
-    // --- 지도 초기화 및 마커 로직 ---
+    // --- 지도 초기화 및 마커 로직 (Naver) ---
     useEffect(() => {
-        // window.kakao 객체가 로드되었는지, 지도 DOM이 있는지 확인
-        // isKakaoReady를 함께 의존하여 SDK가 늦게 로드되어도 초기화되도록 함
+        if (isNaverReady && window.naver?.maps && mapRef.current) {
+            const center = userLocation
+                ? new window.naver.maps.LatLng(userLocation.lat, userLocation.lng)
+                : new window.naver.maps.LatLng(37.5665, 126.978);
+            mapInstance.current = new window.naver.maps.Map(mapRef.current, {
+                center,
+                zoom: 12,
+            });
+            lastCenterRef.current = mapInstance.current.getCenter();
 
-        if (isKakaoReady && window.kakao && mapRef.current) {
-            // kakao.maps.load()를 통해 API가 완전히 준비되도록 보장
-
-            window.kakao.maps.load(() => {
-                // 지도의 중심 좌표 설정
-                const centerPosition = userLocation
-                    ? new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng)
-                    : new window.kakao.maps.LatLng(37.5665, 126.978);
-
-                const mapOptions = {
-                    center: centerPosition,
-                    level: 5,
-                };
-
-                // 맵 인스턴스 생성 또는 업데이트
-                mapInstance.current = new window.kakao.maps.Map(mapRef.current, mapOptions);
-                lastCenterRef.current = mapInstance.current.getCenter();
-
-                // 지도 움직임 감지 이벤트 추가
-                window.kakao.maps.event.addListener(mapInstance.current, "dragend", () => {
-                    setShowMapSearchButton(true);
-                });
-                window.kakao.maps.event.addListener(mapInstance.current, "zoom_changed", () => {
-                    setShowMapSearchButton(true);
-                });
-                // idle 시 중심 좌표 변화 감지하여 버튼 노출 (모바일 드래그/터치 대응)
-                window.kakao.maps.event.addListener(mapInstance.current, "idle", () => {
-                    try {
-                        const current = mapInstance.current.getCenter();
-                        if (lastCenterRef.current) {
-                            const prev = lastCenterRef.current;
-                            const dLat = Math.abs(current.getLat() - prev.getLat());
-                            const dLng = Math.abs(current.getLng() - prev.getLng());
-                            if (dLat > 0.00005 || dLng > 0.00005) {
-                                setShowMapSearchButton(true);
-                            }
-                        }
-                        lastCenterRef.current = current;
-                    } catch {}
-                });
-
-                // 지도 클릭 시 정보창 닫기
-                window.kakao.maps.event.addListener(mapInstance.current, "click", () => {
-                    markersRef.current.forEach((m) => m.infoWindow?.close());
-                    setSelectedPlace(null);
-                });
+            window.naver.maps.Event.addListener(mapInstance.current, "idle", () => {
+                setShowMapSearchButton(true);
+            });
+            window.naver.maps.Event.addListener(mapInstance.current, "click", () => {
+                setSelectedPlace(null);
             });
         }
-    }, [userLocation, isKakaoReady]); // SDK 준비 또는 위치 확정 시 지도를 초기화
+    }, [userLocation, isNaverReady]);
 
     // 마커 업데이트 Hook
     useEffect(() => {
-        if (!mapInstance.current || !window.kakao) return;
+        if (!mapInstance.current || !(window as any).naver?.maps) return;
 
         const map = mapInstance.current;
-        const kakao = window.kakao;
         const markers: any[] = [];
 
         // 기존 마커 즉시 제거 (보수적 정리)
@@ -247,29 +212,28 @@ function MapPageInner() {
             markersRef.current = [];
         }
 
-        const bounds = new kakao.maps.LatLngBounds();
+        const bounds = new (window as any).naver.maps.LatLngBounds();
 
         // 현재 위치 마커 생성 (선택된 핀이 없을 때만 표시)
         if (userLocation && !selectedPlace) {
-            const currentPosition = new kakao.maps.LatLng(userLocation.lat, userLocation.lng);
+            const currentPosition = new (window as any).naver.maps.LatLng(userLocation.lat, userLocation.lng);
 
             // 현재 위치 커스텀 마커 생성 (모든 마커 크기 통일)
             const markerWidth = 44;
             const markerHeight = 44;
 
-            const currentLocationMarker = new kakao.maps.Marker({
+            const currentLocationMarker = new (window as any).naver.maps.Marker({
                 position: currentPosition,
                 title: "현재 위치",
-                // 커스텀 마커 이미지 설정
-                image: new kakao.maps.MarkerImage("/images/maker.png", new kakao.maps.Size(markerWidth, markerHeight), {
-                    // 아이콘의 바닥 중앙이 좌표에 오도록 설정
-                    offset: new kakao.maps.Point(Math.floor(markerWidth / 2), markerHeight),
-                }),
+                icon: {
+                    content:
+                        '<div style="width:18px;height:18px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 0 0 2px rgba(16,185,129,.3)"></div>',
+                },
             });
             currentLocationMarker.setMap(map);
 
             // 현재 위치 마커 클릭 이벤트
-            kakao.maps.event.addListener(currentLocationMarker, "click", () => {
+            (window as any).naver.maps.Event.addListener(currentLocationMarker, "click", () => {
                 console.log("현재 위치 핀 클릭됨");
                 showToast("현재 위치입니다.", "info");
             });
@@ -284,15 +248,11 @@ function MapPageInner() {
         const placesToRender = isMobile ? places : selectedPlace ? [selectedPlace] : places;
         placesToRender.forEach((place) => {
             const isSelected = selectedPlace?.id === place.id;
-            const position = new kakao.maps.LatLng(place.latitude, place.longitude);
+            const position = new (window as any).naver.maps.LatLng(place.latitude, place.longitude);
 
             // 카테고리별 마커 이미지 결정
-            let markerImage: any;
-            // 사이즈 정책: 기본(기타) 34x34, 카페/음식점 48x48
-            const defaultSize = new kakao.maps.Size(34, 34);
-            const defaultOffset = new kakao.maps.Point(17, 34);
-            const largeSize = new kakao.maps.Size(48, 48);
-            const largeOffset = new kakao.maps.Point(24, 48);
+            let markerIcon: any;
+            // 네이버는 content HTML 아이콘 사용
 
             // 카테고리/이름 기반 판별 유틸
             const lowerName = (place.name || "").toLowerCase();
@@ -331,131 +291,73 @@ function MapPageInner() {
                 "보쌈",
                 "막창",
                 "곱창",
-                "김밥",
-                "돈까스",
-                "돈카츠",
-                "카츠",
-                "우동",
-                "회",
-                "초밥",
-                "탕",
-                "전골",
-                "해물",
-                "해산물",
-                "생선",
-                "수산",
-                "횟집",
             ];
-            const cafeKeywords = [
-                "카페",
-                "커피",
-                "coffee",
-                "스타벅스",
-                "starbucks",
-                "이디야",
-                "ediya",
-                "투썸",
-                "twosome",
-                "할리스",
-                "hollys",
-                "커피빈",
-                "coffeebean",
-                "폴바셋",
-                "paul bassett",
-                "빽다방",
-                "mega coffee",
-                "메가커피",
-                "컴포즈",
-                "compose",
-                "블루보틀",
-                "blue bottle",
-                "탐앤탐스",
-                "tom n toms",
-                "바나프레소",
-                "banapresso",
-                "설빙",
-                "sulbing",
-                "블루샥",
-                "blueshark",
-            ];
-            const isCafe = cafeKeywords.some((k) => lowerName.includes(k) || lowerCategory.includes(k));
+            const cafeKeywords = ["카페", "coffee", "커피", "디저트", "dessert"];
+
             const isRestaurant =
-                lowerCategory.includes("음식") ||
-                lowerCategory.includes("맛집") ||
-                lowerCategory.includes("식당") ||
-                restaurantKeywords.some((k) => lowerName.includes(k) || lowerCategory.includes(k));
+                restaurantKeywords.some((kw) => lowerName.includes(kw) || lowerCategory.includes(kw)) ||
+                ["restaurant", "food"].some((kw) => lowerCategory.includes(kw));
+            const isCafe = cafeKeywords.some((kw) => lowerName.includes(kw) || lowerCategory.includes(kw));
 
             if (isCafe) {
-                markerImage = new kakao.maps.MarkerImage("/images/cafeMaker.png", largeSize, {
-                    offset: largeOffset,
-                });
+                markerIcon = {
+                    content:
+                        '<img src="/images/cafeMaker.png" style="width:38px;height:38px;transform:translate(-50%,-100%)" />',
+                };
             } else if (isRestaurant) {
-                markerImage = new kakao.maps.MarkerImage("/images/maker1.png", largeSize, {
-                    offset: largeOffset,
-                });
+                markerIcon = {
+                    content:
+                        '<img src="/images/maker1.png" style="width:38px;height:38px;transform:translate(-50%,-100%)" />',
+                };
             } else {
-                // 기본 SVG 마커 (기존 스타일 유지)
+                // 기본 마커
                 const markerColor = "#45B7D1";
-                markerImage = new kakao.maps.MarkerImage(
-                    "data:image/svg+xml;base64," +
-                        btoa(`
-                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="${markerColor}"/>
-                            <circle cx="12" cy="9" r="2.5" fill="white"/>
-                        </svg>
-                    `),
-                    defaultSize,
-                    { offset: defaultOffset }
-                );
+                markerIcon = {
+                    content: `<div style=\"transform:translate(-50%,-100%);width:22px;height:22px;border-radius:50%;background:${markerColor};border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.25)\"></div>`,
+                };
             }
 
             // 마커 생성
-            const marker = new kakao.maps.Marker({
+            const marker = new (window as any).naver.maps.Marker({
                 position,
                 title: place.name,
-                image: markerImage,
+                icon: markerIcon,
+                zIndex: isSelected ? 20 : 10,
+                clickable: true,
             });
             marker.setMap(map);
 
             // 마커 클릭 이벤트 (지도 위 정보창 없이 왼쪽 패널에만 표시)
-            kakao.maps.event.addListener(marker, "click", () => {
+            (window as any).naver.maps.Event.addListener(marker, "click", () => {
                 console.log("핀 클릭됨:", place.name);
                 // 선택된 장소로 상태 설정
-                // 데스크탑에서만 단일 마커 강조를 위해 기존 마커 제거
-                if (!isMobile) {
-                    try {
-                        markersRef.current.forEach((m) => m.marker && m.marker.setMap(null));
-                    } catch (e) {}
-                    markersRef.current = [];
-                }
-
                 setSelectedPlace(place);
-                // 모바일에서는 핀 클릭 시 바텀시트 자동 오픈
-                if (isMobile && !leftPanelOpen) {
-                    setLeftPanelOpen(true);
-                }
-                console.log("selectedPlace 설정됨:", place.name);
-
-                // 검색된 장소가 아닌 주변 핀 클릭 시 해당 위치에서 새로운 검색 수행
-                if (searchedPlace && place.id !== searchedPlace.id) {
-                    // 검색된 장소의 포커스 제거
-                    setSearchedPlace(null);
-                    // 모바일에서는 목록 축소 금지 (핀 유지)
-                    if (!isMobile) {
-                        setPlaces([place]);
-                    }
-                }
             });
 
-            markersRef.current.push({ marker, infoWindow: null, placeId: place.id });
+            // 경계 확장
             bounds.extend(position);
-        });
 
-        // 클린업 함수: 이 효과가 다시 실행되기 전에 기존 마커들을 지움
-        return () => {
-            markers.forEach((marker) => marker.setMap(null));
-        };
-    }, [places, selectedPlace, userLocation, isMobile, leftPanelOpen]);
+            // 목록 관리를 위한 저장
+            markers.push({ marker, infoWindow: null });
+        });
+        markersRef.current = markers;
+
+        // 경계 적용 (선택된 핀 하나만 보일 때는 약간 확대)
+        if (!bounds.isEmpty()) {
+            try {
+                if (selectedPlace) {
+                    map.setCenter(
+                        new (window as any).naver.maps.LatLng(selectedPlace.latitude, selectedPlace.longitude)
+                    );
+                    map.setZoom(15);
+                } else {
+                    map.fitBounds(bounds);
+                }
+            } catch (e) {
+                // noop
+            }
+        }
+    }, [places, selectedPlace, userLocation, isMobile, showToast]);
 
     // --- 초기 데이터 로드 ---
     useEffect(() => {
@@ -507,8 +409,8 @@ function MapPageInner() {
         setSelectedPlace(placeFromQuery);
         setActiveTab("places");
 
-        if (mapInstance.current && window.kakao) {
-            mapInstance.current.panTo(new window.kakao.maps.LatLng(lat, lng));
+        if (mapInstance.current && (window as any).naver?.maps) {
+            mapInstance.current.panTo(new (window as any).naver.maps.LatLng(lat, lng));
         }
     }, [searchParams]);
 
@@ -522,7 +424,7 @@ function MapPageInner() {
     // 지도 준비 후 places가 비면 지도 중심으로 재검색 (F5 새로고침 대응)
     useEffect(() => {
         if (!isMobile || places.length > 0 || loading) return;
-        if (mapInstance.current && (window as any).kakao?.maps) {
+        if (mapInstance.current && (window as any).naver?.maps) {
             try {
                 const center = mapInstance.current.getCenter();
                 if (center) {
@@ -531,6 +433,15 @@ function MapPageInner() {
             } catch {}
         }
     }, [isMobile, places.length, loading, searchNearbyPlaces]);
+
+    // 장소명 검색 후 결과 반영 시 지도 이동 (선택된 장소 기준)
+    useEffect(() => {
+        if (!searchedPlace) return;
+        // 검색된 장소로 지도 이동
+        if (mapInstance.current) {
+            mapInstance.current.panTo(new (window as any).naver.maps.LatLng(searchedPlace.lat, searchedPlace.lng));
+        }
+    }, [searchedPlace]);
 
     // --- 핸들러 함수들 ---
     const handleSearch = useCallback(async () => {
@@ -573,7 +484,7 @@ function MapPageInner() {
 
             // 검색된 장소로 지도 이동
             if (mapInstance.current) {
-                mapInstance.current.panTo(new window.kakao.maps.LatLng(foundPlace.lat, foundPlace.lng));
+                mapInstance.current.panTo(new (window as any).naver.maps.LatLng(foundPlace.lat, foundPlace.lng));
             }
 
             // 2. 찾은 장소의 좌표로 주변 코스 검색
@@ -612,8 +523,8 @@ function MapPageInner() {
     );
 
     const moveToMyLocation = useCallback(() => {
-        if (mapInstance.current && userLocation) {
-            mapInstance.current.panTo(new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+        if (mapInstance.current && userLocation && (window as any).naver?.maps) {
+            mapInstance.current.panTo(new window.naver.maps.LatLng(userLocation.lat, userLocation.lng));
             showToast("내 위치로 이동했습니다.", "info");
             // 1초 뒤 자동으로 토스트 숨기기
             setTimeout(() => setToast(null), 1000);
@@ -638,7 +549,7 @@ function MapPageInner() {
         (place: Place) => {
             setSelectedPlace(place);
             if (mapInstance.current) {
-                const latlng = new window.kakao.maps.LatLng(place.latitude, place.longitude);
+                const latlng = new (window as any).naver.maps.LatLng(place.latitude, place.longitude);
                 mapInstance.current.panTo(latlng);
             }
             // 모바일에서 목록 클릭 시에도 정보 패널이 보이도록 열기
@@ -647,9 +558,9 @@ function MapPageInner() {
         [isMobile, leftPanelOpen]
     );
 
-    // 카카오맵에서 장소명으로 검색 열기
+    // 네이버 지도에서 장소명으로 검색 열기
     const handleOpenKakaoSearch = useCallback((place: Place) => {
-        const url = `https://map.kakao.com/link/search/${encodeURIComponent(place.name)}`;
+        const url = `https://map.naver.com/v5/search/${encodeURIComponent(place.name)}`;
         window.open(url, "_blank");
     }, []);
 

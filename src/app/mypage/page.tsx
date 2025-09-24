@@ -605,7 +605,7 @@ const MyPage = () => {
         if (!window.Kakao) {
             await new Promise<void>((resolve, reject) => {
                 const script = document.createElement("script");
-                script.src = "https://developers.kakao.com/sdk/js/kakao.js";
+                script.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
                 script.async = true;
                 script.onload = () => resolve();
                 script.onerror = () => reject(new Error("Kakao SDK load failed"));
@@ -615,10 +615,12 @@ const MyPage = () => {
         const Kakao = window.Kakao;
         try {
             if (Kakao && !Kakao.isInitialized?.()) {
-                const key =
-                    process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY || (process as any).env?.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
-                if (!key) return Kakao;
-                Kakao.init(key);
+                const jsKey =
+                    (process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined) ||
+                    (process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY as string | undefined) ||
+                    (process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY as string | undefined);
+                if (!jsKey) return Kakao;
+                Kakao.init(jsKey);
             }
         } catch {}
         return Kakao || null;

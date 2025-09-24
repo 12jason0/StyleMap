@@ -14,7 +14,7 @@ export interface UserLocation {
     lng: number;
 }
 
-export interface KakaoMapProps {
+export interface MapProps {
     places: Place[];
     userLocation: UserLocation | null;
     selectedPlace: Place | null;
@@ -27,3 +27,6 @@ export interface KakaoMapProps {
     ancientStyle?: boolean; // 고대 유물 스타일 오버레이
     highlightPlaceId?: number; // 강조 효과를 줄 place id
 }
+
+// 과거 호환용 타입 별칭 (점진적 마이그레이션용)
+export type KakaoMapProps = MapProps;

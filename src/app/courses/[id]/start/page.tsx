@@ -39,7 +39,7 @@ function LoadingSpinner() {
 }
 
 // 지도 컴포넌트 동적 로딩
-const KakaoMap = dynamic(() => import("@/components/KakaoMap"), {
+const NaverMap = dynamic(() => import("@/components/NaverMap"), {
     ssr: false,
     loading: () => <div className="w-full h-full bg-gray-200 flex items-center justify-center">지도 로딩중...</div>,
 });
@@ -129,7 +129,7 @@ function GuidePageInner() {
         <div className="flex flex-col h-screen bg-white text-black pt-16">
             {/* 지도 영역 */}
             <div className="flex-1 relative min-w-0">
-                <KakaoMap
+                <NaverMap
                     places={[{ ...currentPlace, id: currentPlace.id }]}
                     userLocation={userLocation}
                     selectedPlace={null}
@@ -174,17 +174,14 @@ function GuidePageInner() {
                                         const name = currentPlace.name;
                                         const lat = currentPlace.latitude;
                                         const lng = currentPlace.longitude;
+                                        const base = `https://map.naver.com/v5/directions`;
                                         if (userLocation) {
-                                            const url = `https://map.kakao.com/link/from/${encodeURIComponent(
-                                                "내 위치"
-                                            )},${userLocation.lat},${userLocation.lng}/to/${encodeURIComponent(
-                                                name
-                                            )},${lat},${lng}`;
+                                            const url = `${base}/${userLocation.lng},${
+                                                userLocation.lat
+                                            },내 위치,,/${lng},${lat},${encodeURIComponent(name)},,WALKING`;
                                             window.open(url, "_blank");
                                         } else {
-                                            const url = `https://map.kakao.com/link/to/${encodeURIComponent(
-                                                name
-                                            )},${lat},${lng}`;
+                                            const url = `${base}/${lng},${lat},${encodeURIComponent(name)},,WALKING`;
                                             window.open(url, "_blank");
                                         }
                                     }}

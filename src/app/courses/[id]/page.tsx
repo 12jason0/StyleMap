@@ -8,7 +8,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 
 import ReviewModal from "@/components/ReviewModal";
-import KakaoMap from "@/components/KakaoMap";
+import NaverMap from "@/components/NaverMap";
 import { Place as MapPlace, UserLocation } from "@/types/map";
 
 // 인터페이스 정의
@@ -88,11 +88,7 @@ interface CourseData extends Course {
 }
 
 // 카카오맵 전역 함수 정의
-declare global {
-    interface Window {
-        initKakaoMap: () => void;
-    }
-}
+// 네이버맵으로 변경됨: 별도 전역 초기화 훅 불필요
 
 // 토스트 알림 컴포넌트
 const Toast = ({
@@ -279,7 +275,7 @@ export default function CourseDetailPage() {
     }, []);
 
     // 정보창 생성 함수
-    const createInfoWindow = useCallback((coursePlace: CoursePlace, kakao: any) => {
+    const createInfoWindow = useCallback((coursePlace: CoursePlace) => {
         const content = `
             <div style="padding: 12px; min-width: 200px; max-width: 250px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
                 <div style="margin-bottom: 8px;">
@@ -307,11 +303,7 @@ export default function CourseDetailPage() {
             </div>
         `;
 
-        return new kakao.maps.InfoWindow({
-            content: content,
-            removable: true,
-            zIndex: 1,
-        });
+        return { content } as any;
     }, []);
 
     // 장소 선택 핸들러
@@ -324,7 +316,7 @@ export default function CourseDetailPage() {
     // 길찾기 핸들러
     const createNavigationHandler = useCallback(
         (name: string, lat: number, lng: number) => () => {
-            const url = `https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}`;
+            const url = `https://map.naver.com/v5/search/${encodeURIComponent(name)}?c=${lng},${lat},15,0,0,0,dh`;
             window.open(url, "_blank");
         },
         []
@@ -340,7 +332,6 @@ export default function CourseDetailPage() {
 
     // 전체 지도 보기 (간소화)
     const handleShowFullMap = useCallback(() => {
-        // KakaoMap 컴포넌트에서 자동으로 처리됨
         console.log("전체 지도 보기");
     }, []);
 
@@ -817,7 +808,7 @@ export default function CourseDetailPage() {
                                     <div className="mb-8 rounded-2xl overflow-hidden shadow-lg">
                                         <div className="relative">
                                             {hasPlaces ? (
-                                                <KakaoMap
+                                                <NaverMap
                                                     places={sortedCoursePlaces.map((cp) => ({
                                                         id: cp.place.id,
                                                         name: cp.place.name,

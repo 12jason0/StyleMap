@@ -243,16 +243,6 @@ function CoursesPageInner() {
                                     >
                                         코스 시작하기
                                     </button>
-                                    <a
-                                        href={`https://www.google.com/search?q=${encodeURIComponent(course.title)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="btn-secondary rounded-full text-sm active:scale-95 ml-2"
-                                        title="공식 웹사이트 또는 정보 검색"
-                                    >
-                                        웹사이트
-                                    </a>
                                 </div>
                             </div>
                         </div>

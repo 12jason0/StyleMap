@@ -106,9 +106,9 @@ function EscapeIntroPageInner() {
     }, []);
 
     // --- 지도 컴포넌트 동적 로딩 ---
-    const KakaoMap = useMemo(
+    const NaverMap = useMemo(
         () =>
-            dynamicImport(() => import("@/components/KakaoMap"), {
+            dynamicImport(() => import("@/components/NaverMap"), {
                 ssr: false,
                 loading: () => (
                     <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">
@@ -762,7 +762,7 @@ body {
                                     </div>
                                 </div>
                                 <div className="relative flex-1 rounded-lg overflow-hidden border-2 border-gray-300 shadow-md mb-4">
-                                    <KakaoMap
+                                    <NaverMap
                                         places={mapPlaces as any}
                                         userLocation={userLocation as any}
                                         selectedPlace={null}
@@ -1084,7 +1084,7 @@ body {
                                 </button>
                             </div>
                             <div className="w-full h-full">
-                                <KakaoMap
+                                <NaverMap
                                     places={mapPlaces as any}
                                     userLocation={userLocation as any}
                                     selectedPlace={null}
