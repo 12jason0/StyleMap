@@ -1,5 +1,10 @@
+// src/lib/auth.ts
+
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
+import { User } from "@prisma/client";
+
+// --- JWT (사용자 인증) 관련 함수들 ---
 
 export function getJwtSecret(): string {
     const secret = process.env.JWT_SECRET;
@@ -39,4 +44,17 @@ export function getUserIdFromRequest(request: NextRequest): string | null {
     } catch {
         return null;
     }
+}
+
+// --- 데이터 보안 처리 관련 함수 ---
+
+/**
+ * 사용자 객체에서 비밀번호 필드를 제외합니다.
+ * @param user - 사용자 객체
+ * @returns 비밀번호가 제외된 사용자 객체
+ */
+export function excludePassword(user: User) {
+    // lodash.omit 대신 비구조화 할당 문법을 사용합니다.
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
 }

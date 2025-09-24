@@ -1,148 +1,124 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { MapProps, Place } from "@/types/map";
 
-declare global {
-    interface Window {
-        naver: any;
-    }
-}
-
-const Loading = () => (
-    <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
-        <span className="ml-3 text-gray-600">지도 로딩 중...</span>
-    </div>
-);
-
-export default function NaverMap({
+export default function NaverMapComponent({
     places,
     userLocation,
     selectedPlace,
     onPlaceClick,
     className = "",
     style = {},
-    draggable = true,
-    drawPath = false,
-    routeMode = "simple",
-    ancientStyle = false,
-    highlightPlaceId,
+    drawPath,
 }: MapProps) {
-    const mapRef = useRef<HTMLDivElement>(null);
-    const mapInstance = useRef<any>(null);
-    const [ready, setReady] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
-    const pathRef = useRef<any>(null);
+    const polylineRef = useRef<any>(null);
 
     const isFiniteNum = (v: any) => Number.isFinite(Number(v));
     const isValidLatLng = (lat?: any, lng?: any) => isFiniteNum(lat) && isFiniteNum(lng);
 
-    // 지도 초기화
+    const pickCenter = (): { lat: number; lng: number } => {
+        if (selectedPlace && isValidLatLng(selectedPlace.latitude, selectedPlace.longitude)) {
+            return { lat: Number(selectedPlace.latitude), lng: Number(selectedPlace.longitude) };
+        }
+        const first = (places || []).find((p) => isValidLatLng(p?.latitude, p?.longitude));
+        if (first) return { lat: Number(first.latitude), lng: Number(first.longitude) };
+        if (userLocation && isValidLatLng(userLocation.lat, userLocation.lng)) {
+            return { lat: Number(userLocation.lat), lng: Number(userLocation.lng) };
+        }
+        return { lat: 37.5665, lng: 126.978 };
+    };
+
+    // 스크립트 준비 대기 + 지도 초기화
     useEffect(() => {
-        if (!mapRef.current || mapInstance.current) return;
-        if (!window.naver?.maps) return;
+        let cancelled = false;
+        const ensure = () =>
+            new Promise<void>((resolve) => {
+                if ((window as any).naver?.maps) return resolve();
+                let tries = 0;
+                const t = setInterval(() => {
+                    if ((window as any).naver?.maps || cancelled) {
+                        clearInterval(t);
+                        resolve();
+                    } else if (++tries > 100) {
+                        clearInterval(t);
+                        resolve();
+                    }
+                }, 50);
+            });
 
-        const first = places.find((p) => isValidLatLng(p.latitude, p.longitude));
-        const center = first
-            ? new window.naver.maps.LatLng(Number(first.latitude), Number(first.longitude))
-            : userLocation && isValidLatLng(userLocation.lat, userLocation.lng)
-            ? new window.naver.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng))
-            : new window.naver.maps.LatLng(37.5665, 126.978);
+        (async () => {
+            await ensure();
+            if (cancelled || !(window as any).naver?.maps || !containerRef.current) return;
+            const naver = (window as any).naver;
+            const c = pickCenter();
+            mapRef.current = new naver.maps.Map(containerRef.current, {
+                center: new naver.maps.LatLng(c.lat, c.lng),
+                zoom: 15,
+            });
+        })();
 
-        const map = new window.naver.maps.Map(mapRef.current, {
-            center,
-            zoom: places.length <= 1 ? 15 : 12,
-            draggable,
-            minZoom: 5,
-            scaleControl: true,
-            logoControl: false,
-            mapDataControl: false,
-        });
-        mapInstance.current = map;
-        setReady(true);
-    }, [places, userLocation, draggable]);
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    // 마커 및 경로 업데이트
+    // 마커/경로 업데이트
     useEffect(() => {
-        if (!ready || !mapInstance.current || !window.naver?.maps) return;
-        const map = mapInstance.current;
-        const naver = window.naver;
+        const naver = (window as any).naver;
+        if (!naver?.maps || !mapRef.current) return;
 
-        // 기존 마커 제거
+        // 정리
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
-        if (pathRef.current) {
-            pathRef.current.setMap(null);
-            pathRef.current = null;
+        if (polylineRef.current) {
+            try {
+                polylineRef.current.setMap(null);
+            } catch {}
+            polylineRef.current = null;
         }
 
+        const map = mapRef.current;
         const bounds = new naver.maps.LatLngBounds();
 
-        const addMarker = (place: Place) => {
-            const position = new naver.maps.LatLng(place.latitude, place.longitude);
-            const marker = new naver.maps.Marker({ position, map, title: place.name, zIndex: 10 });
-            naver.maps.Event.addListener(marker, "click", () => onPlaceClick(place));
-            markersRef.current.push(marker);
-            bounds.extend(position);
-        };
-
-        places.filter((p) => isValidLatLng(p.latitude, p.longitude)).forEach(addMarker);
-
+        // 사용자 위치
         if (userLocation && isValidLatLng(userLocation.lat, userLocation.lng)) {
-            const pos = new naver.maps.LatLng(userLocation.lat, userLocation.lng);
-            const me = new naver.maps.Marker({
-                position: pos,
-                map,
-                icon: {
-                    content:
-                        '<div style="width:18px;height:18px;border-radius:50%;background:#10b981;border:2px solid white;box-shadow:0 0 0 2px rgba(16,185,129,.3)"></div>',
-                },
-                zIndex: 20,
-            });
+            const pos = new naver.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng));
+            const me = new naver.maps.Marker({ position: pos, map, zIndex: 20, title: "현재 위치" });
             markersRef.current.push(me);
             bounds.extend(pos);
         }
 
-        // 중심/줌 설정
+        // 장소들
+        const valid: Place[] = (places || []).filter((p) => isValidLatLng(p?.latitude, p?.longitude)) as Place[];
+        valid.forEach((p) => {
+            const pos = new naver.maps.LatLng(Number(p.latitude), Number(p.longitude));
+            const marker = new naver.maps.Marker({ position: pos, map, title: p.name });
+            naver.maps.Event.addListener(marker, "click", () => onPlaceClick(p));
+            markersRef.current.push(marker);
+            bounds.extend(pos);
+        });
+
+        // 중심/경계
         try {
-            if (places.length === 1) {
-                map.setCenter(new naver.maps.LatLng(places[0].latitude, places[0].longitude));
+            if (valid.length === 1 && !userLocation) {
+                map.setCenter(new naver.maps.LatLng(Number(valid[0].latitude), Number(valid[0].longitude)));
                 map.setZoom(15);
             } else if (!bounds.isEmpty()) {
                 map.fitBounds(bounds);
             }
         } catch {}
 
-        // 경로 그리기 (단순 polyline)
-        if (drawPath) {
-            const coords: any[] = [];
-            if (userLocation && isValidLatLng(userLocation.lat, userLocation.lng)) {
-                coords.push(new naver.maps.LatLng(userLocation.lat, userLocation.lng));
-            }
-            places
-                .filter((p) => isValidLatLng(p.latitude, p.longitude))
-                .forEach((p) => coords.push(new naver.maps.LatLng(p.latitude, p.longitude)));
-            if (coords.length >= 2) {
-                pathRef.current = new naver.maps.Polyline({
-                    map,
-                    path: coords,
-                    strokeColor: ancientStyle ? "#b45309" : "#10b981",
-                    strokeOpacity: 0.9,
-                    strokeWeight: 4,
-                });
-            }
+        // 간단 경로(옵션)
+        if (drawPath && valid.length >= 2) {
+            const path = valid.map((p) => new naver.maps.LatLng(Number(p.latitude), Number(p.longitude)));
+            polylineRef.current = new naver.maps.Polyline({ map, path, strokeWeight: 4, strokeColor: "#10b981" });
         }
-    }, [ready, places, userLocation, drawPath, ancientStyle, onPlaceClick]);
+    }, [places, userLocation, selectedPlace, drawPath, onPlaceClick]);
 
-    return (
-        <div className={`relative ${className}`} style={{ ...style, width: "100%", height: "100%" }}>
-            <div ref={mapRef} className="w-full h-full" style={{ minHeight: 300 }} />
-            {!window.naver?.maps && (
-                <div className="absolute inset-0 bg-white/90 flex items-center justify-center">
-                    <Loading />
-                </div>
-            )}
-        </div>
-    );
+    return <div ref={containerRef} className={className} style={{ ...style, width: "100%", height: "100%" }} />;
 }

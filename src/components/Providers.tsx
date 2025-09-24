@@ -5,7 +5,6 @@
 import { NavermapsProvider } from "react-naver-maps";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-    return (
-        <NavermapsProvider ncpClientId={process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || ""}>{children}</NavermapsProvider>
-    );
+    const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || "";
+    return <NavermapsProvider ncpClientId={clientId}>{children}</NavermapsProvider>;
 }
