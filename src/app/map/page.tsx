@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Container as MapDiv, NaverMap, Marker } from "react-naver-maps";
 
 // --- 타입 정의 ---
@@ -69,7 +69,6 @@ function MapPageInner() {
     const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
     const [searchInput, setSearchInput] = useState("");
     const [activeTab, setActiveTab] = useState<"places" | "courses">("places");
-    // 카테고리 필터 제거
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isMobile, setIsMobile] = useState(false);
@@ -80,122 +79,80 @@ function MapPageInner() {
     const fetchPlacesAndCourses = useCallback(async (location: { lat: number; lng: number }, keyword?: string) => {
         setLoading(true);
         setError(null);
-        try {
-            let fetchedPlaces: any[] = [];
+        setSelectedPlace(null); // 새로운 검색 시 선택된 장소 초기화
 
+        try {
+            // 1. 주변 장소 조회 (새로운 API 사용)
+            let placesUrl = `/api/places/search-naver?lat=${location.lat}&lng=${location.lng}`;
             if (keyword && keyword.trim()) {
-                // 키워드가 있을 때 NAVER만 사용 (DB 폴백 제거)
-                const res = await fetch(
-                    `/api/places/search-naver?lat=${location.lat}&lng=${location.lng}&keyword=${encodeURIComponent(
-                        keyword
-                    )}`
-                );
-                if (res.ok) {
-                    const data = await res.json();
-                    fetchedPlaces = (data.success ? data.places : []).map((p: any) => ({
-                        ...p,
-                        latitude: parseFloat(p.latitude),
-                        longitude: parseFloat(p.longitude),
-                    }));
-                } else {
-                    fetchedPlaces = [];
-                }
-            } else {
-                // 키워드가 없을 때도 NAVER만 사용 (DB 폴백 제거)
-                const naverRes = await fetch(`/api/places/search-naver?lat=${location.lat}&lng=${location.lng}`);
-                if (naverRes.ok) {
-                    const data = await naverRes.json();
-                    fetchedPlaces = (data.success ? data.places : []).map((p: any) => ({
-                        ...p,
-                        latitude: parseFloat(p.latitude),
-                        longitude: parseFloat(p.longitude),
-                    }));
-                } else {
-                    fetchedPlaces = [];
-                }
+                placesUrl += `&keyword=${encodeURIComponent(keyword)}`;
             }
 
-            // 좌표 보강: 서버에서 좌표를 못 받은 항목은 클라이언트 SDK 지오코더로 보강
-            const enrichWithClientGeocoder = async (items: any[]): Promise<any[]> => {
-                try {
-                    const svc = (window as any)?.naver?.maps?.Service;
-                    const LatLng = (window as any)?.naver?.maps?.LatLng;
-                    if (!svc || !LatLng) return items;
-                    const geocodeOnce = (addr: string) =>
-                        new Promise<{ lat: number; lng: number } | null>((resolve) => {
-                            try {
-                                svc.geocode({ query: addr }, (status: any, resp: any) => {
-                                    try {
-                                        if (status === (window as any).naver.maps.Service.Status.OK) {
-                                            const r = Array.isArray(resp?.v2?.addresses) ? resp.v2.addresses[0] : null;
-                                            if (r && r.y && r.x)
-                                                return resolve({ lat: parseFloat(r.y), lng: parseFloat(r.x) });
-                                        }
-                                    } catch {}
-                                    resolve(null);
-                                });
-                            } catch {
-                                resolve(null);
-                            }
-                        });
-                    const out: any[] = [];
-                    for (const it of items) {
-                        if (Number.isFinite(parseFloat(it?.latitude)) && Number.isFinite(parseFloat(it?.longitude))) {
-                            out.push(it);
-                            continue;
-                        }
-                        const addr = it?.address || it?.description || "";
-                        if (!addr) continue;
-                        const c = await geocodeOnce(addr);
-                        if (c) out.push({ ...it, latitude: c.lat, longitude: c.lng });
-                    }
-                    return out.length ? out : items;
-                } catch {
-                    return items;
-                }
-            };
+            const placesRes = await fetch(placesUrl);
+            if (!placesRes.ok) {
+                throw new Error("장소 정보를 가져오는 데 실패했습니다.");
+            }
 
-            fetchedPlaces = await enrichWithClientGeocoder(fetchedPlaces);
+            const placesData = await placesRes.json();
+            const fetchedPlaces = (placesData.success ? placesData.places : []).map((p: any) => ({
+                ...p,
+                // 백엔드에서 이미 숫자 타입으로 오지만, 안전을 위해 한 번 더 파싱
+                latitude: parseFloat(p.latitude),
+                longitude: parseFloat(p.longitude),
+            }));
+
             setPlaces(fetchedPlaces);
 
-            // 인근 코스 병행 조회
+            // 2. 인근 코스 병행 조회
             const courseRes = await fetch(`/api/courses/nearby?lat=${location.lat}&lng=${location.lng}`);
-            const courseData = await courseRes.json();
-            setCourses(courseData.success ? courseData.courses : []);
-
-            if (fetchedPlaces.length > 0 && !keyword) {
-                setCenter({ lat: fetchedPlaces[0].latitude, lng: fetchedPlaces[0].longitude });
+            if (courseRes.ok) {
+                const courseData = await courseRes.json();
+                setCourses(courseData.success ? courseData.courses : []);
+            } else {
+                // 코스 조회 실패는 전체 로직을 중단시키지 않도록 예외 처리
+                console.warn("코스 정보를 가져오는 데 실패했습니다.");
+                setCourses([]);
             }
-        } catch (e) {
-            setError("데이터를 불러오는 데 실패했습니다.");
+
+            // 키워드 검색이 아닐 때만, 첫 번째 장소로 지도 중심 이동
+            if (fetchedPlaces.length > 0 && !keyword) {
+                // setCenter({ lat: fetchedPlaces[0].latitude, lng: fetchedPlaces[0].longitude });
+            }
+        } catch (e: any) {
+            setError(e.message || "데이터를 불러오는 데 실패했습니다.");
+            setPlaces([]);
+            setCourses([]);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, []); // 이 함수는 외부 상태에 의존하지 않으므로 의존성 배열은 비어있어도 괜찮습니다.
 
     const handleSearch = useCallback(async () => {
+        // 검색은 현재 지도 중심이 아닌, 검색어 자체의 위치를 기준으로 합니다.
         if (!searchInput.trim()) return;
         setLoading(true);
         setError(null);
         try {
+            // '/api/places/search-single'은 단일 장소의 좌표를 얻기 위해 사용
             const res = await fetch(`/api/places/search-single?query=${encodeURIComponent(searchInput)}`);
             const data = await res.json();
-            if (data.success) {
-                const foundPlace = {
-                    ...data.place,
-                    latitude: parseFloat(data.place.lat),
-                    longitude: parseFloat(data.place.lng),
+
+            if (data.success && data.place) {
+                const foundPlaceLocation = {
+                    lat: parseFloat(data.place.lat),
+                    lng: parseFloat(data.place.lng),
                 };
-                setPlaces([foundPlace]);
-                setSelectedPlace(foundPlace);
-                setCenter({ lat: foundPlace.latitude, lng: foundPlace.longitude });
-                await fetchPlacesAndCourses({ lat: foundPlace.latitude, lng: foundPlace.longitude });
-                setActiveTab("courses");
+                // 검색된 장소의 위치를 중심으로 주변 장소와 코스를 다시 불러옵니다.
+                setCenter(foundPlaceLocation);
+                await fetchPlacesAndCourses(foundPlaceLocation, searchInput);
+                setActiveTab("places"); // 검색 후 장소 탭을 활성화
             } else {
                 throw new Error(data.error || "검색 결과가 없습니다.");
             }
         } catch (e) {
             setError(e instanceof Error ? e.message : "검색 중 오류 발생");
+            setPlaces([]);
+            setCourses([]);
         } finally {
             setLoading(false);
         }
@@ -206,7 +163,7 @@ function MapPageInner() {
         const checkMobile = () => {
             const mobile = window.innerWidth < 768;
             setIsMobile(mobile);
-            if (mobile) setLeftPanelOpen(false);
+            if (mobile) setLeftPanelOpen(true); // 모바일에서는 기본적으로 패널을 열어둡니다.
         };
         checkMobile();
         window.addEventListener("resize", checkMobile);
@@ -214,6 +171,8 @@ function MapPageInner() {
     }, []);
 
     useEffect(() => {
+        if (!mapsReady) return; // 지도 SDK 준비 후 최초 데이터 로드 실행
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const location = { lat: position.coords.latitude, lng: position.coords.longitude };
@@ -222,21 +181,28 @@ function MapPageInner() {
                 fetchPlacesAndCourses(location);
             },
             () => {
+                // 위치 정보 권한이 거부되었을 경우 기본 위치(서울)에서 검색
+                console.warn("위치 정보 접근이 거부되었습니다. 기본 위치에서 검색합니다.");
                 fetchPlacesAndCourses(center);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0,
             }
         );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [mapsReady, fetchPlacesAndCourses]);
 
     const handlePlaceClick = (place: Place) => {
         setSelectedPlace(place);
         setCenter({ lat: place.latitude, lng: place.longitude });
-        setZoom(16);
-        if (isMobile) setLeftPanelOpen(true);
+        setZoom(17); // 장소 클릭 시 더 확대
+        if (isMobile) {
+            // 모바일에서는 패널이 이미 열려있으므로 별도 조작 X
+        } else {
+            setLeftPanelOpen(true); // 데스크탑에서는 패널이 닫혀있을 수 있으므로 열어줌
+        }
     };
-
-    // --- 카테고리 필터 유틸 ---
-    const filteredPlaces = places;
 
     const resetPanelState = (closePanel: boolean = false) => {
         setSelectedPlace(null);
@@ -245,31 +211,32 @@ function MapPageInner() {
         }
     };
 
-    // --- 거리 표시 유틸 (UI 개선) ---
     const formatDistance = useCallback(
         (p: Place) => {
+            if (!userLocation) return ""; // 사용자 위치가 없으면 거리 계산 불가
             try {
-                const R = 6371000;
+                const R = 6371e3; // meters
                 const toRad = (v: number) => (v * Math.PI) / 180;
-                const dLat = toRad(p.latitude - center.lat);
-                const dLng = toRad(p.longitude - center.lng);
+                const φ1 = toRad(userLocation.lat);
+                const φ2 = toRad(p.latitude);
+                const Δφ = toRad(p.latitude - userLocation.lat);
+                const Δλ = toRad(p.longitude - userLocation.lng);
+
                 const a =
-                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                    Math.cos(toRad(center.lat)) *
-                        Math.cos(toRad(p.latitude)) *
-                        (Math.sin(dLng / 2) * Math.sin(dLng / 2));
+                    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                const dist = R * c; // meters
+                const dist = R * c;
+
                 if (!Number.isFinite(dist)) return "";
                 return dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`;
             } catch {
                 return "";
             }
         },
-        [center]
+        [userLocation]
     );
 
-    // 훅은 항상 실행 (조건부 금지), 준비 전에는 null 반환
     const centerLatLng = useMemo(() => {
         if (!navermaps) return null;
         return new navermaps.LatLng(center.lat, center.lng);
@@ -284,20 +251,22 @@ function MapPageInner() {
     }
 
     return (
-        <div className="flex h-screen">
+        <div className="flex h-screen overflow-hidden">
+            {/* --- 왼쪽 정보 패널 --- */}
             <div
-                className={`z-20 ${
-                    isMobile
-                        ? `transition-transform duration-300 fixed inset-x-0 bottom-0 h-[60vh] bg-white rounded-t-2xl shadow-2xl flex flex-col ${
-                              leftPanelOpen ? "translate-y-0" : "translate-y-full"
-                          }`
-                        : `transition-[width] duration-300 h-full bg-white border-r border-gray-200 flex flex-col ${
-                              leftPanelOpen ? "w-96 pointer-events-auto" : "w-0 overflow-hidden pointer-events-none"
-                          }`
-                }`}
-                aria-hidden={!leftPanelOpen && !isMobile}
+                className={`z-20 flex flex-col bg-white
+                    ${
+                        isMobile
+                            ? `transition-transform duration-300 fixed inset-x-0 bottom-0 h-[60vh] rounded-t-2xl shadow-2xl ${
+                                  leftPanelOpen ? "translate-y-0" : "translate-y-full"
+                              }`
+                            : `transition-[width] duration-300 h-full border-r border-gray-200 ${
+                                  leftPanelOpen ? "w-96" : "w-0 overflow-hidden"
+                              }`
+                    }`}
             >
-                <div className="flex-shrink-0 p-4 border-b pt-20">
+                {/* 검색창 및 헤더 */}
+                <div className="flex-shrink-0 p-4 border-b">
                     <div className="flex gap-2">
                         <input
                             type="text"
@@ -305,21 +274,26 @@ function MapPageInner() {
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                            className="flex-1 px-4 py-2 border rounded-lg"
+                            className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         />
                         <button
                             onClick={handleSearch}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                            disabled={loading}
                         >
                             검색
                         </button>
                     </div>
-                    {/* 카테고리 필터 제거 */}
                 </div>
-                <div className="flex border-b">
+
+                {/* 탭 메뉴 */}
+                <div className="flex border-b flex-shrink-0">
                     <button
-                        onClick={() => setActiveTab("places")}
-                        className={`flex-1 p-3 ${
+                        onClick={() => {
+                            setActiveTab("places");
+                            setSelectedPlace(null);
+                        }}
+                        className={`flex-1 p-3 font-semibold ${
                             activeTab === "places" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
                         }`}
                     >
@@ -327,71 +301,90 @@ function MapPageInner() {
                     </button>
                     <button
                         onClick={() => setActiveTab("courses")}
-                        className={`flex-1 p-3 ${
+                        className={`flex-1 p-3 font-semibold ${
                             activeTab === "courses" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
                         }`}
                     >
                         추천 코스 ({courses.length})
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
+
+                {/* 콘텐츠 목록 */}
+                <div className="flex-1 overflow-y-auto p-2">
                     {loading ? (
                         <LoadingSpinner />
                     ) : error ? (
-                        <div className="text-red-500 p-4">{error}</div>
+                        <div className="text-red-500 p-4 text-center">{error}</div>
                     ) : activeTab === "places" ? (
                         selectedPlace ? (
-                            <div className="p-2">
-                                <h3 className="text-xl font-bold">{selectedPlace.name}</h3>
-                                <p className="text-gray-600 mt-1">{selectedPlace.address}</p>
-                                <button
-                                    onClick={() =>
-                                        window.open(
-                                            `https://map.naver.com/v5/search/${encodeURIComponent(selectedPlace.name)}`,
-                                            "_blank"
-                                        )
-                                    }
-                                    className="mt-4 text-blue-600 font-semibold"
-                                >
-                                    네이버 지도에서 보기
-                                </button>
-                                <button onClick={() => resetPanelState()} className="mt-4 ml-4 text-gray-500">
-                                    목록으로 돌아가기
-                                </button>
+                            // 장소 상세 정보
+                            <div className="p-4">
+                                <h3 className="text-2xl font-bold">{selectedPlace.name}</h3>
+                                <p className="text-gray-600 mt-2">{selectedPlace.address}</p>
+                                <p className="text-gray-500 text-sm mt-1">{selectedPlace.category}</p>
+                                {selectedPlace.phone && <p className="text-gray-700 mt-2">📞 {selectedPlace.phone}</p>}
+                                <div className="mt-4 flex gap-4">
+                                    <button
+                                        onClick={() =>
+                                            window.open(
+                                                `https://map.naver.com/v5/search/${encodeURIComponent(
+                                                    selectedPlace.name
+                                                )}`,
+                                                "_blank"
+                                            )
+                                        }
+                                        className="text-blue-600 font-semibold hover:underline"
+                                    >
+                                        네이버 지도에서 보기
+                                    </button>
+                                    <button onClick={() => resetPanelState()} className="text-gray-500 hover:underline">
+                                        목록으로
+                                    </button>
+                                </div>
                             </div>
-                        ) : (
-                            filteredPlaces.map((place) => (
+                        ) : // 장소 목록
+                        places.length > 0 ? (
+                            places.map((place) => (
                                 <div
                                     key={place.id}
                                     onClick={() => handlePlaceClick(place)}
                                     className="group p-3 cursor-pointer hover:bg-gray-100 rounded-lg border-b last:border-b-0"
                                 >
                                     <div className="flex items-center justify-between mb-1">
-                                        <h4 className="font-semibold text-gray-900 line-clamp-1">{place.name}</h4>
-                                        <span className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
-                                            {formatDistance(place)}
-                                        </span>
+                                        <h4 className="font-semibold text-gray-900 truncate pr-2">{place.name}</h4>
+                                        {userLocation && (
+                                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                                                {formatDistance(place)}
+                                            </span>
+                                        )}
                                     </div>
-                                    <p className="text-sm text-gray-500 line-clamp-1">{place.address}</p>
+                                    <p className="text-sm text-gray-500 truncate">{place.address}</p>
+                                    <p className="text-xs text-gray-400 truncate">{place.category}</p>
                                 </div>
                             ))
+                        ) : (
+                            <div className="text-center text-gray-500 pt-10">주변 장소가 없습니다.</div>
                         )
-                    ) : (
+                    ) : // 코스 목록
+                    courses.length > 0 ? (
                         courses.map((course) => (
                             <div
                                 key={course.id}
                                 onClick={() => router.push(`/courses/${course.id}`)}
-                                className="p-3 cursor-pointer hover:bg-gray-100 rounded-lg"
+                                className="p-3 cursor-pointer hover:bg-gray-100 rounded-lg border-b last:border-b-0"
                             >
                                 <h4 className="font-semibold">{course.title}</h4>
                                 <p className="text-sm text-gray-500 line-clamp-2">{course.description}</p>
                             </div>
                         ))
+                    ) : (
+                        <div className="text-center text-gray-500 pt-10">주변에 추천 코스가 없습니다.</div>
                     )}
                 </div>
             </div>
 
-            <div className="flex-1 h-full">
+            {/* --- 네이버 지도 --- */}
+            <div className="flex-1 h-full relative">
                 <MapDiv style={{ width: "100%", height: "100%" }} id="naver-map-container">
                     <NaverMap
                         center={centerLatLng}
@@ -400,61 +393,102 @@ function MapPageInner() {
                             try {
                                 const lat = typeof (c as any).lat === "function" ? (c as any).lat() : (c as any).y;
                                 const lng = typeof (c as any).lng === "function" ? (c as any).lng() : (c as any).x;
-                                if (Number.isFinite(lat) && Number.isFinite(lng)) setCenter({ lat, lng });
-                                setShowMapSearchButton(true);
+                                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                                    setCenter({ lat, lng });
+                                    setShowMapSearchButton(true);
+                                }
                             } catch {}
                         }}
                         onZoomChanged={(z) => {
                             if (Number.isFinite(z as number)) setZoom(z as number);
-                            setShowMapSearchButton(true);
                         }}
                     >
                         {userLocation && (
                             <Marker
                                 position={new navermaps.LatLng(userLocation.lat, userLocation.lng)}
                                 title="현재 위치"
+                                icon={{
+                                    content: `<div style="width:24px;height:24px;border-radius:50%;background-color:#1A73E8;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>`,
+                                    anchor: new navermaps.Point(12, 12),
+                                }}
                             />
                         )}
                         {places.map((place) => {
-                            const pos = new navermaps.LatLng(place.latitude, place.longitude);
                             const isSel = selectedPlace?.id === place.id;
                             return (
                                 <Marker
                                     key={place.id}
-                                    position={pos}
+                                    position={new navermaps.LatLng(place.latitude, place.longitude)}
                                     title={place.name}
                                     onClick={() => handlePlaceClick(place)}
                                     zIndex={isSel ? 100 : 10}
+                                    icon={{
+                                        content: `<div class="w-6 h-6 rounded-full flex items-center justify-center ${
+                                            isSel ? "bg-red-500" : "bg-blue-500"
+                                        } border-2 border-white shadow-md"></div>`,
+                                        anchor: new navermaps.Point(12, 12),
+                                    }}
                                 />
                             );
                         })}
                     </NaverMap>
                 </MapDiv>
-            </div>
 
-            <div className="fixed right-6 bottom-6 z-10">
-                <div className="flex flex-col gap-2 items-end">
+                {/* --- 지도 위 UI 컨트롤 --- */}
+                {showMapSearchButton && (
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                        <button
+                            onClick={async () => {
+                                setShowMapSearchButton(false);
+                                await fetchPlacesAndCourses(center);
+                            }}
+                            className="px-4 py-2 bg-white text-black border border-gray-300 rounded-full shadow-lg hover:bg-gray-50"
+                        >
+                            현재 지도에서 재검색
+                        </button>
+                    </div>
+                )}
+
+                <div
+                    className={`absolute right-4 ${
+                        isMobile ? "top-20" : "bottom-6"
+                    } z-10 flex flex-col gap-2 items-end`}
+                >
                     {userLocation && (
                         <button
-                            onClick={() => setCenter(userLocation)}
+                            onClick={() => {
+                                setCenter(userLocation);
+                                setZoom(15);
+                            }}
                             className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100"
                             title="내 위치로 이동"
                         >
-                            📍
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-5 w-5"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
                         </button>
                     )}
-                    <div className="bg-white rounded-full shadow-lg border border-gray-200 overflow-hidden">
+                    <div className="bg-white rounded-full shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                         <button
-                            onClick={() => setZoom((z) => z + 1)}
-                            className="px-3 py-2 hover:bg-gray-100 hover:cursor-pointer color-black"
+                            onClick={() => setZoom((z) => Math.min(21, z + 1))}
+                            className="px-3 py-2 hover:bg-gray-100 text-lg font-semibold"
                             title="확대"
                         >
                             +
                         </button>
-                        <span className="inline-block w-px h-5 align-middle bg-gray-200" />
+                        <span className="block h-px w-full bg-gray-200" />
                         <button
-                            onClick={() => setZoom((z) => z - 1)}
-                            className="px-3 py-2 hover:bg-gray-100 hover:cursor-pointer color-black"
+                            onClick={() => setZoom((z) => Math.max(0, z - 1))}
+                            className="px-3 py-2 hover:bg-gray-100 text-lg font-semibold"
                             title="축소"
                         >
                             -
@@ -462,40 +496,31 @@ function MapPageInner() {
                     </div>
                 </div>
 
-                {/* 좌측 패널 열기/닫기 토글 (데스크톱 전용) */}
                 {!isMobile && (
                     <button
                         onClick={() => setLeftPanelOpen((v) => !v)}
-                        className="fixed top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out z-20 hover:bg-gray-50 hover:cursor-pointer"
+                        className="fixed top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:bg-gray-50 transition-all duration-300 z-20"
                         style={{ left: leftPanelOpen ? "24rem" : "0" }}
-                        aria-label={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >
                         <span className="text-gray-600 text-sm">{leftPanelOpen ? "◀" : "▶"}</span>
                     </button>
                 )}
             </div>
-
-            {showMapSearchButton && (
-                <div className="fixed left-1/2 -translate-x-1/2 bottom-24 z-10">
-                    <button
-                        onClick={async () => {
-                            setShowMapSearchButton(false);
-                            await fetchPlacesAndCourses(center);
-                        }}
-                        className="px-4 py-2 bg-white text-black border border-gray-300 rounded-full shadow hover:bg-gray-50 hover:cursor-pointer"
-                    >
-                        현재 지도에서 검색
-                    </button>
-                </div>
-            )}
         </div>
     );
 }
 
+// Suspense로 감싸서 useSearchParams 사용에 대한 Next.js 권장사항 준수
 export default function MapPage() {
     return (
-        <Suspense fallback={<div className="h-screen flex items-center justify-center">페이지 로딩 중...</div>}>
+        <Suspense
+            fallback={
+                <div className="h-screen flex items-center justify-center">
+                    <LoadingSpinner text="페이지 준비 중..." />
+                </div>
+            }
+        >
             <MapPageInner />
         </Suspense>
     );
