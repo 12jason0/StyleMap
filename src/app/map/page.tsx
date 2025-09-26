@@ -98,9 +98,10 @@ function MapPageInner() {
                 placesUrl += `&keyword=${encodeURIComponent(keyword)}`;
             }
 
+            const regionParam = keyword && keyword.trim() ? `&region=${encodeURIComponent(keyword.trim())}` : "";
             const [placesRes, courseRes] = await Promise.all([
                 fetch(placesUrl),
-                fetch(`/api/courses/nearby?lat=${location.lat}&lng=${location.lng}`),
+                fetch(`/api/courses/nearby?lat=${location.lat}&lng=${location.lng}${regionParam}`),
             ]);
 
             if (!placesRes.ok) throw new Error("장소 정보를 가져오는 데 실패했습니다.");
@@ -553,6 +554,19 @@ function MapPageInner() {
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >
                         <span className="text-gray-600 text-sm ">{leftPanelOpen ? "◀" : "▶"}</span>
+                    </button>
+                )}
+                {isMobile && (
+                    <button
+                        onClick={() => {
+                            setLeftPanelOpen((v) => !v);
+                            setTimeout(triggerMapResize, 320);
+                        }}
+                        className="hover:cursor-pointer fixed left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-5 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-50"
+                        style={{ bottom: leftPanelOpen ? "calc(60vh + 16px)" : "80px" }}
+                        title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
+                    >
+                        <span className="text-gray-700 text-2xl ">{leftPanelOpen ? "▾" : "▴"}</span>
                     </button>
                 )}
             </div>

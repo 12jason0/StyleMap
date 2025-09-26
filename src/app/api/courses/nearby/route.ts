@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const lat = parseFloat(searchParams.get("lat") || "");
     const lng = parseFloat(searchParams.get("lng") || "");
+    const regionQuery = (searchParams.get("region") || "").trim();
     const radiusParam = searchParams.get("radius");
     const kmParam = searchParams.get("km");
     let radius = 2000;
@@ -26,6 +27,67 @@ export async function GET(request: NextRequest) {
         radius = Math.round(parseFloat(radiusParam));
     }
     radius = Math.min(10000, Math.max(100, radius));
+
+    // 지역 검색 우선 처리
+    if (regionQuery) {
+        try {
+            const regionCourses = await prisma.course.findMany({
+                take: 200,
+                where: {
+                    OR: [
+                        { region: { contains: regionQuery, mode: "insensitive" } },
+                        { title: { contains: regionQuery, mode: "insensitive" } },
+                        { description: { contains: regionQuery, mode: "insensitive" } },
+                        { concept: { contains: regionQuery, mode: "insensitive" } },
+                        {
+                            coursePlaces: {
+                                some: {
+                                    place: {
+                                        OR: [
+                                            { name: { contains: regionQuery, mode: "insensitive" } },
+                                            { address: { contains: regionQuery, mode: "insensitive" } },
+                                        ],
+                                    },
+                                },
+                            },
+                        },
+                    ],
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    imageUrl: true,
+                    region: true,
+                    coursePlaces: {
+                        orderBy: { order_index: "asc" },
+                        select: {
+                            order_index: true,
+                            place: {
+                                select: { id: true, name: true, imageUrl: true, latitude: true, longitude: true },
+                            },
+                        },
+                    },
+                },
+            });
+
+            const enriched = (regionCourses as any[]).map((c) => ({
+                ...c,
+                start_place_name: c.coursePlaces?.[0]?.place?.name || "",
+                distance: 0,
+            }));
+
+            // 장소 사진이 최소 1장이라도 있는 코스 우선 노출 (course.imageUrl 유무와 무관)
+            const withPlaceImages = (enriched as CourseWithDistance[]).filter(
+                (c) => Array.isArray(c.coursePlaces) && c.coursePlaces.some((cp: any) => !!cp?.place?.imageUrl)
+            );
+            const resultRegion = withPlaceImages.slice(0, 20);
+            return NextResponse.json({ success: true, courses: resultRegion });
+        } catch (error) {
+            console.error("지역 코스 검색 오류:", error);
+            return NextResponse.json({ success: false, error: "지역 코스 검색 중 오류 발생" }, { status: 500 });
+        }
+    }
 
     if (isNaN(lat) || isNaN(lng)) {
         return NextResponse.json({ success: false, error: "위치 정보가 필요합니다." }, { status: 400 });
@@ -88,15 +150,11 @@ export async function GET(request: NextRequest) {
         // 1. `enriched`에서 반경 필터링을 먼저 수행합니다.
         const withinRadius = enriched.filter((c) => c.distance <= radius);
 
-        // 2. 이미지 정책 필터를 적용합니다.
-        // 이미지 정책: 코스 자체 imageUrl이 있고, 장소 사진이 모두 있거나 최소 1장 있는 코스만 허용
-        const imagePolicyApplied = filterCoursesByImagePolicy(withinRadius, "all-or-one-missing");
-
-        // 3. 정렬 및 슬라이싱 전에 타입을 다시 `CourseWithDistance[]`로 단언해줍니다.
-        const filtered = (imagePolicyApplied as CourseWithDistance[])
-            .filter((c) => !!c.imageUrl)
-            .sort((a, b) => a.distance - b.distance)
-            .slice(0, 20);
+        // 장소 사진이 최소 1장이라도 있는 코스 우선 노출 (course.imageUrl 유무와 무관)
+        const withPlaceImages = (withinRadius as CourseWithDistance[]).filter(
+            (c) => Array.isArray(c.coursePlaces) && c.coursePlaces.some((cp: any) => !!cp?.place?.imageUrl)
+        );
+        const filtered = withPlaceImages.sort((a, b) => a.distance - b.distance).slice(0, 20);
 
         return NextResponse.json({ success: true, courses: filtered });
     } catch (error) {
