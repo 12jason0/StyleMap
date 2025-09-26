@@ -1,150 +1,102 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getUserIdFromRequest } from "@/lib/auth";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
     try {
-        console.log("API: Starting to fetch reviews...");
-
-        // URL 파라미터에서 limit 가져오기
         const { searchParams } = new URL(request.url);
-        const limit = searchParams.get("limit");
-        const courseIdFilter = searchParams.get("courseId");
+        const courseId = searchParams.get("courseId");
+        const userId = searchParams.get("userId");
+        const limit = Number(searchParams.get("limit") || "10");
+        const offset = Number(searchParams.get("offset") || "0");
 
-        const me = getUserIdFromRequest(request);
+        if (!courseId && !userId) {
+            return NextResponse.json({ error: "courseId 또는 userId가 필요합니다." }, { status: 400 });
+        }
 
-        const reviewsArray = (await (prisma as any).review.findMany({
-            where: courseIdFilter ? { courseId: Number(courseIdFilter) } : undefined,
-            take: limit ? Number(limit) : undefined,
-            orderBy: { createdAt: "desc" },
+        const whereClause: any = {};
+        if (courseId) {
+            whereClause.courseId = Number(courseId);
+        }
+        if (userId) {
+            whereClause.userId = Number(userId);
+        }
+
+        // ✅ [수정됨] prisma.reviews -> prisma.review (단수형)
+        const reviews = await prisma.review.findMany({
+            where: whereClause,
             include: {
-                user: { select: { nickname: true } },
-                course: { select: { title: true, concept: true } },
+                user: {
+                    select: {
+                        username: true,
+                        profileImageUrl: true,
+                    },
+                },
             },
-        })) as any[];
+            orderBy: {
+                createdAt: "desc",
+            },
+            take: limit,
+            skip: offset,
+        });
 
-        console.log("API: Found reviews:", reviewsArray.length);
-
-        // 데이터 포맷팅
-        const formattedReviews = reviewsArray.map((review) => ({
-            id: review.id.toString(),
-            userId: String(review.userId),
-            courseId: String(review.courseId),
-            rating: review.rating,
-            comment: review.comment || "",
-            createdAt: review.createdAt,
-            isMine: me ? Number(me) === Number(review.userId) : false,
+        const formatted = reviews.map((r) => ({
+            ...r,
             user: {
-                nickname: review.user?.nickname || "익명",
-                initial: (review.user?.nickname || "익")[0],
-            },
-            course: {
-                title: review.course?.title || "알 수 없는 코스",
-                concept: review.course?.concept || "기타",
+                ...r.user,
+                name: r.user.username,
+                profileImageUrl: r.user.profileImageUrl || "/images/maker.png",
             },
         }));
 
-        console.log("API: Returning formatted reviews:", formattedReviews.length);
-
-        return NextResponse.json(formattedReviews, {
-            status: 200,
-            headers: {
-                "Content-Type": "application/json",
-                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600", // 5분 캐시, 10분 stale-while-revalidate
-            },
-        });
+        return NextResponse.json(formatted);
     } catch (error) {
-        console.error("API: Error fetching reviews:", error);
-        return NextResponse.json({ error: "리뷰 데이터를 가져오는 중 오류 발생" }, { status: 500 });
+        return NextResponse.json(
+            {
+                error: "리뷰 데이터를 가져오는 중 오류 발생",
+                details: error instanceof Error ? error.message : "알 수 없는 오류",
+            },
+            { status: 500 }
+        );
     }
 }
 
-// 후기 생성
 export async function POST(request: NextRequest) {
     try {
         const userId = getUserIdFromRequest(request);
-        if (!userId) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-
-        const body = await request.json().catch(() => null);
-        if (!body) return NextResponse.json({ error: "잘못된 요청 본문" }, { status: 400 });
-
-        const { courseId, placeId, rating, content } = body as {
-            courseId?: number;
-            placeId?: number;
-            rating?: number;
-            content?: string;
-        };
-
-        if (!courseId || !rating || typeof content !== "string") {
-            return NextResponse.json({ error: "필수 값 누락" }, { status: 400 });
+        if (!userId) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
         }
 
-        // Prisma 모델명에 맞춰 저장 (Review 모델 사용 중)
-        const created = await (prisma as any).review.create({
+        const body = await request.json();
+        // 클라이언트는 content로 보낼 수 있으므로 별칭 처리
+        const { courseId, rating, comment, content, placeId } = body;
+
+        if (!courseId || !rating) {
+            return NextResponse.json({ error: "courseId와 rating은 필수입니다." }, { status: 400 });
+        }
+
+        const finalComment: string =
+            typeof comment === "string" && comment.trim().length > 0
+                ? comment.trim()
+                : typeof content === "string"
+                ? content.trim()
+                : "";
+
+        // ✅ [수정됨] prisma.reviews -> prisma.review (단수형)
+        const newReview = await prisma.review.create({
             data: {
                 userId: Number(userId),
                 courseId: Number(courseId),
-                rating: Math.max(1, Math.min(5, Number(rating))),
-                comment: content.trim(),
+                rating: Number(rating),
+                comment: finalComment,
             },
         });
 
-        return NextResponse.json({ success: true, id: created.id }, { status: 201 });
-    } catch (error: any) {
-        return NextResponse.json({ error: error?.message || "후기 저장 실패" }, { status: 500 });
-    }
-}
-
-// 후기 수정
-export async function PATCH(request: NextRequest) {
-    try {
-        const userId = getUserIdFromRequest(request);
-        if (!userId) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-
-        const body = await request.json().catch(() => null);
-        if (!body) return NextResponse.json({ error: "잘못된 요청 본문" }, { status: 400 });
-
-        const { id, rating, content } = body as { id?: number; rating?: number; content?: string };
-        if (!id || !rating || typeof content !== "string") {
-            return NextResponse.json({ error: "필수 값 누락" }, { status: 400 });
-        }
-
-        // 소유자 검증
-        const review = await (prisma as any).review.findUnique({ where: { id: Number(id) } });
-        if (!review || Number(review.userId) !== Number(userId)) {
-            return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-        }
-
-        await (prisma as any).review.update({
-            where: { id: Number(id) },
-            data: { rating: Math.max(1, Math.min(5, Number(rating))), comment: content.trim() },
-        });
-        return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error?.message || "후기 수정 실패" }, { status: 500 });
-    }
-}
-
-// 후기 삭제
-export async function DELETE(request: NextRequest) {
-    try {
-        const userId = getUserIdFromRequest(request);
-        if (!userId) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-
-        const { searchParams } = new URL(request.url);
-        const idParam = searchParams.get("id");
-        const id = idParam ? Number(idParam) : NaN;
-        if (!Number.isFinite(id)) return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
-
-        const review = await (prisma as any).review.findUnique({ where: { id } });
-        if (!review || Number(review.userId) !== Number(userId)) {
-            return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
-        }
-
-        await (prisma as any).review.delete({ where: { id } });
-        return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error?.message || "후기 삭제 실패" }, { status: 500 });
+        return NextResponse.json(newReview, { status: 201 });
+    } catch (error) {
+        return NextResponse.json({ error: "리뷰 생성 실패" }, { status: 500 });
     }
 }

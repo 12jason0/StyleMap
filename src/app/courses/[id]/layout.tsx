@@ -1,5 +1,11 @@
 "use client";
 
+import React from "react";
+
+export default function CoursesIdLayout({ children }: { children: React.ReactNode }) {
+    return <>{children}</>;
+}
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
@@ -183,7 +189,7 @@ const MapFallbackUI = ({ places }: { places: CoursePlace[] }) => (
     </div>
 );
 
-export default function CourseDetailPage() {
+function CourseDetailPage() {
     const params = useParams();
     const router = useRouter();
 

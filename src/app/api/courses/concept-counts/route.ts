@@ -6,12 +6,14 @@ export const dynamic = "force-dynamic";
 export async function GET(_request: NextRequest) {
     try {
         console.log("API: Starting to fetch concept counts...");
-        // Prisma client uses model name (Course) → prisma.course, regardless of DB table name (courses)
+
+        // ✅ [수정됨] prisma.courses -> prisma.course
         const conceptCounts = await prisma.course.groupBy({
             by: ["concept"],
             where: { concept: { not: null } },
             _count: { concept: true },
         });
+
         const counts: Record<string, number> = Object.fromEntries(
             (conceptCounts as any[])
                 .filter((c) => c.concept)

@@ -464,16 +464,16 @@ function EscapeIntroPageInner() {
             <style>
                 {/* 스타일(CSS) 코드는 이전과 동일하게 유지 */}
                 {`
-                @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");
                 :root { --color-cover: hsl(0, 44%, 42%); --color-cover-text: hsl(40, 64%, 80%); --duration: 5000ms; --initial-delay: 500ms; }
                 body { display: flex; height: 100vh; margin: 0; justify-content: center; align-items: center; font-family: "Cormorant Garamond", Garamond, "Times New Roman", Times, serif; font-size: 20px; background-color: aliceblue; }
                 .book { width: 88vw; max-width: 520px; aspect-ratio: 2/3; border-radius: 0 24px 24px 0; transform-style: preserve-3d; transform: scale(0.92) rotateX(10deg) rotateZ(0deg); animation: move-book var(--duration) ease-in-out forwards; animation-delay: var(--initial-delay); }
                 .book.closing { animation: close-book 1.2s ease-in-out forwards; }
-                .book.animation-finished { pointer-events: none; }
-                .book.animation-finished .interactive { pointer-events: auto; }
+.book.animation-finished { pointer-events: none; }
+.book.animation-finished .interactive { pointer-events: auto; }
                 .page { position: absolute; width: 100%; height: 100%; background-color: white; background: linear-gradient(to right, rgba(0, 0, 0, 0.05), transparent 10%) white; border: 1px solid rgba(0, 0, 0, 0.2); border-radius: inherit; z-index: calc(var(--pages) - var(--id, 0)); transform: translateZ(calc(var(--id, 0) * -1px)); transform-origin: 0 0; animation: turn-page var(--duration) ease-in-out forwards; --increment: calc(var(--duration) / (var(--pages) * 2)); animation-delay: calc(var(--id, 0) * var(--increment) + var(--initial-delay) * 2); }
                 .page.static { animation: none !important; }
-                .deco { pointer-events: none; }
+.deco { pointer-events: none; }
                 .content-flip { transform: rotateY(180deg); backface-visibility: visible; -webkit-backface-visibility: visible; transform-style: preserve-3d; }
                 .cover { width: 100%; height: 100%; color: var(--color-cover-text); z-index: var(--pages); padding: 5%; box-sizing: border-box; font-size: clamp(12px, 2.2vh, 36px); background: var(--color-cover); }
                 .cover .cover-content { position: relative; display: grid; justify-items: center; align-items: center; grid-auto-rows: 1fr; height: 90%; width: 90%; box-sizing: border-box; margin: 5%; padding: 5%; border: 12px double var(--color-cover-text); text-align: center; overflow: hidden; }
@@ -490,8 +490,8 @@ function EscapeIntroPageInner() {
                 @keyframes turn-page-close { from { transform: translateZ(calc((var(--pages) - var(--id, 0)) * -1px)) rotateY(-180deg); } to { transform: translateZ(calc(var(--id, 0) * -1px)) rotateY(0); } }
                 .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
                 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-                .btn-vintage { background: linear-gradient(180deg, #c27a24 0%, #a55e14 100%); color: #fff; border: 1px solid rgba(60,42,25,.35); border-radius: 10px; padding: 8px 14px; box-shadow: 0 3px 0 rgba(60,42,25,.35); cursor: pointer; }
-                .btn-vintage:hover { filter: brightness(1.05); }
+.btn-vintage { background: linear-gradient(180deg, #c27a24 0%, #a55e14 100%); color: #fff; border: 1px solid rgba(60,42,25,.35); border-radius: 10px; padding: 8px 14px; box-shadow: 0 3px 0 rgba(60,42,25,.35); cursor: pointer; }
+.btn-vintage:hover { filter: brightness(1.05); }
                 `}
             </style>
 

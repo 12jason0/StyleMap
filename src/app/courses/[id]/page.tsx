@@ -308,7 +308,13 @@ export default function CourseDetailPage() {
 
     // 장소 선택 핸들러
     const handlePlaceClick = useCallback((place: MapPlace) => {
-        console.log("장소 클릭:", place.name);
+        try {
+            // Preload image to make modal display faster (browser only)
+            if (typeof window !== "undefined" && place?.imageUrl) {
+                const img = document.createElement("img");
+                img.src = place.imageUrl;
+            }
+        } catch {}
         setSelectedPlace(place);
         setShowPlaceModal(true);
     }, []);
@@ -596,21 +602,25 @@ export default function CourseDetailPage() {
     }, [courseData]);
 
     // 초기 데이터 로드
-    // 사용자 위치 가져오기
+    // 사용자 위치 가져오기 (watchPosition으로 업데이트 지속)
     useEffect(() => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setUserLocation({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude,
-                    });
-                },
-                (error) => {
-                    console.log("위치 정보를 가져올 수 없습니다:", error);
-                }
-            );
-        }
+        if (!navigator.geolocation) return;
+        const onOk = (pos: GeolocationPosition) =>
+            setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const onErr = (error: GeolocationPositionError) => {
+            console.log("위치 정보를 가져올 수 없습니다:", error);
+        };
+        navigator.geolocation.getCurrentPosition(onOk, onErr, {
+            enableHighAccuracy: true,
+            timeout: 8000,
+            maximumAge: 60000,
+        });
+        const id = navigator.geolocation.watchPosition(onOk, onErr, {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 60000,
+        });
+        return () => navigator.geolocation.clearWatch?.(id);
     }, []);
 
     useEffect(() => {
@@ -818,13 +828,13 @@ export default function CourseDetailPage() {
                                                         imageUrl: cp.place.image_url,
                                                         description: cp.place.description,
                                                     }))}
-                                                    userLocation={null}
+                                                    userLocation={userLocation}
                                                     selectedPlace={selectedPlace}
                                                     onPlaceClick={handlePlaceClick}
                                                     drawPath={true}
-                                                    routeMode="foot"
+                                                    routeMode="walking"
                                                     className="w-full h-64 md:h-96 rounded-2xl"
-                                                    style={{ minHeight: "200px" }}
+                                                    style={{ minHeight: "260px" }}
                                                 />
                                             ) : (
                                                 <div className="w-full h-80 bg-gray-100 rounded-2xl flex items-center justify-center">
@@ -1294,6 +1304,12 @@ export default function CourseDetailPage() {
                                     width={1200}
                                     height={800}
                                     className="w-full h-auto object-contain"
+                                    priority
+                                    placeholder="blur"
+                                    blurDataURL={
+                                        heroImageUrl ||
+                                        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMTAwJScgaGVpZ2h0PSc2MCUnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zyc+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0nI2U1ZTVlNScvPjwvc3ZnPg=="
+                                    }
                                 />
                             </div>
                         ) : (

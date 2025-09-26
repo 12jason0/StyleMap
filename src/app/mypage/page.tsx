@@ -146,8 +146,21 @@ const MyPage = () => {
             });
 
             if (response.ok) {
-                const data = await response.json();
-                setUserInfo(data.user);
+                const raw = await response.json();
+                const src: any = raw?.user ?? raw ?? {};
+                const name = src.name || src.username || src.nickname || "";
+                const email = src.email || src.userEmail || "";
+                const created = src.joinDate || src.createdAt || src.created_at || null;
+                const profileImage = src.profileImage || src.profileImageUrl || src.profile_image_url || "";
+                const mapped: UserInfo = {
+                    name,
+                    email,
+                    joinDate: created ? new Date(created).toLocaleDateString() : "",
+                    profileImage,
+                    mbti: src.mbti ?? null,
+                    age: typeof src.age === "number" ? src.age : src.age ? Number(src.age) : null,
+                };
+                setUserInfo(mapped);
             } else {
                 console.error("Failed to fetch user info");
             }
@@ -175,7 +188,16 @@ const MyPage = () => {
                 return;
             }
             const data = await res.json();
-            if (Array.isArray(data)) setBadges(data);
+            const list = Array.isArray(data?.badges) ? data.badges : Array.isArray(data) ? data : [];
+            setBadges(
+                list.map((b: any) => ({
+                    id: b.id,
+                    name: b.name || b.title || "",
+                    image_url: b.image_url || b.icon_url || null,
+                    description: b.description ?? null,
+                    awarded_at: b.awarded_at || b.createdAt || b.created_at || new Date().toISOString(),
+                }))
+            );
         } catch (error) {
             console.error("Error fetching badges:", error);
             setBadges([]);
@@ -193,8 +215,18 @@ const MyPage = () => {
                 },
             });
             if (response.ok) {
-                const data = await response.json();
-                setUserPreferences(data);
+                const raw = await response.json();
+                const prefs: any = raw?.preferences ?? raw ?? {};
+                setUserPreferences({
+                    travelStyle: prefs.travelStyle || prefs.travel_style || [],
+                    budgetRange: prefs.budgetRange || prefs.budget_range || "",
+                    timePreference: prefs.timePreference || prefs.time_preference || [],
+                    foodPreference: prefs.foodPreference || prefs.food_preference || [],
+                    activityLevel: prefs.activityLevel || prefs.activity_level || "",
+                    groupSize: prefs.groupSize || prefs.group_size || "",
+                    interests: prefs.interests || [],
+                    locationPreferences: prefs.locationPreferences || prefs.location_preferences || [],
+                });
             }
         } catch (error) {
             console.error("Failed to fetch user preferences:", error);
@@ -210,7 +242,19 @@ const MyPage = () => {
             });
             if (res.ok) {
                 const data = await res.json();
-                setCasefiles(Array.isArray(data) ? data : []);
+                const list = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+                setCasefiles(
+                    list.map((it: any) => ({
+                        story_id: it.story_id || it.storyId || it.id,
+                        title: it.title,
+                        synopsis: it.synopsis || it.description || "",
+                        region: it.region ?? null,
+                        imageUrl: it.imageUrl || it.image_url || null,
+                        completedAt: it.completedAt || it.completed_at || null,
+                        badge: it.badge || null,
+                        photoCount: it.photoCount || it.photo_count || 0,
+                    }))
+                );
             } else {
                 setCasefiles([]);
             }
@@ -255,8 +299,22 @@ const MyPage = () => {
             });
 
             if (response.ok) {
-                const data = await response.json();
-                setFavorites(data || []);
+                const raw = await response.json();
+                const arr = Array.isArray(raw?.favorites) ? raw.favorites : Array.isArray(raw) ? raw : [];
+                const normalized: Favorite[] = arr.map((f: any) => ({
+                    id: f.id || f.favorite_id || f.course_id,
+                    course_id: f.course_id || f.courseId || f.id,
+                    course: {
+                        id: f.course?.id || f.course_id || f.id,
+                        title: f.course?.title || f.title || "",
+                        description: f.course?.description || f.description || "",
+                        imageUrl: f.course?.imageUrl || f.course?.image_url || f.imageUrl || f.image_url || "",
+                        price: f.course?.price || f.price || "",
+                        rating: Number(f.course?.rating ?? f.rating ?? 0),
+                        concept: f.course?.concept || f.concept || "",
+                    },
+                }));
+                setFavorites(normalized);
             } else {
                 console.log("찜 목록 조회 실패, 빈 배열로 설정");
                 setFavorites([]);
@@ -275,8 +333,19 @@ const MyPage = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (res.ok) {
-                const data = await res.json();
-                setCompleted(Array.isArray(data) ? data : []);
+                const raw = await res.json();
+                const list = Array.isArray(raw?.items) ? raw.items : Array.isArray(raw) ? raw : [];
+                setCompleted(
+                    list.map((c: any) => ({
+                        course_id: c.course_id || c.courseId || c.id,
+                        title: c.title,
+                        description: c.description || "",
+                        imageUrl: c.imageUrl || c.image_url || "",
+                        rating: Number(c.rating ?? 0),
+                        concept: c.concept || "",
+                        completedAt: c.completedAt || c.completed_at || null,
+                    }))
+                );
             } else {
                 setCompleted([]);
             }

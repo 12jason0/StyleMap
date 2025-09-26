@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { filterCoursesByImagePolicy, type ImagePolicy } from "@/lib/imagePolicy";
+import { filterCoursesByImagePolicy, type ImagePolicy, CourseWithPlaces } from "@/lib/imagePolicy";
 import { getUserIdFromRequest } from "@/lib/auth";
+
 export const dynamic = "force-dynamic";
-export const revalidate = 300; // ISR for GET (5분)
+export const revalidate = 300;
 
 export async function GET(request: NextRequest) {
     try {
@@ -31,12 +32,11 @@ export async function GET(request: NextRequest) {
         };
 
         if (imagePolicy === "none-or-all" || imagePolicy === "all-or-one-missing") {
-            // 이미지 정책 검증을 위해 장소와 이미지 포함 (Prisma 모델 필드명 기준)
             prismaQuery.include = {
                 coursePlaces: {
                     include: { place: true },
                 },
-            } as any;
+            };
         } else if (lean) {
             prismaQuery.select = {
                 id: true,
@@ -53,16 +53,11 @@ export async function GET(request: NextRequest) {
             };
         }
 
-        // DB 조회 + 부가 데이터는 병렬 준비
-        const [results] = await Promise.all([
-            prisma.course.findMany(prismaQuery as any),
-            // 향후 필요시 추가 병렬 작업을 여기에 배치
-        ]);
+        const results = await prisma.course.findMany(prismaQuery);
 
-        // 이미지 정책 적용: 코스 내 장소 이미지가 하나도 없거나 전부 있는 코스만 허용
-        const imagePolicyApplied = filterCoursesByImagePolicy(results as any[], imagePolicy);
+        // ✅ [수정됨] results의 타입을 명확히 하여 함수에 전달합니다.
+        const imagePolicyApplied = filterCoursesByImagePolicy(results as CourseWithPlaces[], imagePolicy);
 
-        // 이미지가 비어 있으면 코스의 첫 장소 이미지나 기본 플레이스홀더로 대체
         const formattedCourses = imagePolicyApplied.map((course: any) => {
             const firstPlaceImage = Array.isArray(course?.coursePlaces)
                 ? course.coursePlaces.find((cp: any) => cp?.place?.imageUrl)?.place?.imageUrl
@@ -79,7 +74,7 @@ export async function GET(request: NextRequest) {
                 imageUrl: resolvedImageUrl,
                 concept: course.concept || "",
                 rating: Number(course.rating) || 0,
-                reviewCount: 0, // 이 값은 나중에 별도 로직으로 채워야 합니다.
+                reviewCount: 0,
                 participants: course.current_participants || 0,
                 viewCount: course.view_count || 0,
             };
@@ -87,7 +82,6 @@ export async function GET(request: NextRequest) {
 
         console.log("API: Returning formatted courses:", formattedCourses.length);
 
-        // 모든 클라이언트(Home, Courses, Nearby)가 기대하는 형태(배열)로 통일 응답
         return NextResponse.json(formattedCourses, {
             status: 200,
             headers: {
@@ -108,18 +102,15 @@ export async function GET(request: NextRequest) {
     }
 }
 
-// POST 함수는 그대로 둡니다.
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { title, description, duration, location, price, imageUrl, concept } = body;
 
-        // 입력값 검증
         if (!title) {
             return NextResponse.json({ error: "제목은 필수입니다" }, { status: 400 });
         }
 
-        // 인증 필요
         const userId = getUserIdFromRequest(request);
         if (!userId) {
             return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
@@ -134,8 +125,10 @@ export async function POST(request: NextRequest) {
                 price: price || null,
                 imageUrl: imageUrl || null,
                 concept: concept || null,
+                // ✅ [수정됨] userId를 Number로 명확하게 변환하여 타입 오류를 해결합니다.
+                userId: Number(userId),
             },
-        } as any);
+        });
 
         return NextResponse.json(
             {

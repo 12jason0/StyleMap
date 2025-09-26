@@ -77,16 +77,28 @@ function GuidePageInner() {
         fetchCourse();
     }, [courseId]);
 
-    // 전체 스크롤 비활성화 + 현재 위치 가져오기
+    // 전체 스크롤 비활성화 + 현재 위치 가져오기 (watchPosition으로 지속 업데이트)
     useEffect(() => {
         const original = typeof document !== "undefined" ? document.body.style.overflow : "";
         if (typeof document !== "undefined") document.body.style.overflow = "hidden";
         if (typeof navigator !== "undefined" && navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                () => setUserLocation(null),
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-            );
+            const onOk = (pos: GeolocationPosition) =>
+                setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            const onErr = () => setUserLocation(null);
+            navigator.geolocation.getCurrentPosition(onOk, onErr, {
+                enableHighAccuracy: true,
+                timeout: 8000,
+                maximumAge: 60000,
+            });
+            const id = navigator.geolocation.watchPosition(onOk, onErr, {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 60000,
+            });
+            return () => {
+                if (typeof document !== "undefined") document.body.style.overflow = original;
+                navigator.geolocation.clearWatch?.(id);
+            };
         }
         return () => {
             if (typeof document !== "undefined") document.body.style.overflow = original;
@@ -95,6 +107,30 @@ function GuidePageInner() {
 
     // 현재 단계의 장소 정보
     const currentPlace = course?.coursePlaces?.[currentStep]?.place;
+
+    // 지도 경로용 장소 배열 (현재 위치 -> 현재 장소)
+    const mapPlaces = useMemo(() => {
+        if (!currentPlace)
+            return [] as Array<{ id: number; name: string; latitude: number; longitude: number; address?: string }>;
+        const dest = {
+            id: currentPlace.id,
+            name: currentPlace.name,
+            latitude: currentPlace.latitude,
+            longitude: currentPlace.longitude,
+            address: currentPlace.address,
+        };
+        if (userLocation) {
+            const origin = {
+                id: -1,
+                name: "현재 위치",
+                latitude: userLocation.lat,
+                longitude: userLocation.lng,
+                address: "",
+            };
+            return [origin, dest];
+        }
+        return [dest];
+    }, [currentPlace, userLocation]);
 
     // 다음/이전 장소로 이동하는 함수
     const goToNextStep = () => {
@@ -116,27 +152,31 @@ function GuidePageInner() {
 
     async function markCompleted() {
         try {
+            const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
             await fetch("/api/users/completions", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
                 credentials: "include",
-                body: JSON.stringify({ courseId, title: course?.title }),
+                body: JSON.stringify({ courseId: Number(courseId), title: course?.title }),
             });
         } catch {}
     }
 
     return (
-        <div className="flex flex-col h-screen bg-white text-black pt-16">
+        <div className="flex flex-col h-screen bg-white text-black">
             {/* 지도 영역 */}
             <div className="flex-1 relative min-w-0">
                 <NaverMap
-                    places={[{ ...currentPlace, id: currentPlace.id }]}
+                    places={mapPlaces as any}
                     userLocation={userLocation}
                     selectedPlace={null}
                     onPlaceClick={() => {}}
                     className="w-full h-full"
                     drawPath={!!userLocation}
-                    routeMode="driving"
+                    routeMode="walking"
                 />
 
                 {/* 패널 토글 버튼 */}
@@ -149,8 +189,8 @@ function GuidePageInner() {
 
                 {/* 지도 위 하단 모달 패널 */}
                 {showPanel && (
-                    <div className="absolute inset-x-0 bottom-20 z-10 px-4 pb-[env(safe-area-inset-bottom)]">
-                        <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white rounded-2xl shadow-xl border p-4">
+                    <div className="absolute inset-x-0 bottom-30 md:top-auto md:bottom-6 z-10 px-4 pt-[env(safe-area-inset-bottom)] md:pt-0 md:pb-[env(safe-area-inset-bottom)]">
+                        <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-xl border p-4">
                             <div className="mb-3">
                                 <h2 className="text-xl font-bold">{currentPlace.name}</h2>
                                 <p className="text-sm text-gray-500">{currentPlace.address}</p>
