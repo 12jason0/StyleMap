@@ -90,44 +90,34 @@ function MapPageInner() {
     const fetchPlacesAndCourses = useCallback(async (location: { lat: number; lng: number }, keyword?: string) => {
         setLoading(true);
         setError(null);
-        setSelectedPlace(null); // 새로운 검색 시 선택된 장소 초기화
+        setSelectedPlace(null);
 
         try {
-            // 1. 주변 장소 조회 (카카오 장소검색 API 사용)
             let placesUrl = `/api/places/search-kakao?lat=${location.lat}&lng=${location.lng}`;
             if (keyword && keyword.trim()) {
                 placesUrl += `&keyword=${encodeURIComponent(keyword)}`;
             }
 
-            const placesRes = await fetch(placesUrl);
-            if (!placesRes.ok) {
-                throw new Error("장소 정보를 가져오는 데 실패했습니다.");
-            }
+            const [placesRes, courseRes] = await Promise.all([
+                fetch(placesUrl),
+                fetch(`/api/courses/nearby?lat=${location.lat}&lng=${location.lng}`),
+            ]);
 
+            if (!placesRes.ok) throw new Error("장소 정보를 가져오는 데 실패했습니다.");
             const placesData = await placesRes.json();
             const fetchedPlaces = (placesData.success ? placesData.places : []).map((p: any) => ({
                 ...p,
-                // 백엔드에서 이미 숫자 타입으로 오지만, 안전을 위해 한 번 더 파싱
                 latitude: parseFloat(p.latitude),
                 longitude: parseFloat(p.longitude),
             }));
-
             setPlaces(fetchedPlaces);
 
-            // 2. 인근 코스 병행 조회
-            const courseRes = await fetch(`/api/courses/nearby?lat=${location.lat}&lng=${location.lng}`);
             if (courseRes.ok) {
                 const courseData = await courseRes.json();
                 setCourses(courseData.success ? courseData.courses : []);
             } else {
-                // 코스 조회 실패는 전체 로직을 중단시키지 않도록 예외 처리
                 console.warn("코스 정보를 가져오는 데 실패했습니다.");
                 setCourses([]);
-            }
-
-            // 키워드 검색이 아닐 때만, 첫 번째 장소로 지도 중심 이동
-            if (fetchedPlaces.length > 0 && !keyword) {
-                // setCenter({ lat: fetchedPlaces[0].latitude, lng: fetchedPlaces[0].longitude });
             }
         } catch (e: any) {
             setError(e.message || "데이터를 불러오는 데 실패했습니다.");
@@ -136,7 +126,7 @@ function MapPageInner() {
         } finally {
             setLoading(false);
         }
-    }, []); // 이 함수는 외부 상태에 의존하지 않으므로 의존성 배열은 비어있어도 괜찮습니다.
+    }, []);
 
     const handleSearch = useCallback(async () => {
         // 검색은 현재 지도 중심이 아닌, 검색어 자체의 위치를 기준으로 합니다.
@@ -276,19 +266,20 @@ function MapPageInner() {
 
     // /map 페이지에서는 경로를 그리지 않습니다. (코스 상세 페이지에서만 표시)
 
-    // 지도 클릭 시: 선택만 해제하고 패널은 유지
+    // 지도 클릭 시: 선택 해제하고, 모바일은 패널 닫기
     useEffect(() => {
         if (!navermaps || !mapRef.current) return;
         const map = mapRef.current as any;
         const listener = navermaps.Event.addListener(map, "click", () => {
             setSelectedPlace(null);
+            if (isMobile) setLeftPanelOpen(false);
         });
         return () => {
             try {
                 if (listener) navermaps.Event.removeListener(listener);
             } catch {}
         };
-    }, [navermaps, mapRef]);
+    }, [navermaps, mapRef, isMobile]);
 
     if (!mapsReady || !navermaps || !centerLatLng) {
         return (
