@@ -34,23 +34,41 @@ export default function NaverMapComponent({
         return { lat: 37.5665, lng: 126.978 };
     };
 
+    // 네이버 지도 스크립트 로더
+    const loadNaverMapsScript = (): Promise<void> => {
+        return new Promise((resolve) => {
+            if ((window as any).naver?.maps) return resolve();
+            const existing = document.getElementById("naver-maps-script") as HTMLScriptElement | null;
+            if (existing) {
+                existing.addEventListener("load", () => resolve(), { once: true });
+                // 혹시 이미 로드된 경우 대비
+                if ((window as any).naver?.maps) resolve();
+                return;
+            }
+            const clientId = (process as any).env?.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
+            const src = clientId
+                ? `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(
+                      clientId
+                  )}&submodules=geocoder`
+                : `https://openapi.map.naver.com/openapi/v3/maps.js`;
+            const script = document.createElement("script");
+            script.id = "naver-maps-script";
+            script.src = src;
+            script.async = true;
+            script.defer = true;
+            script.onload = () => resolve();
+            document.head.appendChild(script);
+        });
+    };
+
     // 스크립트 준비 대기 + 지도 초기화
     useEffect(() => {
         let cancelled = false;
-        const ensure = () =>
-            new Promise<void>((resolve) => {
-                if ((window as any).naver?.maps) return resolve();
-                let tries = 0;
-                const t = setInterval(() => {
-                    if ((window as any).naver?.maps || cancelled) {
-                        clearInterval(t);
-                        resolve();
-                    } else if (++tries > 100) {
-                        clearInterval(t);
-                        resolve();
-                    }
-                }, 50);
-            });
+        const ensure = async () => {
+            if (!(window as any).naver?.maps) {
+                await loadNaverMapsScript();
+            }
+        };
 
         (async () => {
             await ensure();

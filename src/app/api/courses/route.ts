@@ -31,10 +31,10 @@ export async function GET(request: NextRequest) {
         };
 
         if (imagePolicy === "none-or-all" || imagePolicy === "all-or-one-missing") {
-            // 이미지 정책 검증을 위해 장소와 이미지 포함
+            // 이미지 정책 검증을 위해 장소와 이미지 포함 (Prisma 모델 필드명 기준)
             prismaQuery.include = {
-                course_places: {
-                    include: { places: true },
+                coursePlaces: {
+                    include: { place: true },
                 },
             } as any;
         } else if (lean) {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
         // DB 조회 + 부가 데이터는 병렬 준비
         const [results] = await Promise.all([
-            prisma.courses.findMany(prismaQuery),
+            prisma.course.findMany(prismaQuery as any),
             // 향후 필요시 추가 병렬 작업을 여기에 배치
         ]);
 
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
 
         // 이미지가 비어 있으면 코스의 첫 장소 이미지나 기본 플레이스홀더로 대체
         const formattedCourses = imagePolicyApplied.map((course: any) => {
-            const firstPlaceImage = Array.isArray(course?.course_places)
-                ? course.course_places.find((cp: any) => cp?.places?.imageUrl)?.places?.imageUrl
+            const firstPlaceImage = Array.isArray(course?.coursePlaces)
+                ? course.coursePlaces.find((cp: any) => cp?.place?.imageUrl)?.place?.imageUrl
                 : undefined;
             const resolvedImageUrl = course.imageUrl || firstPlaceImage || "/images/maker.png";
 
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
         }
 
-        const created = await prisma.courses.create({
+        const created = await prisma.course.create({
             data: {
                 title,
                 description: description || null,

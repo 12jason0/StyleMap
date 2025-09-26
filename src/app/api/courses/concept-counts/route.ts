@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 export async function GET(_request: NextRequest) {
     try {
         console.log("API: Starting to fetch concept counts...");
-        const conceptCounts = await (prisma as any).courses.groupBy({
+        // Prisma client uses model name (Course) → prisma.course, regardless of DB table name (courses)
+        const conceptCounts = await prisma.course.groupBy({
             by: ["concept"],
             where: { concept: { not: null } },
             _count: { concept: true },

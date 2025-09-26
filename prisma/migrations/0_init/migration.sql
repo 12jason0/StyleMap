@@ -114,7 +114,7 @@ CREATE TABLE "public"."places" (
     "id" SERIAL NOT NULL,
     "name" VARCHAR(255) NOT NULL,
     "address" VARCHAR(500),
-    "description" TEXT,
+    "description" TEXT, 
     "category" VARCHAR(100),
     "avg_cost_range" VARCHAR(100),
     "opening_hours" VARCHAR(200),
@@ -208,6 +208,7 @@ CREATE TABLE "public"."stories" (
     "updated_at" TIMESTAMP(3) NOT NULL,
     "imageUrl" TEXT,
     "level" INTEGER DEFAULT 1,
+    "epilogue_text" TEXT,
 
     CONSTRAINT "stories_pkey" PRIMARY KEY ("id")
 );
