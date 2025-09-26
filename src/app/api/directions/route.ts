@@ -20,34 +20,33 @@ export async function GET(request: NextRequest) {
                 { status: 400 }
             );
         }
-        // 모드 매핑 (큰길 우선: driving)
-        const profile = modeRaw === "driving" ? "driving" : "walking";
+        // 모드 매핑
+        // 보행 시 건물 관통 직선이 아닌 보행 네트워크를 따라가도록 우선 foot 프로필을 시도하고,
+        // 실패 시 walking 프로필로 폴백합니다.
+        const profiles = modeRaw === "driving" ? ["driving"] : ["foot", "walking"];
 
-        // OSRM 라우팅 호출
-        const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${encodeURIComponent(
-            pairs.join(";")
-        )}?overview=full&geometries=geojson`;
-
-        // --- ✨ 여기가 수정된 부분입니다 ✨ ---
-        // "cache: 'no-store'" 와 "next: { revalidate: 0 }" 중 하나만 사용합니다.
-        // 여기서는 cache: 'no-store'를 사용하여 캐시를 비활성화합니다.
-        const res = await fetch(osrmUrl, { cache: "no-store" });
-        // --- ✨ 수정 끝 ---
-
-        if (!res.ok) {
-            const text = await res.text();
-            return NextResponse.json(
-                { success: false, error: `Upstream error ${res.status}`, details: text.slice(0, 500) },
-                { status: 502 }
-            );
+        // OSRM 라우팅 호출 (여러 프로필 순차 시도)
+        let lastErrorText: string | null = null;
+        for (const profile of profiles) {
+            const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${encodeURIComponent(
+                pairs.join(";")
+            )}?overview=full&geometries=geojson`;
+            const res = await fetch(osrmUrl, { cache: "no-store" });
+            if (!res.ok) {
+                lastErrorText = await res.text();
+                continue;
+            }
+            const data = await res.json();
+            const route = data?.routes?.[0];
+            const coordinates = route?.geometry?.coordinates;
+            if (Array.isArray(coordinates)) {
+                return NextResponse.json({ success: true, coordinates, profile });
+            }
         }
-        const data = await res.json();
-        const route = data?.routes?.[0];
-        const coordinates = route?.geometry?.coordinates;
-        if (!Array.isArray(coordinates)) {
-            return NextResponse.json({ success: false, error: "No route found" }, { status: 404 });
-        }
-        return NextResponse.json({ success: true, coordinates });
+        return NextResponse.json(
+            { success: false, error: "No route found", details: lastErrorText?.slice(0, 500) || null },
+            { status: 404 }
+        );
     } catch (error: any) {
         return NextResponse.json(
             { success: false, error: error?.message || "Unknown error in directions" },

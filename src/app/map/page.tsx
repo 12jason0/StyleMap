@@ -157,6 +157,7 @@ function MapPageInner() {
                 setCenter(foundPlaceLocation);
                 await fetchPlacesAndCourses(foundPlaceLocation, searchInput);
                 setActiveTab("places"); // 검색 후 장소 탭을 활성화
+                setSearchInput(""); // 검색 후 입력창 초기화
             } else {
                 throw new Error(data.error || "검색 결과가 없습니다.");
             }
@@ -253,23 +254,41 @@ function MapPageInner() {
         return new navermaps.LatLng(center.lat, center.lng);
     }, [center, navermaps]);
 
-    // 지도 클릭 시 왼쪽 패널 닫기 이벤트 바인딩
+    // 네이버 기본 핀 아이콘 반환 함수
+    const getNaverPinIcon = useCallback(
+        (type: "user" | "cafe" | "food" | "default") => {
+            if (!navermaps) return undefined as any;
+            const urlMap: Record<string, string> = {
+                user: "https://navermaps.github.io/maps.js/docs/img/example/pin_icon.png",
+                cafe: "https://navermaps.github.io/maps.js/docs/img/example/pin_spot.png",
+                food: "https://navermaps.github.io/maps.js/docs/img/example/pin_default.png",
+                default: "https://navermaps.github.io/maps.js/docs/img/example/pin_default.png",
+            };
+            const url = urlMap[type] || urlMap.default;
+            return {
+                url,
+                size: new navermaps.Size(24, 37),
+                anchor: new navermaps.Point(12, 37),
+            } as any;
+        },
+        [navermaps]
+    );
+
+    // /map 페이지에서는 경로를 그리지 않습니다. (코스 상세 페이지에서만 표시)
+
+    // 지도 클릭 시: 선택만 해제하고 패널은 유지
     useEffect(() => {
         if (!navermaps || !mapRef.current) return;
         const map = mapRef.current as any;
         const listener = navermaps.Event.addListener(map, "click", () => {
             setSelectedPlace(null);
-            if (leftPanelOpen) {
-                setLeftPanelOpen(false);
-                setTimeout(triggerMapResize, 320);
-            }
         });
         return () => {
             try {
                 if (listener) navermaps.Event.removeListener(listener);
             } catch {}
         };
-    }, [navermaps, mapRef, leftPanelOpen, triggerMapResize]);
+    }, [navermaps, mapRef]);
 
     if (!mapsReady || !navermaps || !centerLatLng) {
         return (
@@ -296,7 +315,7 @@ function MapPageInner() {
                 onTransitionEnd={triggerMapResize}
             >
                 {/* 검색창 및 헤더 */}
-                <div className="flex-shrink-0 p-4 border-b color-black">
+                <div className="flex-shrink-0 sticky top-0 z-10 p-3 md:p-4 bg-white/80 backdrop-blur border-b">
                     <div className="flex gap-2 md:pt-20">
                         <input
                             type="text"
@@ -304,11 +323,11 @@ function MapPageInner() {
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                            className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none color-gray-700"
+                            className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-gray-800 placeholder:text-gray-400 bg-white/90"
                         />
                         <button
                             onClick={handleSearch}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 hover:cursor-pointer"
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 hover:cursor-pointer shadow-sm"
                             disabled={loading}
                         >
                             검색
@@ -317,21 +336,21 @@ function MapPageInner() {
                 </div>
 
                 {/* 탭 메뉴 */}
-                <div className="flex border-b flex-shrink-0">
+                <div className="flex border-b flex-shrink-0 ">
                     <button
                         onClick={() => {
                             setActiveTab("places");
                             setSelectedPlace(null);
                         }}
-                        className={`flex-1 p-3 font-semibold ${
+                        className={`flex-1 p-3 font-semibold hover:cursor-pointer ${
                             activeTab === "places" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
                         }`}
                     >
-                        주변 장소 ({places.length})
+                        주변 장소 ({selectedPlace ? 1 : places.length})
                     </button>
                     <button
                         onClick={() => setActiveTab("courses")}
-                        className={`flex-1 p-3 font-semibold ${
+                        className={`flex-1 p-3 font-semibold hover:cursor-pointer ${
                             activeTab === "courses" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
                         }`}
                     >
@@ -349,7 +368,7 @@ function MapPageInner() {
                         selectedPlace ? (
                             // 장소 상세 정보
                             <div className="p-4">
-                                <h3 className="text-2xl font-bold">{selectedPlace.name}</h3>
+                                <h3 className="text-xl font-bold text-black">{selectedPlace.name}</h3>
                                 <p className="text-gray-600 mt-2">{selectedPlace.address}</p>
                                 <p className="text-gray-500 text-sm mt-1">{selectedPlace.category}</p>
                                 {selectedPlace.phone && <p className="text-gray-700 mt-2">📞 {selectedPlace.phone}</p>}
@@ -376,22 +395,24 @@ function MapPageInner() {
                                 </div>
                             </div>
                         ) : // 장소 목록
-                        places.length > 0 ? (
-                            places.map((place) => (
+                        (selectedPlace ? [selectedPlace] : places).length > 0 ? (
+                            (selectedPlace ? [selectedPlace] : places).map((place) => (
                                 <div
                                     key={place.id}
                                     onClick={() => handlePlaceClick(place)}
-                                    className="group p-3 cursor-pointer hover:bg-gray-100 rounded-lg border-b last:border-b-0"
+                                    className="group p-4 mb-2 cursor-pointer bg-white hover:bg-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition"
                                 >
                                     <div className="flex items-center justify-between mb-1">
-                                        <h4 className="font-semibold text-gray-900 truncate pr-2">{place.name}</h4>
+                                        <h4 className="font-semibold text-gray-900 truncate pr-2 text-base md:text-lg">
+                                            {place.name}
+                                        </h4>
                                         {userLocation && (
-                                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0">
+                                            <span className="text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0 ring-1 ring-gray-200">
                                                 {formatDistance(place)}
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-sm text-gray-500 truncate">{place.address}</p>
+                                    <p className="text-sm text-gray-600 truncate">{place.address}</p>
                                     <p className="text-xs text-gray-400 truncate">{place.category}</p>
                                 </div>
                             ))
@@ -404,10 +425,10 @@ function MapPageInner() {
                             <div
                                 key={course.id}
                                 onClick={() => router.push(`/courses/${course.id}`)}
-                                className="p-3 cursor-pointer hover:bg-gray-100 rounded-lg border-b last:border-b-0"
+                                className="group p-4 mb-2 cursor-pointer bg-white hover:bg-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition"
                             >
-                                <h4 className="font-semibold">{course.title}</h4>
-                                <p className="text-sm text-gray-500 line-clamp-2">{course.description}</p>
+                                <h4 className="font-semibold text-gray-800">{course.title}</h4>
+                                <p className="text-sm text-gray-600 line-clamp-2">{course.description}</p>
                             </div>
                         ))
                     ) : (
@@ -442,19 +463,11 @@ function MapPageInner() {
                             <Marker
                                 position={new navermaps.LatLng(userLocation.lat, userLocation.lng)}
                                 title="현재 위치"
-                                zIndex={200}
-                                icon={{
-                                    content: `
-                                        <div style="position:relative;width:30px;height:30px;">
-                                            <div style="position:absolute;left:50%;top:50%;width:26px;height:26px;margin-left:-13px;margin-top:-13px;background:#2563EB;border:2px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.35), 0 0 0 8px rgba(37,99,235,0.2);"></div>
-                                            <div style="position:absolute;left:50%;top:50%;width:8px;height:8px;margin-left:-4px;margin-top:-4px;background:#ffffff;border-radius:50%;"></div>
-                                        </div>
-                                    `,
-                                    anchor: new navermaps.Point(15, 15),
-                                }}
+                                zIndex={300}
+                                icon={getNaverPinIcon("user")}
                             />
                         )}
-                        {places.map((place) => {
+                        {(selectedPlace ? [selectedPlace] : places).map((place) => {
                             const isSel = selectedPlace?.id === place.id;
                             return (
                                 <Marker
@@ -463,12 +476,13 @@ function MapPageInner() {
                                     title={place.name}
                                     onClick={() => handlePlaceClick(place)}
                                     zIndex={isSel ? 100 : 10}
-                                    icon={{
-                                        content: `<div class="w-6 h-6 rounded-full flex items-center justify-center ${
-                                            isSel ? "bg-red-500" : "bg-blue-500"
-                                        } border-2 border-white shadow-md"></div>`,
-                                        anchor: new navermaps.Point(12, 12),
-                                    }}
+                                    icon={getNaverPinIcon(
+                                        place.category?.includes("카페")
+                                            ? "cafe"
+                                            : place.category?.includes("음식") || place.category?.includes("맛집")
+                                            ? "food"
+                                            : "default"
+                                    )}
                                 />
                             );
                         })}
@@ -477,13 +491,13 @@ function MapPageInner() {
 
                 {/* --- 지도 위 UI 컨트롤 --- */}
                 {showMapSearchButton && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+                    <div className={`absolute ${isMobile ? "top-20" : "bottom-6"} left-1/2 -translate-x-1/2 z-50`}>
                         <button
                             onClick={async () => {
                                 setShowMapSearchButton(false);
                                 await fetchPlacesAndCourses(center);
                             }}
-                            className="px-4 py-2 bg-white text-black border border-gray-300 rounded-full shadow-lg hover:bg-gray-50 hover:cursor-pointer"
+                            className="px-5 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-full shadow-xl hover:bg-gray-50 hover:cursor-pointer backdrop-blur"
                         >
                             현재 지도에서 검색
                         </button>
@@ -501,7 +515,7 @@ function MapPageInner() {
                                 setCenter(userLocation);
                                 setZoom(15);
                             }}
-                            className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100"
+                            className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 hover:cursor-pointer"
                             title="내 위치로 이동"
                         >
                             <svg
@@ -521,7 +535,7 @@ function MapPageInner() {
                     <div className="bg-white rounded-full shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                         <button
                             onClick={() => setZoom((z) => Math.min(21, z + 1))}
-                            className="px-3 py-2 hover:bg-gray-100 text-lg font-semibold"
+                            className="px-3 py-2 hover:bg-gray-100 text-lg font-semibold hover:cursor-pointer text-black"
                             title="확대"
                         >
                             +
@@ -529,7 +543,7 @@ function MapPageInner() {
                         <span className="block h-px w-full bg-gray-200" />
                         <button
                             onClick={() => setZoom((z) => Math.max(0, z - 1))}
-                            className="px-3 py-2 hover:bg-gray-100 text-lg font-semibold"
+                            className="px-3 py-2 hover:bg-gray-100 text-lg font-semibold hover:cursor-pointer text-black"
                             title="축소"
                         >
                             -
@@ -543,11 +557,11 @@ function MapPageInner() {
                             setLeftPanelOpen((v) => !v);
                             setTimeout(triggerMapResize, 320);
                         }}
-                        className="fixed top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:bg-gray-50 transition-all duration-300 z-20"
+                        className="hover:cursor-pointer fixed top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:bg-gray-50 transition-all duration-300 z-20"
                         style={{ left: leftPanelOpen ? "24rem" : "0" }}
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >
-                        <span className="text-gray-600 text-sm">{leftPanelOpen ? "◀" : "▶"}</span>
+                        <span className="text-gray-600 text-sm ">{leftPanelOpen ? "◀" : "▶"}</span>
                     </button>
                 )}
             </div>

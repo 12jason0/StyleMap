@@ -55,9 +55,7 @@ function EscapeIntroPageInner() {
     const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
     const [validationError, setValidationError] = useState<string>("");
     const [answerChecked, setAnswerChecked] = useState<boolean>(false);
-    const [showStoryModal, setShowStoryModal] = useState<boolean>(false);
-    const [pendingNextIndex, setPendingNextIndex] = useState<number | null>(null);
-    const [nextStoryText, setNextStoryText] = useState<string>("");
+    // 다음 이야기 모달 제거: 관련 상태 제거
     const STORAGE_KEY = useMemo(() => `escape_progress_${storyId}`, [storyId]);
     const [resumed, setResumed] = useState<boolean>(false);
     const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
@@ -218,7 +216,22 @@ function EscapeIntroPageInner() {
           ]
         : [];
 
-    // 경로 표시를 위해 현재 위치를 시작점으로 포함
+    // 이전 챕터 위치 (지오로케이션이 없을 때 경로 폴백용)
+    const prevChapter = currentChapterIdx > 0 ? chapters[currentChapterIdx - 1] : null;
+    const prevPlace =
+        prevChapter && Number.isFinite(Number(prevChapter.latitude)) && Number.isFinite(Number(prevChapter.longitude))
+            ? [
+                  {
+                      id: prevChapter.id,
+                      name: prevChapter.location_name || prevChapter.title || "이전 위치",
+                      latitude: Number(prevChapter.latitude),
+                      longitude: Number(prevChapter.longitude),
+                      address: prevChapter.address,
+                  },
+              ]
+            : [];
+
+    // 경로 표시를 위해: 우선 사용자 위치 + 현재 위치, 없으면 이전 위치 + 현재 위치, 최후엔 현재 위치만
     const mapPlaces = userLocation
         ? [
               {
@@ -229,6 +242,8 @@ function EscapeIntroPageInner() {
               },
               ...currentPlace,
           ]
+        : prevPlace.length > 0
+        ? [...prevPlace, ...currentPlace]
         : currentPlace;
 
     const numFlipPages = 11;
@@ -411,15 +426,16 @@ function EscapeIntroPageInner() {
 
             const nextIdx = currentChapterIdx + 1;
             if (nextIdx < chapters.length) {
-                setPendingNextIndex(nextIdx);
-                setNextStoryText(chapters[nextIdx]?.story_text || "이야기 내용이 없습니다.");
-                setShowStoryModal(true);
+                setCurrentChapterIdx(nextIdx);
             } else {
                 if (endingFlowStarted) return;
                 setEndingFlowStarted(true);
                 setIsEndFlip(true);
                 setTimeout(async () => {
                     setIsEndFlip(false);
+                    // 1) 에필로그 먼저 엽니다
+                    setShowFinalMessageInBook(true);
+                    // 2) 사진 미리 조회
                     try {
                         const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, {
                             credentials: "include",
@@ -427,7 +443,8 @@ function EscapeIntroPageInner() {
                         const data = await res.json();
                         if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
                     } catch {}
-                    setShowGalleryInPage(true);
+                    // 갤러리는 에필로그에서 '마무리 보기' 클릭 시 열림
+                    // 3) 배지는 갤러리 다음 카드
                     try {
                         const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
                         const bd = await br.json();
@@ -768,7 +785,7 @@ body {
                                         selectedPlace={null}
                                         onPlaceClick={() => {}}
                                         className="w-full h-full"
-                                        drawPath={!!userLocation}
+                                        drawPath={mapPlaces.length >= 2}
                                         routeMode="driving"
                                     />
                                 </div>
@@ -835,6 +852,7 @@ body {
                                                 <div className="text-lg font-semibold text-blue-900 mb-3 break-words">
                                                     {currentChapter.mission_payload?.question || "질문이 없습니다."}
                                                 </div>
+                                                {/* 정답은 노출하지 않음 */}
 
                                                 {/* --- 수정된 부분: 미션 타입별 UI 렌더링 --- */}
                                                 {String(currentChapter.mission_type || "").toUpperCase() ===
@@ -865,13 +883,7 @@ body {
                                                                 {answerChecked ? "정답 확인됨" : "정답"}
                                                             </button>
                                                         </div>
-                                                        {currentChapter.mission_payload?.answer && (
-                                                            <div className="text-xs text-blue-900/70 select-none pointer-events-none">
-                                                                힌트: 정답은{" "}
-                                                                {String(currentChapter.mission_payload.answer).length}자
-                                                                입니다.
-                                                            </div>
-                                                        )}
+                                                        {/* 정답 길이 힌트도 숨김 */}
                                                     </div>
                                                 ) : String(currentChapter.mission_type || "").toUpperCase() ===
                                                   "PHOTO" ? (
@@ -992,11 +1004,88 @@ body {
                                             📖 마무리
                                         </h2>
                                         <div className="flex-1 bg-white rounded p-4 border">
-                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
-                                                {chapters[chapters.length - 1]?.story_text ||
+                                            {(() => {
+                                                const epi: any = (story as any)?.epilogue_text;
+                                                const textFallback =
+                                                    chapters[chapters.length - 1]?.story_text ||
                                                     story?.synopsis ||
-                                                    "여정을 함께해 주셔서 감사합니다."}
-                                            </div>
+                                                    "여정을 함께해 주셔서 감사합니다.";
+                                                const isVideoUrl = (s: string) =>
+                                                    /\.(mp4|webm|ogg)(\?.*)?$/i.test(s) ||
+                                                    s.includes("youtube.com") ||
+                                                    s.includes("youtu.be") ||
+                                                    s.includes("vimeo.com");
+                                                const youTubeEmbed = (s: string) => {
+                                                    try {
+                                                        const u = new URL(s);
+                                                        if (u.hostname.includes("youtu.be")) {
+                                                            const id = u.pathname.replace(/^\//, "");
+                                                            return id ? `https://www.youtube.com/embed/${id}` : null;
+                                                        }
+                                                        const id = u.searchParams.get("v");
+                                                        return id ? `https://www.youtube.com/embed/${id}` : null;
+                                                    } catch {
+                                                        return null;
+                                                    }
+                                                };
+                                                if (!epi) {
+                                                    return (
+                                                        <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                            {textFallback}
+                                                        </div>
+                                                    );
+                                                }
+                                                if (typeof epi === "object" && typeof epi.videoUrl === "string") {
+                                                    const url = epi.videoUrl;
+                                                    const yt = youTubeEmbed(url);
+                                                    return yt ? (
+                                                        <div className="aspect-video w-full">
+                                                            <iframe
+                                                                src={yt}
+                                                                className="w-full h-full rounded"
+                                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                                allowFullScreen
+                                                                title="epilogue"
+                                                            />
+                                                        </div>
+                                                    ) : isVideoUrl(url) ? (
+                                                        <video src={url} controls className="w-full rounded" />
+                                                    ) : (
+                                                        <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                            {String(epi.text || textFallback)}
+                                                        </div>
+                                                    );
+                                                }
+                                                if (typeof epi === "string") {
+                                                    const yt = youTubeEmbed(epi);
+                                                    if (yt) {
+                                                        return (
+                                                            <div className="aspect-video w-full">
+                                                                <iframe
+                                                                    src={yt}
+                                                                    className="w-full h-full rounded"
+                                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                                    allowFullScreen
+                                                                    title="epilogue"
+                                                                />
+                                                            </div>
+                                                        );
+                                                    }
+                                                    if (isVideoUrl(epi)) {
+                                                        return <video src={epi} controls className="w-full rounded" />;
+                                                    }
+                                                    return (
+                                                        <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                            {epi}
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                        {textFallback}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="mt-4 flex justify-end">
                                             <button
@@ -1090,7 +1179,7 @@ body {
                                     selectedPlace={null}
                                     onPlaceClick={() => {}}
                                     className="w-full h-full"
-                                    drawPath={!!userLocation}
+                                    drawPath={mapPlaces.length >= 2}
                                     routeMode="driving"
                                 />
                             </div>
@@ -1098,7 +1187,106 @@ body {
                     </div>
                 )}
 
-                {/* 엔딩 섹션: 페이지 내부에 사진 액자/마무리/배지 */}
+                {/* 엔딩 섹션 1: 에필로그(마무리) */}
+                {animationFinished && chapters.length > 0 && showFinalMessageInBook && !showGalleryInPage && (
+                    <div className="absolute inset-0 z-[1200] pointer-events-none">
+                        <div className="absolute inset-0 p-4 sm:p-6 pointer-events-auto">
+                            <div className="bg-white/90 rounded-xl border shadow p-3 sm:p-4 h-full overflow-auto">
+                                <div className="text-lg font-bold mb-3">📖 마무리</div>
+                                <div className="space-y-4">
+                                    {/* 1) 마지막 챕터의 story_text 우선 노출 */}
+                                    <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                        {chapters[chapters.length - 1]?.story_text ||
+                                            story?.synopsis ||
+                                            "여정을 함께해 주셔서 감사합니다."}
+                                    </div>
+
+                                    {/* 2) 이어서 epilogue_text (텍스트 또는 영상) */}
+                                    {(() => {
+                                        const epi: any = (story as any)?.epilogue_text;
+                                        if (!epi) return null;
+                                        const isVideoUrl = (s: string) =>
+                                            /\.(mp4|webm|ogg)(\?.*)?$/i.test(s) ||
+                                            s.includes("youtube.com") ||
+                                            s.includes("youtu.be") ||
+                                            s.includes("vimeo.com");
+                                        const youTubeEmbed = (s: string) => {
+                                            try {
+                                                const u = new URL(s);
+                                                if (u.hostname.includes("youtu.be")) {
+                                                    const id = u.pathname.replace(/^\//, "");
+                                                    return id ? `https://www.youtube.com/embed/${id}` : null;
+                                                }
+                                                const id = u.searchParams.get("v");
+                                                return id ? `https://www.youtube.com/embed/${id}` : null;
+                                            } catch {
+                                                return null;
+                                            }
+                                        };
+                                        if (typeof epi === "object" && typeof epi.videoUrl === "string") {
+                                            const url = epi.videoUrl;
+                                            const yt = youTubeEmbed(url);
+                                            return yt ? (
+                                                <div className="aspect-video w-full">
+                                                    <iframe
+                                                        src={yt}
+                                                        className="w-full h-full rounded"
+                                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                        allowFullScreen
+                                                        title="epilogue"
+                                                    />
+                                                </div>
+                                            ) : isVideoUrl(url) ? (
+                                                <video src={url} controls className="w-full rounded" />
+                                            ) : (
+                                                <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                    {String(epi.text || "")}
+                                                </div>
+                                            );
+                                        }
+                                        if (typeof epi === "string") {
+                                            const yt = youTubeEmbed(epi);
+                                            if (yt) {
+                                                return (
+                                                    <div className="aspect-video w-full">
+                                                        <iframe
+                                                            src={yt}
+                                                            className="w-full h-full rounded"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                            allowFullScreen
+                                                            title="epilogue"
+                                                        />
+                                                    </div>
+                                                );
+                                            }
+                                            if (isVideoUrl(epi)) {
+                                                return <video src={epi} controls className="w-full rounded" />;
+                                            }
+                                            return (
+                                                <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
+                                                    {epi}
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                                <div className="mt-4 flex justify-end gap-2">
+                                    <button
+                                        className="btn-vintage"
+                                        onClick={() => {
+                                            setShowGalleryInPage(true);
+                                        }}
+                                    >
+                                        추억 사진 보기
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 엔딩 섹션 2: 추억 사진 */}
                 {animationFinished && chapters.length > 0 && showGalleryInPage && (
                     <div className="absolute inset-0 z-[1200] pointer-events-none">
                         <div className="absolute inset-0 p-4 sm:p-6 pointer-events-auto">
@@ -1156,10 +1344,11 @@ body {
                                         className="btn-vintage"
                                         onClick={() => {
                                             setShowGalleryInPage(false);
-                                            setShowFinalMessageInBook(true);
+                                            setShowFinalMessageInBook(false);
+                                            setShowBadgeInPage(true);
                                         }}
                                     >
-                                        마무리 보기
+                                        배지 보기
                                     </button>
                                 </div>
                             </div>
@@ -1167,8 +1356,8 @@ body {
                     </div>
                 )}
 
-                {/* 배지: 페이지 내부 오른쪽 하단 카드 */}
-                {animationFinished && chapters.length > 0 && !showGalleryInPage && showFinalMessageInBook && (
+                {/* 엔딩 섹션 3: 배지 카드 */}
+                {animationFinished && chapters.length > 0 && showBadgeInPage && !isClosing && (
                     <div className="absolute inset-0 z-[1200] pointer-events-none">
                         <div className="absolute right-4 bottom-4 w-[86vw] sm:w-[360px] pointer-events-auto">
                             <div className="bg-white/95 rounded-xl border shadow p-4">
@@ -1201,35 +1390,7 @@ body {
                     </div>
                 )}
 
-                {/* 다음 챕터 모달 */}
-                {showStoryModal && (
-                    <div className="parchment-modal">
-                        <div className="parchment animate-fade-in-up">
-                            <div className="parchment-title">
-                                <span>🗺️</span>
-                                <span>다음 이야기</span>
-                            </div>
-                            <div className="parchment-body whitespace-pre-wrap">{nextStoryText}</div>
-                            <div className="parchment-actions">
-                                <button className="btn-ghost" onClick={() => setShowStoryModal(false)}>
-                                    닫기
-                                </button>
-                                <button
-                                    className="btn-vintage"
-                                    onClick={() => {
-                                        setShowStoryModal(false);
-                                        if (pendingNextIndex !== null) {
-                                            setCurrentChapterIdx(pendingNextIndex);
-                                            setPendingNextIndex(null);
-                                        }
-                                    }}
-                                >
-                                    다음으로
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* 다음 챕터 모달 제거됨 */}
             </div>
             {/* 전체 화면 갤러리 오버레이는 사용하지 않습니다 (책 페이지 내 갤러리만 사용) */}
         </div>

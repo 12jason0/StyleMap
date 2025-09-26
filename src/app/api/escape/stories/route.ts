@@ -30,10 +30,24 @@ export async function GET(request: NextRequest) {
                 return Number.isFinite(n) ? n : 0;
             };
 
+            const safeEpilogue = (() => {
+                const raw: any = s as any;
+                if (raw?.epilogue_text != null) return raw.epilogue_text;
+                // story_json 내부에서 폴백으로 시도
+                try {
+                    const j = raw?.story_json;
+                    if (j && typeof j === "object") {
+                        return (j as any).epilogue_text ?? (j as any).epilogue ?? "";
+                    }
+                } catch {}
+                return "";
+            })();
+
             const normalized = {
                 id: s.id,
                 title: s.title,
                 synopsis: s.synopsis ?? "",
+                epilogue_text: safeEpilogue,
                 region: s.region ?? null,
                 price: s.price != null ? String(s.price) : null,
                 imageUrl: s.imageUrl ?? null,
@@ -76,27 +90,41 @@ export async function GET(request: NextRequest) {
             return Number.isFinite(n) ? n : 0;
         };
 
-        const normalized = stories.map((s) => ({
-            id: s.id,
-            title: s.title,
-            synopsis: s.synopsis ?? "",
-            region: s.region ?? null,
-            price: s.price != null ? String(s.price) : null,
-            imageUrl: s.imageUrl ?? null,
-            reward_badge_id: s.reward_badge_id ?? null,
-            level: normalizeLevel((s as any).level),
-            is_active: s.is_active,
-            created_at: s.created_at,
-            updated_at: s.updated_at,
-            badge: s.reward_badge
-                ? {
-                      id: s.reward_badge.id,
-                      name: s.reward_badge.name,
-                      description: s.reward_badge.description ?? "",
-                      image_url: s.reward_badge.image_url ?? undefined,
-                  }
-                : null,
-        }));
+        const normalized = stories.map((s) => {
+            const raw: any = s as any;
+            const epi = (() => {
+                if (raw?.epilogue_text != null) return raw.epilogue_text;
+                try {
+                    const j = raw?.story_json;
+                    if (j && typeof j === "object") {
+                        return (j as any).epilogue_text ?? (j as any).epilogue ?? "";
+                    }
+                } catch {}
+                return "";
+            })();
+            return {
+                id: s.id,
+                title: s.title,
+                synopsis: s.synopsis ?? "",
+                epilogue_text: epi,
+                region: s.region ?? null,
+                price: s.price != null ? String(s.price) : null,
+                imageUrl: s.imageUrl ?? null,
+                reward_badge_id: s.reward_badge_id ?? null,
+                level: normalizeLevel((s as any).level),
+                is_active: s.is_active,
+                created_at: s.created_at,
+                updated_at: s.updated_at,
+                badge: s.reward_badge
+                    ? {
+                          id: s.reward_badge.id,
+                          name: s.reward_badge.name,
+                          description: s.reward_badge.description ?? "",
+                          image_url: s.reward_badge.image_url ?? undefined,
+                      }
+                    : null,
+            };
+        });
 
         return NextResponse.json(normalized, {
             headers: {

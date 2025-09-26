@@ -11,6 +11,8 @@ export default function NaverMapComponent({
     className = "",
     style = {},
     drawPath,
+    routeMode = "simple",
+    center,
 }: MapProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
@@ -54,7 +56,7 @@ export default function NaverMapComponent({
             await ensure();
             if (cancelled || !(window as any).naver?.maps || !containerRef.current) return;
             const naver = (window as any).naver;
-            const c = pickCenter();
+            const c = center ?? pickCenter();
             mapRef.current = new naver.maps.Map(containerRef.current, {
                 center: new naver.maps.LatLng(c.lat, c.lng),
                 zoom: 15,
@@ -113,12 +115,78 @@ export default function NaverMapComponent({
             }
         } catch {}
 
-        // 간단 경로(옵션)
-        if (drawPath && valid.length >= 2) {
-            const path = valid.map((p) => new naver.maps.LatLng(Number(p.latitude), Number(p.longitude)));
-            polylineRef.current = new naver.maps.Polyline({ map, path, strokeWeight: 4, strokeColor: "#10b981" });
-        }
-    }, [places, userLocation, selectedPlace, drawPath, onPlaceClick]);
+        // 경로(옵션)
+        const buildRoute = async () => {
+            if (!drawPath || valid.length < 2) return;
+
+            // simple: 장소 간 직선 연결
+            if (!routeMode || routeMode === "simple") {
+                const path = valid.map((p) => new naver.maps.LatLng(Number(p.latitude), Number(p.longitude)));
+                polylineRef.current = new naver.maps.Polyline({
+                    map,
+                    path,
+                    strokeWeight: 4,
+                    strokeColor: "#111827",
+                    strokeOpacity: 0.9,
+                });
+                return;
+            }
+
+            // 네트워크 라우팅: 인접 장소 쌍마다 OSRM 호출 후 이어붙임
+            const allLatLngs: any[] = [];
+            for (let i = 0; i < valid.length - 1; i++) {
+                const a = valid[i];
+                const b = valid[i + 1];
+                const coords = `${a.longitude},${a.latitude};${b.longitude},${b.latitude}`;
+                try {
+                    const res = await fetch(
+                        `/api/directions?coords=${encodeURIComponent(coords)}&mode=${encodeURIComponent(routeMode)}`,
+                        { cache: "no-store" }
+                    );
+                    if (!res.ok) throw new Error("route fetch failed");
+                    const data = await res.json();
+                    const coordinates: Array<[number, number]> = Array.isArray(data?.coordinates)
+                        ? data.coordinates
+                        : [];
+                    if (coordinates.length > 1) {
+                        const pairLatLngs = coordinates.map(
+                            ([lng, lat]) => new naver.maps.LatLng(Number(lat), Number(lng))
+                        );
+                        // 이어붙일 때 중복 점 하나 제거
+                        if (allLatLngs.length > 0 && pairLatLngs.length > 0) pairLatLngs.shift();
+                        allLatLngs.push(...pairLatLngs);
+                    } else {
+                        // 폴백: 직선
+                        const straight = [
+                            new naver.maps.LatLng(Number(a.latitude), Number(a.longitude)),
+                            new naver.maps.LatLng(Number(b.latitude), Number(b.longitude)),
+                        ];
+                        if (allLatLngs.length > 0) straight.shift();
+                        allLatLngs.push(...straight);
+                    }
+                } catch {
+                    const straight = [
+                        new naver.maps.LatLng(Number(a.latitude), Number(a.longitude)),
+                        new naver.maps.LatLng(Number(b.latitude), Number(b.longitude)),
+                    ];
+                    if (allLatLngs.length > 0) straight.shift();
+                    allLatLngs.push(...straight);
+                }
+            }
+
+            if (allLatLngs.length > 1) {
+                polylineRef.current = new naver.maps.Polyline({
+                    map,
+                    path: allLatLngs,
+                    strokeWeight: 5,
+                    strokeColor: "#4169E1",
+                    strokeOpacity: 0.9,
+                });
+            }
+        };
+
+        buildRoute();
+    }, [places, userLocation, selectedPlace, drawPath, onPlaceClick, routeMode]);
 
     return <div ref={containerRef} className={className} style={{ ...style, width: "100%", height: "100%" }} />;
 }

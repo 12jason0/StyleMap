@@ -823,7 +823,7 @@ export default function CourseDetailPage() {
                                                     onPlaceClick={handlePlaceClick}
                                                     drawPath={true}
                                                     routeMode="foot"
-                                                    className="w-full h-56 md:h-80 rounded-2xl"
+                                                    className="w-full h-64 md:h-96 rounded-2xl"
                                                     style={{ minHeight: "200px" }}
                                                 />
                                             ) : (
@@ -1035,18 +1035,22 @@ export default function CourseDetailPage() {
                                                 <span className="text-gray-600">소요시간</span>
                                                 <span className="font-semibold">{courseData.duration}</span>
                                             </div>
-                                            <div className="border-t pt-4 space-y-3">
+                                            <div className="border-t pt-4 space-y-3 ">
                                                 <button
+                                                    type="button"
                                                     onClick={() => {
-                                                        const token = localStorage.getItem("authToken");
-                                                        if (!token) {
-                                                            alert("로그인이 필요합니다.");
-                                                            router.push("/login");
-                                                            return;
+                                                        try {
+                                                            router.push(
+                                                                `/courses/${encodeURIComponent(String(courseId))}/start`
+                                                            );
+                                                        } catch (e) {
+                                                            console.error("start navigation failed", e);
+                                                            window.location.assign(
+                                                                `/courses/${encodeURIComponent(String(courseId))}/start`
+                                                            );
                                                         }
-                                                        router.push(`/courses/${courseId}/start`);
                                                     }}
-                                                    className={`w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700`}
+                                                    className={` w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700`}
                                                 >
                                                     🚀 코스 시작하기
                                                 </button>
@@ -1126,7 +1130,7 @@ export default function CourseDetailPage() {
                                         <h3 className="text-xl font-bold mb-4">비슷한 코스</h3>
                                         <div className="text-center py-8 text-gray-500">
                                             <div className="text-4xl mb-2">🎯</div>
-                                            <p className="text-sm">
+                                            <p className="text-sm text-black">
                                                 곧 추천 코스를
                                                 <br />
                                                 제공할 예정입니다!
