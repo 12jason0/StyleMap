@@ -339,7 +339,7 @@ export default function Home() {
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
                         <button
                             onClick={() => setSearchRegion(searchRegion.trim())}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+                            className="hover:cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
                         >
                             검색
                         </button>
@@ -582,7 +582,7 @@ function TabbedConcepts({
     return (
         <section className="py-12">
             <div className="max-w-7xl mx-auto px-4">
-                <div className="flex gap-3 mb-6">
+                <div className="flex gap-3 mb-6 ">
                     {[
                         { key: "concept", label: "테마별" },
                         { key: "popular", label: "인기별" },
@@ -591,10 +591,10 @@ function TabbedConcepts({
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key as any)}
-                            className={`px-4 py-2 rounded-full border transition shadow-sm ${
+                            className={`px-4 py-2 rounded-full border transition shadow-sm hover:cursor-pointer ${
                                 activeTab === tab.key
                                     ? "bg-white text-blue-600 border-blue-300 shadow"
-                                    : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-white"
+                                    : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-white "
                             }`}
                         >
                             {tab.label}

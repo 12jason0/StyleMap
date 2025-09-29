@@ -133,13 +133,13 @@ function CoursesPageInner() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 pt-15">
+        <div className="min-h-screen bg-gray-50 ">
             {/* 헤더 */}
             <div className="bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 py-6">
+                <div className="max-w-[500px] mx-auto px-4 py-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900">
+                            <h1 className="text-2xl font-bold text-gray-900">
                                 {concept ? `${concept} 코스` : "모든 코스"}
                             </h1>
                             <p className="text-gray-600 mt-2">
@@ -154,8 +154,8 @@ function CoursesPageInner() {
             </div>
 
             {/* 코스 목록 */}
-            <div className="max-w-7xl mx-auto px-4 py-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="max-w-[500px] mx-auto px-4 py-8">
+                <div className="grid grid-cols-1 gap-6">
                     {courses.map((course) => (
                         <div
                             key={course.id}
@@ -178,7 +178,7 @@ function CoursesPageInner() {
                                         src={course.imageUrl}
                                         alt={course.title}
                                         fill
-                                        sizes="(max-width: 1024px) 100vw, 33vw"
+                                        sizes="100vw"
                                         className="object-cover"
                                     />
                                 ) : (

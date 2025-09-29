@@ -48,7 +48,10 @@ export default function RootLayout({
                     }}
                 />
             </head>
-            <body className={`${inter.variable} antialiased min-h-screen flex flex-col typography-smooth bg-gray-100`}>
+            {/* [수정] h-screen과 overflow-hidden을 추가하여 body 자체의 스크롤을 막습니다. */}
+            <body
+                className={`${inter.variable} antialiased h-screen overflow-hidden flex flex-col typography-smooth bg-gray-100`}
+            >
                 <Script src="https://www.googletagmanager.com/gtag/js?id=G-R3EYQNXY13" strategy="afterInteractive" />
                 <Script
                     id="ga4-init"

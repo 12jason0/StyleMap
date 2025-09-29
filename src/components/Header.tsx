@@ -9,6 +9,9 @@ import { usePathname, useRouter } from "next/navigation";
 const Header = () => {
     // ... (컴포넌트의 나머지 로직은 그대로 유지) ...
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [panelRight, setPanelRight] = useState(0);
+    const [panelWidth, setPanelWidth] = useState(0);
+    const [drawerWidth, setDrawerWidth] = useState(0);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [hasFavorites, setHasFavorites] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -87,6 +90,25 @@ const Header = () => {
             window.removeEventListener("favoritesChanged", handleFavoritesChanged);
         };
     }, []);
+
+    // 메뉴 패널 기준을 main 우측 가장자리로 고정
+    const recomputeAnchor = () => {
+        try {
+            const mainEl = document.querySelector("main");
+            if (!mainEl) return;
+            const rect = (mainEl as HTMLElement).getBoundingClientRect();
+            const rightOffset = Math.max(0, window.innerWidth - rect.right);
+            setPanelRight(rightOffset);
+            setPanelWidth(rect.width);
+            setDrawerWidth(Math.min(333, rect.width));
+        } catch {}
+    };
+
+    useEffect(() => {
+        recomputeAnchor();
+        window.addEventListener("resize", recomputeAnchor);
+        return () => window.removeEventListener("resize", recomputeAnchor);
+    }, [pathname]);
 
     const fetchFavoritesSummary = async () => {
         try {
@@ -211,18 +233,20 @@ const Header = () => {
             <div>
                 {isMenuOpen && (
                     <div
-                        className="fixed top-16 bottom-0 z-40 bg-black/30 left-0 right-0 min-[600px]:left-auto min-[600px]:w-[500px] min-[600px]:right-[calc((100vw-500px)/2)]"
+                        className="fixed top-16 bottom-0 z-40 bg-black/30"
+                        style={{ right: panelRight, width: panelWidth }}
                         onClick={closeMenu}
                     />
                 )}
                 <div
-                    className={`fixed top-16 bottom-0 z-50 w-2/3 bg-white border-l border-gray-200 shadow-2xl transform transition-all ease-in-out duration-300 right-0 min-[600px]:w-[333px] min-[600px]:right-[calc((100vw-500px)/2)] flex flex-col ${
+                    className={`fixed top-16 bottom-0 z-50 bg-white border-l border-gray-200 shadow-2xl transform transition-all ease-in-out duration-300 flex flex-col ${
                         isMenuOpen
                             ? "translate-x-0 opacity-100 pointer-events-auto"
                             : "translate-x-full opacity-0 pointer-events-none"
                     }`}
                     aria-hidden={!isMenuOpen}
                     onClick={(e) => e.stopPropagation()}
+                    style={{ right: panelRight, width: Math.max(240, drawerWidth) }}
                 >
                     <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-2">
                         <div className="pt-4 mt-2 border-t border-gray-200 grid grid-cols-2 gap-3">
