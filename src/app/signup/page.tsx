@@ -199,10 +199,9 @@ const Signup = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 text-black">
-            <Header />
-            <main className="max-w-md mx-auto px-4 py-8 pt-24">
+            <main className="max-w-md mx-auto px-4 py-8 pt-10">
                 <div className="bg-white rounded-2xl shadow-md p-8">
-                    <div className="text-center mb-8">
+                    <div className="text-center">
                         <h1 className="text-3xl font-bold text-gray-900 mb-2">회원가입</h1>
                         <p className="text-gray-600">StyleMap과 함께 여행을 시작하세요</p>
                     </div>

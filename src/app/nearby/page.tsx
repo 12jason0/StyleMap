@@ -102,10 +102,13 @@ export default function NearbyPage() {
 
     return (
         <div className="min-h-screen bg-white text-black">
-            <section className="max-w-7xl mx-auto px-4 pt-24 pb-12">
-                <div className="md:flex md:gap-6">
+            <section
+                className="max-w-[500px] mx-auto px-4 pt-5 pb-12 overflow-y-auto overscroll-contain no-scrollbar scrollbar-hide"
+                style={{ maxHeight: "calc(100vh - 80px)" }}
+            >
+                <div className="flex flex-col gap-6">
                     {/* Left: Control panel */}
-                    <aside className="md:w-1/3 lg:w-[30%] bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 md:mb-0">
+                    <aside className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
                         <h2 className="text-lg font-bold mb-4">인기 지역 코스 필터</h2>
                         {/* 활동 선택 */}
                         <div className="mb-6">
@@ -166,7 +169,7 @@ export default function NearbyPage() {
                     </aside>
 
                     {/* Right: Results */}
-                    <section className="md:w-2/3 lg:w-[70%]">
+                    <section>
                         <div className="flex items-center justify-between mb-3">
                             <p className="text-sm text-gray-600">총 {filtered.length}개 결과</p>
                             <button
@@ -187,7 +190,7 @@ export default function NearbyPage() {
                             <div className="p-8 text-center text-red-500">{error}</div>
                         ) : (
                             <>
-                                <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     {filtered.map((c) => (
                                         <Link
                                             key={c.id}

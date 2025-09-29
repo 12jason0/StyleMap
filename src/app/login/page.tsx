@@ -200,8 +200,6 @@ const Login = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-            <Header />
-
             <main
                 className="max-w-md mx-auto px-4 pt-20 pb-28 flex items-center"
                 style={{ minHeight: "calc(100dvh - 120px)" }}

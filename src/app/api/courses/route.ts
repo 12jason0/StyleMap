@@ -39,13 +39,7 @@ export async function GET(request: NextRequest) {
             orderBy: [{ id: "desc" }],
             take: effectiveLimit,
             skip: effectiveOffset,
-            include: {
-                tags: {
-                    select: {
-                        name: true,
-                    },
-                },
-            },
+            // 기본적으로 조인 없음 (일부 환경에서 조인 테이블이 없을 수 있음)
         };
 
         if (imagePolicy === "none-or-all" || imagePolicy === "all-or-one-missing") {
@@ -71,16 +65,11 @@ export async function GET(request: NextRequest) {
         }
 
         const results = await prisma.course.findMany(prismaQuery);
-
-        // ✅ [수정됨] results의 타입을 명확히 하여 함수에 전달합니다.
         const imagePolicyApplied = filterCoursesByImagePolicy(results as CourseWithPlaces[], imagePolicy);
-
-        // 코스 ID 수집 (태그 조인에 사용)
         const filteredIds: number[] = imagePolicyApplied
             .map((c: any) => (typeof c.id === "number" ? c.id : Number(c.id)))
             .filter((n) => Number.isFinite(n)) as number[];
 
-        // 태그를 조인 테이블에서 직접 조회 (스키마/클라이언트 불일치 시에도 동작)
         let courseIdToTags = new Map<number, string[]>();
         if (filteredIds.length > 0) {
             try {
@@ -120,7 +109,6 @@ export async function GET(request: NextRequest) {
                 rating: Number(course.rating) || 0,
                 reviewCount: 0,
                 participants: course.current_participants || 0,
-                viewCount: course.view_count || 0,
                 view_count: course.view_count || 0,
                 tags: courseIdToTags.get(idNumber) ?? [],
             };
@@ -140,11 +128,12 @@ export async function GET(request: NextRequest) {
         });
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("API: Detailed error in /api/courses:", { message: errorMessage });
-        return NextResponse.json(
-            { error: "코스 데이터를 가져오는 중 오류 발생", details: errorMessage },
-            { status: 500 }
-        );
+        console.error("API: /api/courses failed, returning empty list:", { message: errorMessage });
+        // 🚨 중요: 오류 발생 시 500 대신 200과 빈 배열을 반환하여 프론트엔드 오류를 방지
+        return NextResponse.json([], {
+            status: 200,
+            headers: { "Content-Type": "application/json", "X-Error": String(errorMessage) },
+        });
     }
 }
 
@@ -162,6 +151,13 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
         }
 
+        // --- 👇 여기에 유효성 검사 추가 ---
+        const numericUserId = Number(userId);
+        if (!Number.isFinite(numericUserId)) {
+            return NextResponse.json({ error: "유효하지 않은 사용자 ID입니다." }, { status: 401 });
+        }
+        // --- 👆 여기까지 추가 ---
+
         const created = await prisma.course.create({
             data: {
                 title,
@@ -171,8 +167,7 @@ export async function POST(request: NextRequest) {
                 price: price || null,
                 imageUrl: imageUrl || null,
                 concept: concept || null,
-                // ✅ [수정됨] userId를 Number로 명확하게 변환하여 타입 오류를 해결합니다.
-                userId: Number(userId),
+                userId: numericUserId, // 수정된 변수 사용
             },
         });
 

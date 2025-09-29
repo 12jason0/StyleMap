@@ -732,7 +732,7 @@ export default function CourseDetailPage() {
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
 
-                    <div className="relative h-full max-w-7xl mx-auto px-4 flex items-center">
+                    <div className="relative h-full max-w-[500px] mx-auto px-4 flex items-center">
                         <div className="max-w-[85%] md:max-w-2xl">
                             <div className="mb-4 flex items-center gap-3 flex-wrap">
                                 {courseData.isPopular && (
@@ -777,10 +777,10 @@ export default function CourseDetailPage() {
 
                 {/* Course Details */}
                 <section className="py-16">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="max-w-[500px] mx-auto px-4">
+                        <div className="grid grid-cols-1 gap-8">
                             {/* Main Content */}
-                            <div className="lg:col-span-2 space-y-8">
+                            <div className="space-y-8">
                                 {/* 코스 설명 */}
                                 <div className="bg-white rounded-2xl shadow-lg p-4 md:p-8">
                                     <h2 className="text-2xl md:text-3xl font-bold mb-6">코스 소개</h2>
@@ -1018,7 +1018,7 @@ export default function CourseDetailPage() {
                             </div>
 
                             {/* Sidebar */}
-                            <div className="lg:col-span-1">
+                            <div>
                                 <div className="sticky top-6 space-y-6">
                                     {/* 코스 액션 카드 */}
                                     <div className="bg-white rounded-2xl shadow-lg p-6">

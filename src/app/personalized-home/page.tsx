@@ -612,14 +612,14 @@ const AIRecommender = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 font-sans pt-10">
-            <div className="flex flex-col items-center justify-center p-4 pt-16">
+        <div className="min-h-screen bg-white font-sans ">
+            <div className="flex flex-col items-center justify-center p-4 ">
                 {showLogin && <LoginModal />}
                 {showPaywall && <TicketPlans />}
 
                 <div className="w-full max-w-4xl flex flex-col">
                     {/* AI 추천 헤더 */}
-                    <header className="bg-gradient-to-r bg-sky-400 rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 flex-shrink-0">
+                    <header className="bg-[#1E2A44] rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 flex-shrink-0 border border-white/10">
                         <div className="flex flex-col sm:flex-row items-center justify-between">
                             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
                                 <div className="relative">
@@ -656,7 +656,7 @@ const AIRecommender = () => {
                                 ) : (
                                     <button
                                         onClick={() => setShowLogin(true)}
-                                        className="px-6 py-3 bg-white/20 text-white rounded-xl font-semibold hover:bg-white/30 transition-all active:scale-95"
+                                        className="px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/25 transition-all active:scale-95"
                                     >
                                         로그인하기
                                     </button>
@@ -669,10 +669,10 @@ const AIRecommender = () => {
                     <main className="flex-1 overflow-y-auto rounded-3xl">
                         {/* 채팅 시작 버튼 */}
                         {!conversationStarted && (
-                            <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white/50 rounded-3xl">
+                            <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white/10 rounded-3xl border border-white/10">
                                 <button
                                     onClick={startConversation}
-                                    className="cursor-pointer px-8 py-4 bg-gradient-to-r bg-sky-400 text-white rounded-2xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
+                                    className="cursor-pointer px-8 py-4 bg-[#2A3B5F] text-white rounded-2xl font-bold text-lg hover:shadow-xl transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
                                 >
                                     <MessageCircle className="w-6 h-6 mr-3" />
                                     AI 추천 시작하기
@@ -683,7 +683,7 @@ const AIRecommender = () => {
 
                         {/* 채팅 및 추천 영역 */}
                         {conversationStarted && (
-                            <div className="bg-white rounded-3xl shadow-xl p-4 sm:p-6 h-full flex flex-col max-h-[600px]">
+                            <div className="bg-white/95 rounded-3xl shadow-xl p-4 sm:p-6 h-full flex flex-col max-h-[600px]">
                                 {/* 채팅 메시지 영역 */}
                                 <div className="flex-grow overflow-y-auto pr-2 space-y-6">
                                     {messages.map((message, index) => (
@@ -694,14 +694,14 @@ const AIRecommender = () => {
                                             }`}
                                         >
                                             {message.type === "ai" && (
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-200 to-pink-200 flex items-center justify-center flex-shrink-0">
-                                                    <Sparkles className="w-5 h-5 text-purple-600" />
+                                                <div className="w-8 h-8 rounded-full bg-[#1E2A44] text-white flex items-center justify-center flex-shrink-0">
+                                                    <Sparkles className="w-5 h-5" />
                                                 </div>
                                             )}
                                             <div
                                                 className={`max-w-sm px-5 py-3 rounded-2xl ${
                                                     message.type === "user"
-                                                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg rounded-br-none"
+                                                        ? "bg-[#2A3B5F] text-white shadow-lg rounded-br-none"
                                                         : "bg-gray-100 text-gray-800 rounded-bl-none"
                                                 }`}
                                             >
@@ -712,18 +712,18 @@ const AIRecommender = () => {
 
                                     {isTyping && (
                                         <div className="flex items-end gap-2 justify-start">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-200 to-pink-200 flex items-center justify-center flex-shrink-0">
-                                                <Sparkles className="w-5 h-5 text-purple-600" />
+                                            <div className="w-8 h-8 rounded-full bg-[#1E2A44] text-white flex items-center justify-center flex-shrink-0">
+                                                <Sparkles className="w-5 h-5" />
                                             </div>
                                             <div className="bg-gray-100 px-5 py-4 rounded-2xl rounded-bl-none">
                                                 <div className="flex space-x-1.5">
-                                                    <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+                                                    <div className="w-2 h-2 bg-[#2A3B5F] rounded-full animate-bounce"></div>
                                                     <div
-                                                        className="w-2 h-2 bg-pink-400 rounded-full animate-bounce"
+                                                        className="w-2 h-2 bg-[#3E548C] rounded-full animate-bounce"
                                                         style={{ animationDelay: "150ms" }}
                                                     ></div>
                                                     <div
-                                                        className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"
+                                                        className="w-2 h-2 bg-[#6B84C3] rounded-full animate-bounce"
                                                         style={{ animationDelay: "300ms" }}
                                                     ></div>
                                                 </div>
@@ -741,7 +741,7 @@ const AIRecommender = () => {
                                                 <button
                                                     key={index}
                                                     onClick={() => handleAnswer(option)}
-                                                    className="cursor-pointer px-5 py-2.5 bg-white border-2 border-purple-200 text-purple-700 rounded-full font-semibold hover:bg-purple-50 hover:border-purple-400 transition-all active:scale-95"
+                                                    className="cursor-pointer px-5 py-2.5 bg-white/90 border-2 border-[#2A3B5F]/30 text-[#1E2A44] rounded-full font-semibold hover:bg-white transition-all active:scale-95"
                                                 >
                                                     {option.text}
                                                 </button>
@@ -763,7 +763,7 @@ const AIRecommender = () => {
                                 <div className="text-center pb-6">
                                     <button
                                         onClick={handleResetAndRecommend}
-                                        className="cursor-pointer px-6 py-3 bg-white border-2 border-purple-500 text-purple-700 rounded-2xl font-bold text-base hover:bg-purple-50 transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
+                                        className="cursor-pointer px-6 py-3 bg-white border-2 border-[#2A3B5F] text-[#1E2A44] rounded-2xl font-bold text-base hover:bg-white transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
                                     >
                                         <RefreshCw className="w-5 h-5 mr-2" />
                                         다른 추천 받기 (쿠폰 1개 사용)
