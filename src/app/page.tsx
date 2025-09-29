@@ -349,7 +349,7 @@ export default function Home() {
                 {/* Hero Section - 대형 슬라이드 (카드형) */}
                 <section className="relative px-4">
                     <div
-                        className="relative h-[200px] overflow-hidden shadow-xl mr-8"
+                        className="relative h-[200px] overflow-hidden shadow-xl mr-8 cursor-grab select-none"
                         style={{
                             transform: `translateX(${touchDeltaX * 0.15}px)`,
                             transition: isTouching ? "none" : "transform 300ms ease",
@@ -374,6 +374,47 @@ export default function Home() {
                                 setCurrentSlide((prev) => (prev - 1 + total) % total);
                             } else if (touchDeltaX < -threshold) {
                                 setCurrentSlide((prev) => (prev + 1) % total);
+                            }
+                            setTouchStartX(null);
+                            setTouchDeltaX(0);
+                            setIsTouching(false);
+                        }}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            setTouchStartX(e.clientX);
+                            setTouchDeltaX(0);
+                            setIsTouching(true);
+                        }}
+                        onMouseMove={(e) => {
+                            if (isTouching && touchStartX !== null) {
+                                setTouchDeltaX(e.clientX - touchStartX);
+                            }
+                        }}
+                        onMouseLeave={() => {
+                            if (!isTouching) return;
+                            const threshold = 40;
+                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
+                            if (total !== 0) {
+                                if (touchDeltaX > threshold) {
+                                    setCurrentSlide((prev) => (prev - 1 + total) % total);
+                                } else if (touchDeltaX < -threshold) {
+                                    setCurrentSlide((prev) => (prev + 1) % total);
+                                }
+                            }
+                            setTouchStartX(null);
+                            setTouchDeltaX(0);
+                            setIsTouching(false);
+                        }}
+                        onMouseUp={() => {
+                            if (!isTouching) return;
+                            const threshold = 40;
+                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
+                            if (total !== 0) {
+                                if (touchDeltaX > threshold) {
+                                    setCurrentSlide((prev) => (prev - 1 + total) % total);
+                                } else if (touchDeltaX < -threshold) {
+                                    setCurrentSlide((prev) => (prev + 1) % total);
+                                }
                             }
                             setTouchStartX(null);
                             setTouchDeltaX(0);

@@ -20,17 +20,14 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                     <div className="relative h-full flex items-center">
                         <div className="px-10 max-w-[520px] text-white space-y-6">
                             {/* 1. 로고 및 앱 이름 */}
-                            <div className="inline-flex items-center gap-3 bg-white/15 border border-white/20 rounded-full px-4 py-2 backdrop-blur-sm">
-                                <div className="w-15 h-15 flex items-center justify-center font-extrabold">
-                                    <div className=" rounded-1xl">
-                                        <img
-                                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoicon-navy.png"
-                                            alt="Logo"
-                                            className="w-full h-full"
-                                        />
-                                    </div>
+                            <div className="w-40 h-40  flex items-center justify-center font-extrabold">
+                                <div className=" rounded-1xl">
+                                    <img
+                                        src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoicon-navy.png"
+                                        alt="Logo"
+                                        className="w-full h-full"
+                                    />
                                 </div>
-                                <span className="font-semibold tracking-wide">StyleMap</span>
                             </div>
 
                             {/* 2. 메인 슬로건 (Headline) */}
