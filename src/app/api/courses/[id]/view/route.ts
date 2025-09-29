@@ -7,7 +7,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         const { id: courseId } = await context.params;
         console.log("API: Incrementing view count for course:", courseId);
 
-        const updated = await (prisma as any).courses.update({
+        const updated = await (prisma as any).course.update({
             where: { id: Number(courseId) },
             data: { view_count: { increment: 1 } },
             select: { id: true },

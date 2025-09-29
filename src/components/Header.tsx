@@ -187,7 +187,7 @@ const Header = () => {
                         <span className="text-xl font-bold text-gray-900">StyleMap</span>
                     </Link>
 
-                    {/* 데스크톱 네비게이션 */}
+                    {/* 데스크톱 네비게이션 (웹: 기존 가로 메뉴 유지) */}
                     <nav className="hidden md:flex items-center space-x-8">
                         <Link
                             href="/"
@@ -243,6 +243,24 @@ const Header = () => {
 
                         {/* 팝업 메뉴 제거 */}
                     </nav>
+
+                    {/* 데스크톱: 우측 햄버거 버튼 제거(웹은 가로 메뉴 유지) */}
+                    <div className="hidden md:hidden items-center gap-3">
+                        <button
+                            onClick={toggleMenu}
+                            className="p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                            aria-label="메뉴 열기"
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M4 6h16M4 12h16M4 18h16"
+                                />
+                            </svg>
+                        </button>
+                    </div>
 
                     {/* 사용자 메뉴 */}
                     <div className="hidden md:flex items-center space-x-4">
@@ -332,261 +350,147 @@ const Header = () => {
                 </div>
             </div>
 
-            {/* 모바일 메뉴 */}
-            {isMenuOpen && (
-                <div className="md:hidden">
-                    {/* 메뉴 외부 클릭시 닫힘: 헤더(높이 h-16) 아래 전체 투명 오버레이 */}
-                    <div className="fixed left-0 right-0 top-16 bottom-0 z-40" onClick={closeMenu} />
-                    <div
-                        className="bg-white border-t border-gray-200 relative z-50"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="px-4 py-2 space-y-1">
-                            <Link
-                                href="/"
-                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                    pathname === "/"
-                                        ? "text-blue-600 bg-blue-50"
-                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                }`}
-                                onClick={closeMenu}
-                            >
-                                홈
-                            </Link>
-                            <Link
-                                href="/courses"
-                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                    pathname === "/courses"
-                                        ? "text-blue-600 bg-blue-50"
-                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                }`}
-                                onClick={closeMenu}
-                            >
-                                코스
-                            </Link>
-                            <Link
-                                href="/personalized-home"
-                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                    pathname === "/personalized-home"
-                                        ? "text-blue-600 bg-blue-50"
-                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                }`}
-                                onClick={closeMenu}
-                            >
-                                🎯 AI 추천 - 맞춤형
-                            </Link>
-                            <Link
-                                href="/nearby"
-                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                    pathname === "/nearby"
-                                        ? "text-blue-600 bg-blue-50"
-                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                }`}
-                                onClick={closeMenu}
-                            >
-                                오늘 뭐하지?
-                            </Link>
-                            <Link
-                                href="/map"
-                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                    pathname === "/map"
-                                        ? "text-blue-600 bg-blue-50"
-                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                }`}
-                                onClick={closeMenu}
-                            >
-                                지도
-                            </Link>
+            {/* 상단 드롭다운 형태의 모바일 메뉴는 제거됨 */}
 
+            {/* 앱(모바일 전용) 오프캔버스 메뉴 (오른쪽 → 왼쪽, 화면 절반) */}
+            <div className="md:hidden">
+                {/* 헤더 아래부터 전체 오버레이 */}
+                {isMenuOpen && (
+                    <div className="fixed left-0 right-0 top-16 bottom-0 z-40 bg-black/30" onClick={closeMenu} />
+                )}
+                <div
+                    className={`fixed top-16 right-0 bottom-0 z-50 w-1/2 bg-white border-l border-gray-200 shadow-2xl transform transition-transform duration-300 ${
+                        isMenuOpen ? "translate-x-0" : "translate-x-full"
+                    }`}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="p-6 space-y-2">
+                        {/* 하단 유틸 섹션: 서비스 소개, 이용안내 (아이콘 포함) */}
+                        <div className="pt-4 mt-2 border-t border-gray-200 grid grid-cols-2 gap-3">
                             <Link
-                                href="/escape"
-                                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                                    pathname === "/escape"
-                                        ? "text-blue-600 bg-blue-50"
-                                        : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                }`}
+                                href="/about"
                                 onClick={closeMenu}
+                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
                             >
-                                사건 파일
+                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
+                                    <svg
+                                        className="w-5 h-5 text-gray-700"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M12 20l9-5-9-5-9 5 9 5z" />
+                                        <path d="M12 12l9-5-9-5-9 5 9 5z" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-semibold text-gray-800">서비스 소개</span>
                             </Link>
+                            <Link
+                                href="/help"
+                                onClick={closeMenu}
+                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
+                            >
+                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
+                                    <svg
+                                        className="w-5 h-5 text-gray-700"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M11 10h2v6h-2z" />
+                                        <path d="M12 6h.01" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-semibold text-gray-800">이용안내</span>
+                            </Link>
+                        </div>
 
-                            {/* 팝업 메뉴 제거 */}
+                        <Link
+                            href="/"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            홈
+                        </Link>
+                        <Link
+                            href="/courses"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            코스
+                        </Link>
+                        <Link
+                            href="/nearby"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            오늘 뭐하지?
+                        </Link>
+                        <Link
+                            href="/personalized-home"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            🎯 AI 추천
+                        </Link>
+                        <Link
+                            href="/map"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            지도
+                        </Link>
+                        <Link
+                            href="/escape"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            사건 파일
+                        </Link>
 
-                            <div className="pt-4 pb-3 border-t border-gray-200">
-                                {isLoggedIn ? (
-                                    <>
-                                        <Link
-                                            href="/mypage"
-                                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                            onClick={closeMenu}
-                                        >
-                                            마이페이지
-                                        </Link>
-                                        <button
-                                            onClick={openLogoutConfirm}
-                                            className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors active:scale-95 transform"
-                                        >
-                                            로그아웃
-                                        </button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Link
-                                            href="/login"
-                                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                            onClick={closeMenu}
-                                        >
-                                            로그인
-                                        </Link>
-                                        <Link
-                                            href="/signup"
-                                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors"
-                                            onClick={closeMenu}
-                                        >
-                                            회원가입
-                                        </Link>
-                                    </>
-                                )}
-                            </div>
+                        <div className="pt-4 mt-2 border-t border-gray-200">
+                            {isLoggedIn ? (
+                                <>
+                                    <Link
+                                        href="/mypage"
+                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                        onClick={closeMenu}
+                                    >
+                                        마이페이지
+                                    </Link>
+                                    <button
+                                        onClick={openLogoutConfirm}
+                                        className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                        로그아웃
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <Link
+                                        href="/login"
+                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                        onClick={closeMenu}
+                                    >
+                                        로그인
+                                    </Link>
+                                    <Link
+                                        href="/signup"
+                                        className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                        onClick={closeMenu}
+                                    >
+                                        회원가입
+                                    </Link>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* 모바일 하단 탭 바 */}
-            <div
-                className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 shadow-lg"
-                style={{ bottom: 0 }}
-            >
-                <div className="grid grid-cols-6 gap-1 p-2">
-                    <Link
-                        href="/"
-                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                            pathname === "/" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
-                        }`}
-                        onClick={closeMenu}
-                    >
-                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                            />
-                        </svg>
-                        <span className="text-xs font-medium">홈</span>
-                    </Link>
-                    <Link
-                        href="/courses"
-                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                            pathname === "/courses" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
-                        }`}
-                        onClick={closeMenu}
-                    >
-                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                            />
-                        </svg>
-                        <span className="text-xs font-medium">코스</span>
-                    </Link>
-                    <Link
-                        href="/personalized-home"
-                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                            pathname === "/personalized-home"
-                                ? "text-blue-600 bg-blue-50"
-                                : "text-gray-600 hover:text-blue-600"
-                        }`}
-                        onClick={closeMenu}
-                    >
-                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                            />
-                        </svg>
-                        <span className="text-xs font-medium">AI 추천</span>
-                    </Link>
-                    <Link
-                        href="/map"
-                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                            pathname === "/map" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
-                        }`}
-                        onClick={closeMenu}
-                    >
-                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                            />
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                        </svg>
-                        <span className="text-xs font-medium">지도</span>
-                    </Link>
-                    <Link
-                        href="/escape"
-                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-colors ${
-                            pathname === "/escape" ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:text-blue-600"
-                        }`}
-                        onClick={closeMenu}
-                    >
-                        <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6M9 8h6m5 4a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                        </svg>
-                        <span className="text-xs font-medium">사건 파일</span>
-                    </Link>
-                    {/* 팝업 탭 제거 */}
-                    {isLoggedIn ? (
-                        <button
-                            onClick={openLogoutConfirm}
-                            className="flex flex-col items-center py-2 px-1 rounded-lg transition-colors text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                                />
-                            </svg>
-                            <span className="text-xs font-medium">로그아웃</span>
-                        </button>
-                    ) : (
-                        <Link
-                            href="/login"
-                            className="flex flex-col items-center py-2 px-1 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
-                            onClick={closeMenu}
-                        >
-                            <svg className="w-5 h-5 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-                                />
-                            </svg>
-                            <span className="text-xs font-medium">로그인</span>
-                        </Link>
-                    )}
-                </div>
             </div>
+
+            {/* 모바일 하단 탭 바 제거됨 */}
             {/* 로그아웃 확인 모달 */}
             {showLogoutConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]">

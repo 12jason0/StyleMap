@@ -19,13 +19,17 @@ type Course = {
     rating: number;
     reviewCount: number;
     participants: number;
+    view_count: number;
+    tags?: string[];
 };
 
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
+    const [searchRegion, setSearchRegion] = useState("");
     const [currentSlide, setCurrentSlide] = useState(0);
     const [touchStartX, setTouchStartX] = useState<number | null>(null);
     const [touchDeltaX, setTouchDeltaX] = useState(0);
+    const [isTouching, setIsTouching] = useState(false);
     const [, setLoading] = useState(true);
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
@@ -43,12 +47,13 @@ export default function Home() {
 
     // 자동 로그아웃 로직 제거: 사용자가 로그아웃할 때까지 세션 유지
 
-    // 코스 데이터 가져오기
+    // 코스 데이터 가져오기 (지역 검색 지원)
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                // 캐싱 허용 + 서버 압축/캐시 활용
-                const response = await fetch("/api/courses?limit=12&imagePolicy=all-or-one-missing&lean=1", {
+                const qs = new URLSearchParams({ limit: "12", imagePolicy: "all-or-one-missing", lean: "1" });
+                if (searchRegion.trim()) qs.set("region", searchRegion.trim());
+                const response = await fetch(`/api/courses?${qs.toString()}` as any, {
                     cache: "force-cache",
                     next: { revalidate: 300 },
                 });
@@ -76,7 +81,7 @@ export default function Home() {
             }
         };
         fetchCourses();
-    }, []);
+    }, [searchRegion]);
 
     // 슬라이드 자동 재생
     useEffect(() => {
@@ -395,158 +400,147 @@ export default function Home() {
                 </div>
             )}
 
-            <main className="min-h-screen bg-white pt-10">
-                {/* Hero Section - 대형 슬라이드 */}
-                <section
-                    className="relative h-[460px] md:h-[520px] overflow-hidden"
-                    onTouchStart={(e) => {
-                        if (e.touches && e.touches.length > 0) {
-                            setTouchStartX(e.touches[0].clientX);
-                            setTouchDeltaX(0);
-                        }
-                    }}
-                    onTouchMove={(e) => {
-                        if (touchStartX !== null && e.touches && e.touches.length > 0) {
-                            setTouchDeltaX(e.touches[0].clientX - touchStartX);
-                        }
-                    }}
-                    onTouchEnd={() => {
-                        const threshold = 40; // 스와이프 임계값(px)
-                        const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
-                        if (total === 0) return;
-                        if (touchDeltaX > threshold) {
-                            // 이전 슬라이드
-                            setCurrentSlide((prev) => (prev - 1 + total) % total);
-                        } else if (touchDeltaX < -threshold) {
-                            // 다음 슬라이드
-                            setCurrentSlide((prev) => (prev + 1) % total);
-                        }
-                        setTouchStartX(null);
-                        setTouchDeltaX(0);
-                    }}
-                >
-                    {topCourses.map((course, index) => (
-                        <div
-                            key={course.id}
-                            className={`absolute inset-0 transition-all duration-1000 ${
-                                index === currentSlide ? "opacity-100 z-20" : "opacity-0 z-10"
-                            }`}
+            <main className="min-h-screen bg-white pt-20">
+                {/* 지역 검색 바 */}
+                <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={searchRegion}
+                            onChange={(e) => setSearchRegion(e.target.value)}
+                            placeholder="지역으로 검색"
+                            className="w-full border border-gray-300 rounded-xl py-3 pl-11 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+                        <button
+                            onClick={() => setSearchRegion(searchRegion.trim())}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
                         >
-                            {/* 배경 이미지 */}
-                            <div className="absolute inset-0">
-                                {course.imageUrl ? (
-                                    <Image
-                                        src={course.imageUrl}
-                                        alt={course.title}
-                                        fill
-                                        priority={index === currentSlide}
-                                        sizes="100vw"
-                                        className="object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full bg-white" />
-                                )}
-                                <div className="absolute inset-0 bg-black/50" />
-                            </div>
-
-                            {/* 콘텐츠 */}
-                            <div className="relative h-full max-w-7xl mx-auto px-4 flex items-center pt-10">
-                                <div className="max-w-[85%] md:max-w-2xl">
-                                    <div className="mb-4 flex items-center gap-3">
-                                        <span className="px-4 py-1.5 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
-                                            🔥 실시간 HOT #{index + 1}
-                                        </span>
-                                        <div className="flex items-center gap-2 px-4 py-1.5 bg-white/20 backdrop-blur-sm rounded-full">
-                                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                                            <span className="text-white text-sm font-medium">
-                                                {course.participants}명 참여중
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-2xl md:text-4xl font-bold text-white mb-4">{course.title}</h3>
-
-                                    <p
-                                        className="text-base md:text-xl text-white/90 mb-1"
-                                        style={{
-                                            display: "-webkit-box",
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: "vertical",
-                                            overflow: "hidden",
-                                        }}
-                                    >
-                                        {course.description}
-                                    </p>
-
-                                    <div
-                                        className="flex items-center gap-6 mb-3 md:mb-8"
-                                        aria-label="StyleMap Hero Stats"
-                                    >
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-yellow-400 text-2xl leading-none pb-3" aria-hidden>
-                                                ★
-                                            </span>
-                                            <span className="text-white font-bold text-sm leading-none">
-                                                {course.rating}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col md:flex-row items-center">
-                                            <span
-                                                className="text-white text-xl leading-none pb-2 md:pb-0 md:pr-2"
-                                                aria-hidden
-                                            >
-                                                📍
-                                            </span>
-                                            <span className="text-white text-xs md:text-sm leading-none">
-                                                {course.location}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-white text-xl leading-none pb-3" aria-hidden>
-                                                ⏱
-                                            </span>
-                                            <span className="text-white text-xs leading-none">{course.duration}</span>
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-white text-xl leading-none pb-3" aria-hidden>
-                                                💰
-                                            </span>
-                                            <span className="text-white text-xs leading-none">{course.price}</span>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={() => router.push(`/courses/${course.id}`)}
-                                        className="hover:cursor-pointer px-5 py-2 md:px-8 md:py-4 bg-sky-600 text-white font-bold rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-105 transition-all duration-300 text-sm md:text-base"
-                                    >
-                                        코스 시작하기 →
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-
-                    {/* 슬라이드 인디케이터 */}
-                    <div className="absolute bottom-3 md:bottom-8 left-1/2 transform -translate-x-1/2 flex gap-1.5 md:gap-2 z-30">
-                        {topCourses.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => setCurrentSlide(index)}
-                                className={`transition-all duration-300 rounded-full ${
-                                    index === currentSlide
-                                        ? "w-6 h-1.5 md:w-12 md:h-2 bg-white"
-                                        : "w-1 h-1 md:w-2 md:h-2 bg-white/50 hover:bg-white/70"
-                                }`}
-                            />
-                        ))}
+                            검색
+                        </button>
                     </div>
+                    {searchRegion && <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>}
+                </div>
+                {/* Hero Section - 대형 슬라이드 (카드형) */}
+                <section className="relative px-4 md:px-6">
+                    <div
+                        className="relative h-[300px] md:h-[520px] rounded-2xl overflow-hidden shadow-xl mr-8 md:mr-16"
+                        style={{
+                            transform: `translateX(${touchDeltaX * 0.15}px)`,
+                            transition: isTouching ? "none" : "transform 300ms ease",
+                        }}
+                        onTouchStart={(e) => {
+                            if (e.touches && e.touches.length > 0) {
+                                setTouchStartX(e.touches[0].clientX);
+                                setTouchDeltaX(0);
+                                setIsTouching(true);
+                            }
+                        }}
+                        onTouchMove={(e) => {
+                            if (touchStartX !== null && e.touches && e.touches.length > 0) {
+                                setTouchDeltaX(e.touches[0].clientX - touchStartX);
+                            }
+                        }}
+                        onTouchEnd={() => {
+                            const threshold = 40; // 스와이프 임계값(px)
+                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
+                            if (total === 0) return;
+                            if (touchDeltaX > threshold) {
+                                setCurrentSlide((prev) => (prev - 1 + total) % total);
+                            } else if (touchDeltaX < -threshold) {
+                                setCurrentSlide((prev) => (prev + 1) % total);
+                            }
+                            setTouchStartX(null);
+                            setTouchDeltaX(0);
+                            setIsTouching(false);
+                        }}
+                    >
+                        {/* 슬라이드 뷰포트 */}
+                        <div className="absolute inset-0">
+                            {topCourses.map((course, index) => (
+                                <div
+                                    key={course.id}
+                                    className={`absolute inset-0 transition-all duration-1000 ${
+                                        index === currentSlide ? "opacity-100 z-20" : "opacity-0 z-10"
+                                    }`}
+                                >
+                                    {/* 배경 이미지 */}
+                                    <div className="absolute inset-0">
+                                        {course.imageUrl ? (
+                                            <Image
+                                                src={course.imageUrl}
+                                                alt={course.title}
+                                                fill
+                                                priority={index === currentSlide}
+                                                sizes="100vw"
+                                                className="object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-white" />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/50" />
+                                    </div>
+
+                                    {/* 오버레이 콘텐츠 (우하단 정렬) */}
+                                    <div className="absolute bottom-6 right-6 left-6 md:left-auto md:max-w-[70%] text-right">
+                                        <h2 className="text-white font-extrabold text-3xl md:text-5xl leading-tight drop-shadow-md">
+                                            {course.location}
+                                        </h2>
+                                        <div className="text-white/90 text-sm mt-3 opacity-90">
+                                            #{course.concept}
+                                            {Array.isArray(course.tags) && course.tags.length > 0 && (
+                                                <>
+                                                    {" "}
+                                                    {course.tags.slice(0, 3).map((t) => (
+                                                        <span key={t} className="ml-2">
+                                                            #{t}
+                                                        </span>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 좌하단 슬라이드 카운터 */}
+                                    <div className="absolute bottom-4 left-4 z-30">
+                                        <span className="px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
+                                            {currentSlide + 1}/{topCourses.length || 1}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {/* 현재 슬라이드 바깥, 오른쪽 가장자리에서 살짝 보이는 다음 슬라이드 */}
+                    {topCourses.length > 1 && (
+                        <div
+                            className="pointer-events-none absolute top-0 bottom-0 right-2 md:right-3 w-6 md:w-8 rounded-tl-2xl rounded-bl-2xl overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
+                            style={{
+                                transform: `translateX(${touchDeltaX * 0.15}px)`,
+                                transition: isTouching ? "none" : "transform 300ms ease",
+                            }}
+                        >
+                            {topCourses[(currentSlide + 1) % topCourses.length].imageUrl ? (
+                                <Image
+                                    src={topCourses[(currentSlide + 1) % topCourses.length].imageUrl}
+                                    alt="next preview"
+                                    fill
+                                    sizes="200px"
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gray-200" />
+                            )}
+                            <div className="absolute inset-0 bg-black/20" />
+                        </div>
+                    )}
                 </section>
 
-                {/* 컨셉 선택 섹션 */}
-                <ConceptSection />
+                {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
+                <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
 
                 {/* 개인화 온보딩 섹션 */}
-                <section className="py-8">
+                <section className="py-8 pb-30">
                     <div className="max-w-7xl mx-auto px-4">
                         <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
                             <div className="flex items-start gap-4">
@@ -570,183 +564,180 @@ export default function Home() {
                         </div>
                     </div>
                 </section>
-
-                {/* 실시간 인기 코스 */}
-                <section className="py-16 bg-sky-50">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <SectionHeader
-                            title="🔥 지금 가장 핫한 코스"
-                            subtitle="실시간으로 많은 사람들이 참여중인 코스"
-                        />
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                            {hotCourses.slice(0, 3).map((course, index) => (
-                                <Link
-                                    key={course.id}
-                                    href={`/courses/${course.id}`}
-                                    className={
-                                        "group relative rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
-                                    }
-                                >
-                                    <div className={"relative overflow-hidden h-64 md:h-72"}>
-                                        {course.imageUrl ? (
-                                            <Image
-                                                src={course.imageUrl}
-                                                alt={course.title}
-                                                fill
-                                                priority={index === 0}
-                                                sizes="(max-width: 1024px) 100vw, 50vw"
-                                                className={
-                                                    "object-cover transition-transform duration-700 group-hover:scale-105"
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-gray-200" />
-                                        )}
-                                        <div className="absolute inset-0 bg-black/40" />
-                                        <div className="absolute top-4 left-4">
-                                            {(() => {
-                                                const rankClass =
-                                                    index === 0
-                                                        ? "bg-amber-400 text-white"
-                                                        : index === 1
-                                                        ? "bg-gray-400 text-white"
-                                                        : "bg-orange-500 text-white";
-                                                const label =
-                                                    index === 0 ? "👑 1위" : index === 1 ? "🥈 2위" : "🥉 3위";
-                                                return (
-                                                    <span
-                                                        className={`${rankClass} px-4 py-2 font-bold rounded-full shadow-lg`}
-                                                    >
-                                                        {label}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </div>
-                                        <div className="absolute top-4 right-4 text-black">
-                                            <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                                <span className="text-sm font-bold">{course.participants}명</span>
-                                            </div>
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                                            <h3 className={"font-bold text-white mb-2 text-lg md:text-xl"}>
-                                                {course.title}
-                                            </h3>
-                                            <div className="flex items-center gap-3 text-white/90 text-sm">
-                                                <span>📍 {course.location}</span>
-                                                <span>⏱ {course.duration}</span>
-                                                <span className="flex items-center gap-1">
-                                                    <span className="text-yellow-400">★</span> {course.rating}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Link>
-                            ))}
-
-                            {hotCourses.slice(3).map((course) => (
-                                <Link
-                                    key={course.id}
-                                    href={`/courses/${course.id}`}
-                                    className={
-                                        "group relative rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
-                                    }
-                                >
-                                    <div className={"relative overflow-hidden h-64 md:h-72"}>
-                                        {course.imageUrl ? (
-                                            <Image
-                                                src={course.imageUrl}
-                                                alt={course.title}
-                                                fill
-                                                sizes="(max-width: 1024px) 100vw, 50vw"
-                                                className={
-                                                    "object-cover transition-transform duration-700 group-hover:scale-105"
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-gray-200" />
-                                        )}
-                                        <div className="absolute inset-0 bg-black/40" />
-                                        <div className="absolute top-4 right-4 text-black">
-                                            <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-full flex items-center gap-2">
-                                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                                                <span className="text-sm font-bold">{course.participants}명</span>
-                                            </div>
-                                        </div>
-                                        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                                            <h3 className={"font-bold text-white mb-2 text-lg md:text-xl"}>
-                                                {course.title}
-                                            </h3>
-                                            <div className="flex items-center gap-3 text-white/90 text-sm">
-                                                <span>📍 {course.location}</span>
-                                                <span>⏱ {course.duration}</span>
-                                                <span className="flex items-center gap-1">
-                                                    <span className="text-yellow-400">★</span> {course.rating}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                {/* NEW 코스 섹션 */}
-                <section className="py-16">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <SectionHeader title="✨ NEW 코스" subtitle="이번 주 새로 추가된 코스" />
-
-                        {/* 간단 캐러셀 */}
-                        <div className="relative overflow-hidden">
-                            <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2">
-                                {newCourses.map((course) => (
-                                    <Link
-                                        key={course.id}
-                                        href={`/courses/${course.id}`}
-                                        className="snap-start w-[280px] md:w-[340px] lg:w-[380px] min-w-[280px] md:min-w-[340px] lg:min-w-[380px] h-[340px] md:h-[380px] lg:h-[400px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col"
-                                    >
-                                        <div className="relative h-36 md:h-40 lg:h-52">
-                                            {course.imageUrl ? (
-                                                <Image
-                                                    src={course.imageUrl}
-                                                    alt={course.title}
-                                                    fill
-                                                    sizes="260px"
-                                                    className="object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full bg-gray-100" />
-                                            )}
-                                            <span className="absolute top-3 left-3 px-2.5 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
-                                                NEW
-                                            </span>
-                                        </div>
-                                        <div className="p-4 flex flex-col flex-1">
-                                            <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
-                                                {course.title}
-                                            </h3>
-                                            <p className="text-sm text-gray-600 line-clamp-1">{course.description}</p>
-                                            <div className="text-xs text-gray-500 flex justify-between mt-auto">
-                                                <span>{course.location}</span>
-                                                <span className="font-semibold text-blue-600">{course.price}</span>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </main>
-            {/* 모바일 하단 네비게이션을 위한 여백 */}
-            <div className="md:hidden h-20"></div>
         </>
     );
 }
 
-// 컨셉 섹션
+// 탭형 컨셉/인기/새로운 섹션
+function TabbedConcepts({
+    courses,
+    hotCourses,
+    newCourses,
+}: {
+    courses: Course[];
+    hotCourses: Course[];
+    newCourses: Course[];
+}) {
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState<"concept" | "popular" | "new">("concept");
+    const [conceptCountsMap, setConceptCountsMap] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        const fetchCounts = async () => {
+            try {
+                const res = await fetch("/api/courses/concept-counts");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && typeof data === "object") setConceptCountsMap(data);
+                }
+            } catch {}
+        };
+        fetchCounts();
+    }, []);
+
+    // 개념별 집계 (간단)
+    // 대표 이미지가 있는 경우 함께 제공
+    const representativeImageByConcept: Record<string, string | undefined> = courses.reduce((acc, c) => {
+        const key = c.concept || "기타";
+        if (!acc[key] && c.imageUrl) acc[key] = c.imageUrl;
+        return acc;
+    }, {} as Record<string, string | undefined>);
+
+    const conceptItems = (
+        Object.keys(conceptCountsMap).length
+            ? Object.entries(conceptCountsMap).map(([name, count]) => ({
+                  name,
+                  count,
+                  imageUrl: representativeImageByConcept[name],
+              }))
+            : Object.entries(
+                  courses.reduce<Record<string, { count: number; imageUrl?: string }>>((acc, c) => {
+                      const key = c.concept || "기타";
+                      if (!acc[key]) acc[key] = { count: 0, imageUrl: c.imageUrl };
+                      acc[key].count += 1;
+                      return acc;
+                  }, {})
+              ).map(([name, v]) => ({ name, count: v.count, imageUrl: v.imageUrl }))
+    ).sort((a, b) => b.count - a.count);
+
+    const trackClasses =
+        "flex md:grid md:grid-cols-3 gap-4 overflow-x-auto md:overflow-visible snap-x md:snap-none snap-mandatory pb-2 no-scrollbar";
+    const cardBase =
+        "snap-start w-[80px] md:w-auto min-w-[150px] md:min-w-0 bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
+
+    return (
+        <section className="py-12">
+            <div className="max-w-7xl mx-auto px-4">
+                <div className="flex gap-3 mb-6">
+                    {[
+                        { key: "concept", label: "테마별" },
+                        { key: "popular", label: "인기별" },
+                        { key: "new", label: "새로운" },
+                    ].map((tab) => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key as any)}
+                            className={`px-4 py-2 rounded-full border transition shadow-sm ${
+                                activeTab === tab.key
+                                    ? "bg-white text-blue-600 border-blue-300 shadow"
+                                    : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-white"
+                            }`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* 가로 드래그 캐러셀 */}
+                {activeTab === "concept" && (
+                    <div className={trackClasses}>
+                        {conceptItems.map((item) => (
+                            <button
+                                key={item.name}
+                                onClick={() => router.push(`/courses?concept=${encodeURIComponent(item.name)}`)}
+                                className={`${cardBase} md:w-auto md:min-w-0 cursor-pointer`}
+                            >
+                                <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border">
+                                    {item.imageUrl ? (
+                                        <Image
+                                            src={item.imageUrl}
+                                            alt={item.name}
+                                            width={144}
+                                            height={144}
+                                            className="object-cover w-full h-full"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-200" />
+                                    )}
+                                </div>
+                                <div className="text-lg font-bold text-gray-900 mb-2">{item.name}</div>
+                                <div className="text-blue-600 font-semibold">{item.count}개 코스</div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {activeTab === "popular" && (
+                    <div className={trackClasses}>
+                        {hotCourses.slice(0, 10).map((c) => (
+                            <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase} md:w-auto md:min-w-0`}>
+                                <div className="w-20 h-20  rounded-full overflow-hidden mb-4 border">
+                                    {c.imageUrl ? (
+                                        <Image
+                                            src={c.imageUrl}
+                                            alt={c.title}
+                                            width={144}
+                                            height={144}
+                                            className="object-cover w-full h-full"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-200" />
+                                    )}
+                                </div>
+                                <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
+                                <div className="text-blue-600 font-semibold">{c.view_count} 조회</div>
+                            </Link>
+                        ))}
+                    </div>
+                )}
+
+                {activeTab === "new" && (
+                    <div className={trackClasses}>
+                        {newCourses
+                            .slice()
+                            .reverse()
+                            .map((c) => (
+                                <Link
+                                    key={c.id}
+                                    href={`/courses/${c.id}`}
+                                    className={`${cardBase} md:w-auto md:min-w-0`}
+                                >
+                                    <div className="w-20 h-20  rounded-full overflow-hidden mb-4 border">
+                                        {c.imageUrl ? (
+                                            <Image
+                                                src={c.imageUrl}
+                                                alt={c.title}
+                                                width={144}
+                                                height={144}
+                                                className="object-cover w-full h-full"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-gray-200" />
+                                        )}
+                                    </div>
+                                    <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
+                                    <div className="text-blue-600 font-semibold">NEW</div>
+                                </Link>
+                            ))}
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
+// 기존 컨셉 섹션 (미사용 시 제거 가능)
 function ConceptSection() {
     const [conceptCounts, setConceptCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -779,7 +770,6 @@ function ConceptSection() {
         { name: "공연·전시", icon: "🏛️", gradient: "from-yellow-400 to-orange-500" },
         { name: "야경", icon: "🌃", gradient: "from-purple-500 to-pink-500" },
         { name: "힙스터", icon: "🎨", gradient: "from-pink-400 to-red-500" },
-        // 추가 컨셉
         { name: "테마파크", icon: "🎢", gradient: "from-indigo-500 to-sky-500" },
         { name: "핫플레이스", icon: "🔥", gradient: "from-rose-500 to-pink-500" },
         { name: "이색데이트", icon: "🧪", gradient: "from-teal-400 to-cyan-500" },

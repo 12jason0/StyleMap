@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { filterCoursesByImagePolicy, type ImagePolicy, CourseWithPlaces } from "@/lib/imagePolicy";
 import { getUserIdFromRequest } from "@/lib/auth";
 
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
+        const regionQuery = searchParams.get("region");
         const limitParam = searchParams.get("limit");
         const offsetParam = searchParams.get("offset");
         const noCache = searchParams.get("nocache");
@@ -25,10 +27,25 @@ export async function GET(request: NextRequest) {
         const prismaQuery: any = {
             where: {
                 ...(concept ? { concept } : {}),
+                ...(regionQuery
+                    ? {
+                          region: {
+                              contains: regionQuery,
+                              mode: "insensitive",
+                          },
+                      }
+                    : {}),
             },
             orderBy: [{ id: "desc" }],
             take: effectiveLimit,
             skip: effectiveOffset,
+            include: {
+                tags: {
+                    select: {
+                        name: true,
+                    },
+                },
+            },
         };
 
         if (imagePolicy === "none-or-all" || imagePolicy === "all-or-one-missing") {
@@ -58,11 +75,38 @@ export async function GET(request: NextRequest) {
         // ✅ [수정됨] results의 타입을 명확히 하여 함수에 전달합니다.
         const imagePolicyApplied = filterCoursesByImagePolicy(results as CourseWithPlaces[], imagePolicy);
 
+        // 코스 ID 수집 (태그 조인에 사용)
+        const filteredIds: number[] = imagePolicyApplied
+            .map((c: any) => (typeof c.id === "number" ? c.id : Number(c.id)))
+            .filter((n) => Number.isFinite(n)) as number[];
+
+        // 태그를 조인 테이블에서 직접 조회 (스키마/클라이언트 불일치 시에도 동작)
+        let courseIdToTags = new Map<number, string[]>();
+        if (filteredIds.length > 0) {
+            try {
+                const rows = (await prisma.$queryRaw<Array<{ course_id: number; name: string }>>(
+                    Prisma.sql`SELECT j."B" AS course_id, ct.name
+                               FROM "_CourseTagToCourses" j
+                               JOIN "course_tags" ct ON ct.id = j."A"
+                               WHERE j."B" IN (${Prisma.join(filteredIds)})`
+                )) as Array<{ course_id: number; name: string }>;
+
+                for (const row of rows) {
+                    const list = courseIdToTags.get(row.course_id) ?? [];
+                    list.push(row.name);
+                    courseIdToTags.set(row.course_id, list);
+                }
+            } catch (e) {
+                console.warn("Tag join query failed, proceeding without tags", e);
+            }
+        }
+
         const formattedCourses = imagePolicyApplied.map((course: any) => {
             const firstPlaceImage = Array.isArray(course?.coursePlaces)
                 ? course.coursePlaces.find((cp: any) => cp?.place?.imageUrl)?.place?.imageUrl
                 : undefined;
             const resolvedImageUrl = course.imageUrl || firstPlaceImage || "/images/maker.png";
+            const idNumber = typeof course.id === "number" ? course.id : Number(course.id);
 
             return {
                 id: String(course.id),
@@ -77,6 +121,8 @@ export async function GET(request: NextRequest) {
                 reviewCount: 0,
                 participants: course.current_participants || 0,
                 viewCount: course.view_count || 0,
+                view_count: course.view_count || 0,
+                tags: courseIdToTags.get(idNumber) ?? [],
             };
         });
 
