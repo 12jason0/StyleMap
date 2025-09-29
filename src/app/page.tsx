@@ -1,10 +1,11 @@
+// src/app/page.tsx
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import Header from "@/components/Header";
 import SectionHeader from "@/components/SectionHeader";
 
 type Course = {
@@ -35,18 +36,15 @@ export default function Home() {
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [showAdModal, setShowAdModal] = useState(false);
-
     const [isSignup, setIsSignup] = useState(false);
     const [showAiAdModal, setShowAiAdModal] = useState(false);
     const [showLoginRequiredModal, setShowLoginRequiredModal] = useState(false);
     const router = useRouter();
 
-    // 페이지 로드 시 스크롤을 맨 위로
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
 
-    // 코스 데이터 가져오기 (지역 검색 지원)
     useEffect(() => {
         const fetchCourses = async () => {
             try {
@@ -57,13 +55,10 @@ export default function Home() {
                     next: { revalidate: 300 },
                 });
                 const data = await response.json();
-
-                // API 응답이 배열인지 확인하고 에러 객체인지 확인
                 if (Array.isArray(data)) {
                     setCourses(data);
                 } else if (data.error) {
                     console.error("API Error:", data.error, data.details);
-                    // 데이터베이스 연결 실패 시 사용자에게 알림
                     alert("데이터베이스 연결에 실패했습니다. 환경 변수와 데이터베이스 설정을 확인해주세요.");
                     setCourses([]);
                 } else {
@@ -72,7 +67,6 @@ export default function Home() {
                 }
             } catch (error) {
                 console.error("Failed to fetch courses:", error);
-                // 네트워크 오류 시 사용자에게 알림
                 alert("코스 데이터를 가져오는데 실패했습니다. 네트워크 연결을 확인해주세요.");
                 setCourses([]);
             } finally {
@@ -82,9 +76,6 @@ export default function Home() {
         fetchCourses();
     }, [searchRegion]);
 
-    // 슬라이드 자동 재생 제거: 사용자가 직접 넘기는 방식만 유지
-
-    // 환영 메시지 및 로그인 모달 처리
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const welcome = urlParams.get("welcome");
@@ -93,38 +84,19 @@ export default function Home() {
 
         if (welcome === "true") {
             setShowWelcome(true);
-
-            // URL에서 파라미터 제거
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
-
-            // 3초 후 환영 메시지 숨기기
-            setTimeout(() => {
-                setShowWelcome(false);
-            }, 3000);
+            setTimeout(() => setShowWelcome(false), 3000);
         }
 
         if (loginSuccess === "true") {
             setShowLoginModal(true);
-
-            // 로그인 성공 시에만 토큰 유지 (자동 로그아웃 방지)
             const token = localStorage.getItem("authToken");
             if (token) {
-                const authEvent = new CustomEvent("authTokenChange", {
-                    detail: { token },
-                });
-                window.dispatchEvent(authEvent);
-                console.log("홈페이지: 로그인 성공 모달 표시 후 헤더 업데이트", {
-                    token: token.substring(0, 20) + "...",
-                    eventDetail: authEvent.detail,
-                });
+                window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token } }));
             } else {
-                // 토큰이 없으면 강제로 헤더 상태 업데이트
-                console.log("로그인 성공했지만 토큰이 없음 - 헤더 상태 강제 업데이트");
                 window.dispatchEvent(new CustomEvent("authTokenChange"));
             }
-
-            // URL에서 파라미터 제거
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
         }
@@ -132,40 +104,26 @@ export default function Home() {
         if (signupSuccess === "true") {
             setShowLoginModal(true);
             setIsSignup(true);
-
-            // 회원가입 성공 시에도 로그인 시간 저장 (자동 로그아웃 방지용)
             localStorage.setItem("loginTime", Date.now().toString());
-
-            // URL에서 파라미터 제거
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
         }
     }, []);
 
-    // AI 광고 모달 자동 표시 처리 (로그인 성공 시에만)
     useEffect(() => {
-        // 로그인 상태 변경 감지
         const handleAuthChange = (event: Event) => {
             const customEvent = event as CustomEvent;
             const token = customEvent.detail?.token || localStorage.getItem("authToken");
-
             if (token) {
-                // 로그인 성공 시에만 AI 모달 표시
                 const hideUntil = localStorage.getItem("hideAiAdUntil");
                 const now = new Date().getTime();
-
                 if (!hideUntil || now > parseInt(hideUntil)) {
                     setShowAiAdModal(true);
                 }
             }
         };
-
-        // 이벤트 리스너 등록
-        window.addEventListener("authTokenChange", handleAuthChange);
-
-        return () => {
-            window.removeEventListener("authTokenChange", handleAuthChange);
-        };
+        window.addEventListener("authTokenChange", handleAuthChange as EventListener);
+        return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
     }, []);
 
     const topCourses = courses.slice(0, 5);
@@ -176,8 +134,7 @@ export default function Home() {
     const newCourses = courses.slice(-3);
 
     const handleStartOnboarding = () => {
-        const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
-        if (!token) {
+        if (!localStorage.getItem("authToken")) {
             setShowLoginRequiredModal(true);
             return;
         }
@@ -186,7 +143,6 @@ export default function Home() {
 
     return (
         <>
-            {/* 환영 메시지 */}
             {showWelcome && (
                 <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
                     <div className="flex items-center space-x-2">
@@ -195,12 +151,9 @@ export default function Home() {
                     </div>
                 </div>
             )}
-
-            {/* 로그인 성공 모달 */}
             {showLoginModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center animate-fade-in relative">
-                        {/* X 버튼 */}
                         <button
                             onClick={() => setShowLoginModal(false)}
                             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -214,7 +167,6 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-
                         <div className="text-6xl mb-4">🎉</div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인 성공!</h2>
                         <p className="text-gray-600 mb-4">StyleMap에 오신 것을 환영합니다</p>
@@ -228,21 +180,15 @@ export default function Home() {
                             </svg>
                             <span className="font-semibold">환영합니다!</span>
                         </div>
-
-                        {/* 확인 버튼 */}
                         <button
                             onClick={() => {
                                 setShowLoginModal(false);
-                                // Header 업데이트를 위한 이벤트 발생
                                 window.dispatchEvent(new CustomEvent("authTokenChange"));
-                                // 회원가입인 경우에만 광고 모달 표시
                                 if (isSignup) {
                                     setShowAdModal(true);
                                 } else {
-                                    // 로그인인 경우 AI 광고 모달 표시
                                     const hideUntil = localStorage.getItem("hideAiAdUntil");
                                     const now = new Date().getTime();
-
                                     if (!hideUntil || now > parseInt(hideUntil)) {
                                         setShowAiAdModal(true);
                                     }
@@ -255,12 +201,9 @@ export default function Home() {
                     </div>
                 </div>
             )}
-
-            {/* 광고 모달 */}
             {showAdModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 ">
                     <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
-                        {/* X 버튼 */}
                         <button
                             onClick={() => setShowAdModal(false)}
                             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
@@ -274,7 +217,6 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-
                         <div className="text-4xl mb-4">🤖</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">AI 추천 티켓 지급!</h2>
                         <p className="text-gray-600 mb-4">새로 가입하신 고객님을 위한 특별한 혜택</p>
@@ -288,17 +230,13 @@ export default function Home() {
                     </div>
                 </div>
             )}
-
-            {/* AI 광고 모달 (홈페이지 접속 시) */}
             {showAiAdModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
-                        {/* X 버튼 */}
                         <button
                             onClick={() => {
                                 setShowAiAdModal(false);
-                                // 1시간 후 다시 표시
-                                const hideUntil = new Date().getTime() + 60 * 60 * 1000; // 1시간
+                                const hideUntil = new Date().getTime() + 3600000;
                                 localStorage.setItem("hideAiAdUntil", hideUntil.toString());
                             }}
                             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
@@ -312,7 +250,6 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-
                         <div className="text-4xl mb-4">🤖</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">AI 코스 이용해보세요!</h2>
                         <p className="text-gray-600 mb-4">개인 맞춤 AI 추천 코스를 경험해보세요</p>
@@ -320,7 +257,6 @@ export default function Home() {
                             <div className="text-2xl font-bold mb-1">AI 맞춤 추천</div>
                             <div className="text-sm opacity-90">당신만을 위한 특별한 여행 코스</div>
                         </div>
-
                         <div className="flex flex-col gap-2">
                             <button
                                 onClick={() => {
@@ -331,12 +267,10 @@ export default function Home() {
                             >
                                 AI 코스 시작하기
                             </button>
-
                             <button
                                 onClick={() => {
                                     setShowAiAdModal(false);
-                                    // 1시간 동안 보지 않기
-                                    const hideUntil = new Date().getTime() + 60 * 60 * 1000; // 1시간
+                                    const hideUntil = new Date().getTime() + 3600000;
                                     localStorage.setItem("hideAiAdUntil", hideUntil.toString());
                                 }}
                                 className="text-gray-500 text-sm hover:text-gray-700 transition-colors hover:cursor-pointer"
@@ -347,8 +281,6 @@ export default function Home() {
                     </div>
                 </div>
             )}
-
-            {/* 로그인 필요 모달 */}
             {showLoginRequiredModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white rounded-2xl p-6 max-w-md mx-4 text-center animate-fade-in relative">
@@ -366,7 +298,6 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-
                         <div className="text-4xl mb-3">🔐</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">로그인이 필요합니다</h2>
                         <p className="text-gray-600 mb-5">내 취향을 설정하려면 먼저 로그인해 주세요.</p>
@@ -391,207 +322,168 @@ export default function Home() {
                 </div>
             )}
 
-            <main className="min-h-screen bg-white pt-20">
-                <div className="min-[960px]:grid min-[960px]:grid-cols-[1fr_420px_1fr] min-[960px]:gap-8">
-                    {/* 데스크톱 전용: 좌측 다운로드 안내 */}
-                    <aside className="hidden min-[960px]:block px-8 py-10">
-                        <div className="max-w-md bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-sm">
-                            <h2 className="text-2xl font-extrabold text-gray-900 mb-3">모바일에서 더 편하게 보기</h2>
-                            <p className="text-gray-600 mb-4">
-                                앱을 설치하면 저장, 알림, 오프라인 보기 등을 더 빠르게 사용할 수 있어요.
-                            </p>
-                            <ul className="text-gray-700 list-disc pl-5 space-y-1 mb-5">
-                                <li>앱 스토어에서 StyleMap 검색</li>
-                                <li>또는 QR 코드로 바로 설치</li>
-                            </ul>
-                            <div className="flex items-center gap-3">
-                                <a className="px-4 py-2 rounded-xl bg-black text-white text-sm font-semibold cursor-pointer select-none">
-                                    App Store
-                                </a>
-                                <a className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold cursor-pointer select-none">
-                                    Google Play
-                                </a>
-                            </div>
-                        </div>
-                    </aside>
-
-                    {/* 가운데: 모바일 화면 그대로 (고정폭) */}
-                    <div className="min-[960px]:col-start-2 min-[960px]:w-[420px] min-[960px]:mx-auto min-[960px]:bg-white min-[960px]:rounded-2xl min-[960px]:shadow min-[960px]:overflow-hidden">
-                        {/* 지역 검색 바 */}
-                        <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={searchRegion}
-                                    onChange={(e) => setSearchRegion(e.target.value)}
-                                    placeholder="지역으로 검색"
-                                    className="w-full border border-gray-300 rounded-xl py-3 pl-11 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                                />
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
-                                <button
-                                    onClick={() => setSearchRegion(searchRegion.trim())}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
-                                >
-                                    검색
-                                </button>
-                            </div>
-                            {searchRegion && (
-                                <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>
-                            )}
-                        </div>
-                        {/* Hero Section - 대형 슬라이드 (카드형) */}
-                        <section className="relative px-4 md:px-6">
-                            <div
-                                className="relative h-[300px] md:h-[520px] overflow-hidden shadow-xl mr-8 md:mr-16"
-                                style={{
-                                    transform: `translateX(${touchDeltaX * 0.15}px)`,
-                                    transition: isTouching ? "none" : "transform 300ms ease",
-                                }}
-                                onTouchStart={(e) => {
-                                    if (e.touches && e.touches.length > 0) {
-                                        setTouchStartX(e.touches[0].clientX);
-                                        setTouchDeltaX(0);
-                                        setIsTouching(true);
-                                    }
-                                }}
-                                onTouchMove={(e) => {
-                                    if (touchStartX !== null && e.touches && e.touches.length > 0) {
-                                        setTouchDeltaX(e.touches[0].clientX - touchStartX);
-                                    }
-                                }}
-                                onTouchEnd={() => {
-                                    const threshold = 40; // 스와이프 임계값(px)
-                                    const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
-                                    if (total === 0) return;
-                                    if (touchDeltaX > threshold) {
-                                        setCurrentSlide((prev) => (prev - 1 + total) % total);
-                                    } else if (touchDeltaX < -threshold) {
-                                        setCurrentSlide((prev) => (prev + 1) % total);
-                                    }
-                                    setTouchStartX(null);
-                                    setTouchDeltaX(0);
-                                    setIsTouching(false);
-                                }}
-                            >
-                                {/* 슬라이드 뷰포트 */}
-                                <div className="absolute inset-0">
-                                    {topCourses.map((course, index) => (
-                                        <div
-                                            key={course.id}
-                                            className={`absolute inset-0 transition-all duration-1000 ${
-                                                index === currentSlide ? "opacity-100 z-20" : "opacity-0 z-10"
-                                            }`}
-                                        >
-                                            {/* 배경 이미지 */}
-                                            <div className="absolute inset-0">
-                                                {course.imageUrl ? (
-                                                    <Image
-                                                        src={course.imageUrl}
-                                                        alt={course.title}
-                                                        fill
-                                                        priority={index === currentSlide}
-                                                        sizes="100vw"
-                                                        className="object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full bg-white" />
-                                                )}
-                                                <div className="absolute inset-0 bg-black/50" />
-                                            </div>
-
-                                            {/* 오버레이 콘텐츠 (우하단 정렬) */}
-                                            <div className="absolute bottom-6 right-6 left-6 md:left-auto md:max-w-[70%] text-right">
-                                                <h2 className="text-white font-extrabold text-3xl md:text-5xl leading-tight drop-shadow-md">
-                                                    {course.location}
-                                                </h2>
-                                                <div className="text-white/90 text-sm mt-3 opacity-90">
-                                                    #{course.concept}
-                                                    {Array.isArray(course.tags) && course.tags.length > 0 && (
-                                                        <>
-                                                            {" "}
-                                                            {course.tags.slice(0, 3).map((t) => (
-                                                                <span key={t} className="ml-2">
-                                                                    #{t}
-                                                                </span>
-                                                            ))}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* 좌하단 슬라이드 카운터 */}
-                                            <div className="absolute bottom-4 left-4 z-30">
-                                                <span className="px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
-                                                    {currentSlide + 1}/{topCourses.length || 1}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            {/* 현재 슬라이드 바깥, 오른쪽 가장자리에서 살짝 보이는 다음 슬라이드 */}
-                            {topCourses.length > 1 && (
+            {/* [수정] 기존의 main, aside, grid 레이아웃을 모두 제거하고 콘텐츠만 남깁니다.
+              - pt-20, pb-20과 같은 상/하단 여백도 제거하여 LayoutContent와 중복되지 않도록 합니다.
+            */}
+            <>
+                {/* 지역 검색 바 */}
+                <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={searchRegion}
+                            onChange={(e) => setSearchRegion(e.target.value)}
+                            placeholder="지역으로 검색"
+                            className="w-full border border-gray-300 rounded-xl py-3 pl-11 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                        />
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+                        <button
+                            onClick={() => setSearchRegion(searchRegion.trim())}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+                        >
+                            검색
+                        </button>
+                    </div>
+                    {searchRegion && <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>}
+                </div>
+                {/* Hero Section - 대형 슬라이드 (카드형) */}
+                <section className="relative px-4">
+                    <div
+                        className="relative h-[200px] overflow-hidden shadow-xl mr-8"
+                        style={{
+                            transform: `translateX(${touchDeltaX * 0.15}px)`,
+                            transition: isTouching ? "none" : "transform 300ms ease",
+                        }}
+                        onTouchStart={(e) => {
+                            if (e.touches && e.touches.length > 0) {
+                                setTouchStartX(e.touches[0].clientX);
+                                setTouchDeltaX(0);
+                                setIsTouching(true);
+                            }
+                        }}
+                        onTouchMove={(e) => {
+                            if (touchStartX !== null && e.touches && e.touches.length > 0) {
+                                setTouchDeltaX(e.touches[0].clientX - touchStartX);
+                            }
+                        }}
+                        onTouchEnd={() => {
+                            const threshold = 40;
+                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
+                            if (total === 0) return;
+                            if (touchDeltaX > threshold) {
+                                setCurrentSlide((prev) => (prev - 1 + total) % total);
+                            } else if (touchDeltaX < -threshold) {
+                                setCurrentSlide((prev) => (prev + 1) % total);
+                            }
+                            setTouchStartX(null);
+                            setTouchDeltaX(0);
+                            setIsTouching(false);
+                        }}
+                    >
+                        <div className="absolute inset-0">
+                            {topCourses.map((course, index) => (
                                 <div
-                                    className="pointer-events-none absolute top-0 bottom-0 right-2 md:right-3 w-6 md:w-8 overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
-                                    style={{
-                                        transform: `translateX(${touchDeltaX * 0.15}px)`,
-                                        transition: isTouching ? "none" : "transform 300ms ease",
-                                    }}
+                                    key={course.id}
+                                    className={`absolute inset-0 transition-all duration-1000 ${
+                                        index === currentSlide ? "opacity-100 z-20" : "opacity-100 z-10"
+                                    }`}
                                 >
-                                    {topCourses[(currentSlide + 1) % topCourses.length].imageUrl ? (
-                                        <Image
-                                            src={topCourses[(currentSlide + 1) % topCourses.length].imageUrl}
-                                            alt="next preview"
-                                            fill
-                                            sizes="200px"
-                                            className="object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full bg-gray-200" />
-                                    )}
-                                    <div className="absolute inset-0 bg-black/20" />
-                                </div>
-                            )}
-                        </section>
-
-                        {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
-                        <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
-
-                        {/* 개인화 온보딩 섹션 */}
-                        <section className="py-8 pb-30">
-                            <div className="max-w-7xl mx-auto px-4">
-                                <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
-                                    <div className="flex items-start gap-4">
-                                        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-700 text-2xl">
-                                            💫
-                                        </div>
-                                        <div>
-                                            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-                                                더 정확한 추천을 원하시나요?
-                                            </h3>
-                                            <p className="text-gray-600 mb-4">
-                                                3분만 투자하면 완전히 다른 경험을 드릴게요
-                                            </p>
-                                            <button
-                                                onClick={handleStartOnboarding}
-                                                className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
-                                            >
-                                                내 취향 설정하기
-                                                <span>→</span>
-                                            </button>
+                                    <div className="absolute inset-0">
+                                        {course.imageUrl ? (
+                                            <Image
+                                                src={course.imageUrl}
+                                                alt={course.title}
+                                                fill
+                                                priority={index === currentSlide}
+                                                sizes="100vw"
+                                                className="object-cover"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-white" />
+                                        )}
+                                        <div className="absolute inset-0 bg-black/50" />
+                                    </div>
+                                    <div className="absolute bottom-6 right-6 left-6 text-right">
+                                        <h2 className="text-white font-extrabold text-3xl leading-tight drop-shadow-md">
+                                            {course.location}
+                                        </h2>
+                                        <div className="text-white/90 text-sm mt-3 opacity-90">
+                                            #{course.concept}
+                                            {Array.isArray(course.tags) && course.tags.length > 0 && (
+                                                <>
+                                                    {" "}
+                                                    {course.tags.slice(0, 3).map((t) => (
+                                                        <span key={t} className="ml-2">
+                                                            #{t}
+                                                        </span>
+                                                    ))}
+                                                </>
+                                            )}
                                         </div>
                                     </div>
+                                    <div className="absolute bottom-4 left-4 z-30">
+                                        <span className="px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
+                                            {currentSlide + 1}/{topCourses.length || 1}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {topCourses.length > 1 && (
+                        <div
+                            className="pointer-events-none absolute top-0 bottom-0 right-2 w-6 overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
+                            style={{
+                                transform: `translateX(${touchDeltaX * 0.15}px)`,
+                                transition: isTouching ? "none" : "transform 300ms ease",
+                            }}
+                        >
+                            {topCourses[(currentSlide + 1) % topCourses.length].imageUrl ? (
+                                <Image
+                                    src={topCourses[(currentSlide + 1) % topCourses.length].imageUrl}
+                                    alt="next preview"
+                                    fill
+                                    sizes="200px"
+                                    className="object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gray-200" />
+                            )}
+                            <div className="absolute inset-0 bg-black/20" />
+                        </div>
+                    )}
+                </section>
+                {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
+                <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
+                {/* 개인화 온보딩 섹션 */}
+                <section className="py-8 pb-30">
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
+                            <div className="flex items-start gap-4">
+                                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-700 text-2xl">
+                                    💫
+                                </div>
+                                <div>
+                                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+                                        더 정확한 추천을 원하시나요?
+                                    </h3>
+                                    <p className="text-gray-600 mb-4">3분만 투자하면 완전히 다른 경험을 드릴게요</p>
+                                    <button
+                                        onClick={handleStartOnboarding}
+                                        className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+                                    >
+                                        내 취향 설정하기<span>→</span>
+                                    </button>
                                 </div>
                             </div>
-                        </section>
+                        </div>
                     </div>
-                </div>
-            </main>
+                </section>
+            </>
         </>
     );
 }
 
-// 탭형 컨셉/인기/새로운 섹션
 function TabbedConcepts({
     courses,
     hotCourses,
@@ -618,8 +510,6 @@ function TabbedConcepts({
         fetchCounts();
     }, []);
 
-    // 개념별 집계 (간단)
-    // 대표 이미지가 있는 경우 함께 제공
     const representativeImageByConcept: Record<string, string | undefined> = courses.reduce((acc, c) => {
         const key = c.concept || "기타";
         if (!acc[key] && c.imageUrl) acc[key] = c.imageUrl;
@@ -642,11 +532,52 @@ function TabbedConcepts({
                   }, {})
               ).map(([name, v]) => ({ name, count: v.count, imageUrl: v.imageUrl }))
     ).sort((a, b) => b.count - a.count);
-
     const trackClasses =
-        "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 no-scrollbar md:grid md:grid-cols-3 md:overflow-visible md:snap-none";
+        "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 no-scrollbar scrollbar-hide cursor-grab select-none";
     const cardBase =
-        "snap-start w-[130px] min-w-[130px] md:w-auto md:min-w-0 bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
+        "snap-start w-[130px] min-w-[130px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
+
+    // 데스크톱에서 마우스 드래그로 가로 스크롤 지원
+    const trackRef = useRef<HTMLDivElement | null>(null);
+    const isDownRef = useRef(false);
+    const startXRef = useRef(0);
+    const scrollLeftRef = useRef(0);
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!trackRef.current) return;
+        isDownRef.current = true;
+        startXRef.current = e.pageX;
+        scrollLeftRef.current = trackRef.current.scrollLeft;
+        trackRef.current.classList.add("cursor-grabbing");
+    };
+
+    const handleMouseLeave = () => {
+        if (!trackRef.current) return;
+        isDownRef.current = false;
+        trackRef.current.classList.remove("cursor-grabbing");
+    };
+
+    const handleMouseUp = () => {
+        if (!trackRef.current) return;
+        isDownRef.current = false;
+        trackRef.current.classList.remove("cursor-grabbing");
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isDownRef.current || !trackRef.current) return;
+        e.preventDefault();
+        const dx = e.pageX - startXRef.current;
+        trackRef.current.scrollLeft = scrollLeftRef.current - dx;
+    };
+
+    const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+        if (!trackRef.current) return;
+        // 세로 휠을 가로 스크롤로 변환
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            trackRef.current.scrollLeft += e.deltaY;
+        }
+    };
 
     return (
         <section className="py-12">
@@ -670,15 +601,21 @@ function TabbedConcepts({
                         </button>
                     ))}
                 </div>
-
-                {/* 가로 드래그 캐러셀 */}
                 {activeTab === "concept" && (
-                    <div className={trackClasses}>
+                    <div
+                        className={trackClasses}
+                        ref={trackRef}
+                        onMouseDown={handleMouseDown}
+                        onMouseLeave={handleMouseLeave}
+                        onMouseUp={handleMouseUp}
+                        onMouseMove={handleMouseMove}
+                        onWheel={handleWheel}
+                    >
                         {conceptItems.map((item) => (
                             <button
                                 key={item.name}
                                 onClick={() => router.push(`/courses?concept=${encodeURIComponent(item.name)}`)}
-                                className={`${cardBase} md:w-auto md:min-w-0 cursor-pointer`}
+                                className={`${cardBase} cursor-pointer`}
                             >
                                 <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border">
                                     {item.imageUrl ? (
@@ -699,11 +636,18 @@ function TabbedConcepts({
                         ))}
                     </div>
                 )}
-
                 {activeTab === "popular" && (
-                    <div className={trackClasses}>
+                    <div
+                        className={trackClasses}
+                        ref={trackRef}
+                        onMouseDown={handleMouseDown}
+                        onMouseLeave={handleMouseLeave}
+                        onMouseUp={handleMouseUp}
+                        onMouseMove={handleMouseMove}
+                        onWheel={handleWheel}
+                    >
                         {hotCourses.slice(0, 10).map((c) => (
-                            <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase} md:w-auto md:min-w-0`}>
+                            <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
                                 <div className="w-20 h-20  rounded-full overflow-hidden mb-4 border">
                                     {c.imageUrl ? (
                                         <Image
@@ -723,18 +667,21 @@ function TabbedConcepts({
                         ))}
                     </div>
                 )}
-
                 {activeTab === "new" && (
-                    <div className={trackClasses}>
+                    <div
+                        className={trackClasses}
+                        ref={trackRef}
+                        onMouseDown={handleMouseDown}
+                        onMouseLeave={handleMouseLeave}
+                        onMouseUp={handleMouseUp}
+                        onMouseMove={handleMouseMove}
+                        onWheel={handleWheel}
+                    >
                         {newCourses
                             .slice()
                             .reverse()
                             .map((c) => (
-                                <Link
-                                    key={c.id}
-                                    href={`/courses/${c.id}`}
-                                    className={`${cardBase} md:w-auto md:min-w-0`}
-                                >
+                                <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
                                     <div className="w-20 h-20  rounded-full overflow-hidden mb-4 border">
                                         {c.imageUrl ? (
                                             <Image
@@ -759,12 +706,10 @@ function TabbedConcepts({
     );
 }
 
-// 기존 컨셉 섹션 (미사용 시 제거 가능)
 function ConceptSection() {
     const [conceptCounts, setConceptCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [showAll, setShowAll] = useState(false);
-
     useEffect(() => {
         const fetchConceptCounts = async () => {
             try {
@@ -779,10 +724,8 @@ function ConceptSection() {
                 setLoading(false);
             }
         };
-
         fetchConceptCounts();
     }, []);
-
     const concepts = [
         { name: "카페투어", icon: "☕", gradient: "from-brown-400 to-amber-500" },
         { name: "맛집탐방", icon: "🍜", gradient: "from-red-400 to-orange-500" },
@@ -795,9 +738,7 @@ function ConceptSection() {
         { name: "테마파크", icon: "🎢", gradient: "from-indigo-500 to-sky-500" },
         { name: "핫플레이스", icon: "🔥", gradient: "from-rose-500 to-pink-500" },
         { name: "이색데이트", icon: "🧪", gradient: "from-teal-400 to-cyan-500" },
-        // { name: "빵지순례", icon: "🍞", gradient: "from-teal-400 to-cyan-500" },
     ];
-
     if (loading) {
         return (
             <section className="py-16 bg-white">
@@ -813,16 +754,13 @@ function ConceptSection() {
             </section>
         );
     }
-
     return (
         <section className="py-16 bg-white">
             <div className="max-w-7xl mx-auto px-4">
                 <SectionHeader title="이런 컨셉은 어때요?" subtitle="취향에 맞는 코스를 찾아보세요" />
-
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {concepts.slice(0, showAll ? concepts.length : 6).map((concept, index) => {
                         const hasCourses = conceptCounts[concept.name] > 0;
-
                         return (
                             <div
                                 key={concept.name}
@@ -833,18 +771,9 @@ function ConceptSection() {
                                         ? "opacity-0 scale-95"
                                         : "opacity-100"
                                 }`}
-                                style={{
-                                    animationDelay: index >= 6 ? `${(index - 6) * 100}ms` : "0ms",
-                                }}
+                                style={{ animationDelay: index >= 6 ? `${(index - 6) * 100}ms` : "0ms" }}
                             >
                                 {hasCourses ? (
-                                    // <Link
-                                    //     href={
-                                    //         concept.name === "빵지순례"
-                                    //             ? "/bread-tour"
-                                    //             : `/courses?concept=${encodeURIComponent(concept.name)}`
-                                    //     }
-                                    // >
                                     <Link
                                         href={`/courses?concept=${encodeURIComponent(concept.name)}`}
                                         className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block"
@@ -873,8 +802,6 @@ function ConceptSection() {
                         );
                     })}
                 </div>
-
-                {/* 더보기 버튼 */}
                 {!showAll && concepts.length > 6 && (
                     <div className="text-center mt-8">
                         <button
@@ -885,8 +812,6 @@ function ConceptSection() {
                         </button>
                     </div>
                 )}
-
-                {/* 접기 버튼 */}
                 {showAll && (
                     <div className="text-center mt-8">
                         <button
