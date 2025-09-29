@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-// 페이지 단에서 Header를 중복 렌더링하지 않도록 제거 (레이아웃에서 이미 포함)
+import Header from "@/components/Header";
 import SectionHeader from "@/components/SectionHeader";
 
 type Course = {
@@ -20,6 +20,7 @@ type Course = {
     reviewCount: number;
     participants: number;
     view_count: number;
+    viewCount?: number;
     tags?: string[];
 };
 
@@ -44,8 +45,6 @@ export default function Home() {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
-
-    // 자동 로그아웃 로직 제거: 사용자가 로그아웃할 때까지 세션 유지
 
     // 코스 데이터 가져오기 (지역 검색 지원)
     useEffect(() => {
@@ -83,15 +82,7 @@ export default function Home() {
         fetchCourses();
     }, [searchRegion]);
 
-    // 슬라이드 자동 재생
-    useEffect(() => {
-        if (courses.length > 0) {
-            const interval = setInterval(() => {
-                setCurrentSlide((prev) => (prev + 1) % Math.min(5, courses.length));
-            }, 5000);
-            return () => clearInterval(interval);
-        }
-    }, [courses.length]);
+    // 슬라이드 자동 재생 제거: 사용자가 직접 넘기는 방식만 유지
 
     // 환영 메시지 및 로그인 모달 처리
     useEffect(() => {
@@ -401,169 +392,200 @@ export default function Home() {
             )}
 
             <main className="min-h-screen bg-white pt-20">
-                {/* 지역 검색 바 */}
-                <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={searchRegion}
-                            onChange={(e) => setSearchRegion(e.target.value)}
-                            placeholder="지역으로 검색"
-                            className="w-full border border-gray-300 rounded-xl py-3 pl-11 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                        />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
-                        <button
-                            onClick={() => setSearchRegion(searchRegion.trim())}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
-                        >
-                            검색
-                        </button>
-                    </div>
-                    {searchRegion && <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>}
-                </div>
-                {/* Hero Section - 대형 슬라이드 (카드형) */}
-                <section className="relative px-4 md:px-6">
-                    <div
-                        className="relative h-[300px] md:h-[520px] rounded-2xl overflow-hidden shadow-xl mr-8 md:mr-16"
-                        style={{
-                            transform: `translateX(${touchDeltaX * 0.15}px)`,
-                            transition: isTouching ? "none" : "transform 300ms ease",
-                        }}
-                        onTouchStart={(e) => {
-                            if (e.touches && e.touches.length > 0) {
-                                setTouchStartX(e.touches[0].clientX);
-                                setTouchDeltaX(0);
-                                setIsTouching(true);
-                            }
-                        }}
-                        onTouchMove={(e) => {
-                            if (touchStartX !== null && e.touches && e.touches.length > 0) {
-                                setTouchDeltaX(e.touches[0].clientX - touchStartX);
-                            }
-                        }}
-                        onTouchEnd={() => {
-                            const threshold = 40; // 스와이프 임계값(px)
-                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
-                            if (total === 0) return;
-                            if (touchDeltaX > threshold) {
-                                setCurrentSlide((prev) => (prev - 1 + total) % total);
-                            } else if (touchDeltaX < -threshold) {
-                                setCurrentSlide((prev) => (prev + 1) % total);
-                            }
-                            setTouchStartX(null);
-                            setTouchDeltaX(0);
-                            setIsTouching(false);
-                        }}
-                    >
-                        {/* 슬라이드 뷰포트 */}
-                        <div className="absolute inset-0">
-                            {topCourses.map((course, index) => (
-                                <div
-                                    key={course.id}
-                                    className={`absolute inset-0 transition-all duration-1000 ${
-                                        index === currentSlide ? "opacity-100 z-20" : "opacity-0 z-10"
-                                    }`}
-                                >
-                                    {/* 배경 이미지 */}
-                                    <div className="absolute inset-0">
-                                        {course.imageUrl ? (
-                                            <Image
-                                                src={course.imageUrl}
-                                                alt={course.title}
-                                                fill
-                                                priority={index === currentSlide}
-                                                sizes="100vw"
-                                                className="object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-white" />
-                                        )}
-                                        <div className="absolute inset-0 bg-black/50" />
-                                    </div>
-
-                                    {/* 오버레이 콘텐츠 (우하단 정렬) */}
-                                    <div className="absolute bottom-6 right-6 left-6 md:left-auto md:max-w-[70%] text-right">
-                                        <h2 className="text-white font-extrabold text-3xl md:text-5xl leading-tight drop-shadow-md">
-                                            {course.location}
-                                        </h2>
-                                        <div className="text-white/90 text-sm mt-3 opacity-90">
-                                            #{course.concept}
-                                            {Array.isArray(course.tags) && course.tags.length > 0 && (
-                                                <>
-                                                    {" "}
-                                                    {course.tags.slice(0, 3).map((t) => (
-                                                        <span key={t} className="ml-2">
-                                                            #{t}
-                                                        </span>
-                                                    ))}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* 좌하단 슬라이드 카운터 */}
-                                    <div className="absolute bottom-4 left-4 z-30">
-                                        <span className="px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
-                                            {currentSlide + 1}/{topCourses.length || 1}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {/* 현재 슬라이드 바깥, 오른쪽 가장자리에서 살짝 보이는 다음 슬라이드 */}
-                    {topCourses.length > 1 && (
-                        <div
-                            className="pointer-events-none absolute top-0 bottom-0 right-2 md:right-3 w-6 md:w-8 rounded-tl-2xl rounded-bl-2xl overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
-                            style={{
-                                transform: `translateX(${touchDeltaX * 0.15}px)`,
-                                transition: isTouching ? "none" : "transform 300ms ease",
-                            }}
-                        >
-                            {topCourses[(currentSlide + 1) % topCourses.length].imageUrl ? (
-                                <Image
-                                    src={topCourses[(currentSlide + 1) % topCourses.length].imageUrl}
-                                    alt="next preview"
-                                    fill
-                                    sizes="200px"
-                                    className="object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full bg-gray-200" />
-                            )}
-                            <div className="absolute inset-0 bg-black/20" />
-                        </div>
-                    )}
-                </section>
-
-                {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
-                <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
-
-                {/* 개인화 온보딩 섹션 */}
-                <section className="py-8 pb-30">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
-                            <div className="flex items-start gap-4">
-                                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-700 text-2xl">
-                                    💫
-                                </div>
-                                <div>
-                                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-                                        더 정확한 추천을 원하시나요?
-                                    </h3>
-                                    <p className="text-gray-600 mb-4">3분만 투자하면 완전히 다른 경험을 드릴게요</p>
-                                    <button
-                                        onClick={handleStartOnboarding}
-                                        className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
-                                    >
-                                        내 취향 설정하기
-                                        <span>→</span>
-                                    </button>
-                                </div>
+                <div className="min-[960px]:grid min-[960px]:grid-cols-[1fr_420px_1fr] min-[960px]:gap-8">
+                    {/* 데스크톱 전용: 좌측 다운로드 안내 */}
+                    <aside className="hidden min-[960px]:block px-8 py-10">
+                        <div className="max-w-md bg-gray-50 border border-gray-200 rounded-2xl p-6 shadow-sm">
+                            <h2 className="text-2xl font-extrabold text-gray-900 mb-3">모바일에서 더 편하게 보기</h2>
+                            <p className="text-gray-600 mb-4">
+                                앱을 설치하면 저장, 알림, 오프라인 보기 등을 더 빠르게 사용할 수 있어요.
+                            </p>
+                            <ul className="text-gray-700 list-disc pl-5 space-y-1 mb-5">
+                                <li>앱 스토어에서 StyleMap 검색</li>
+                                <li>또는 QR 코드로 바로 설치</li>
+                            </ul>
+                            <div className="flex items-center gap-3">
+                                <a className="px-4 py-2 rounded-xl bg-black text-white text-sm font-semibold cursor-pointer select-none">
+                                    App Store
+                                </a>
+                                <a className="px-4 py-2 rounded-xl bg-green-600 text-white text-sm font-semibold cursor-pointer select-none">
+                                    Google Play
+                                </a>
                             </div>
                         </div>
+                    </aside>
+
+                    {/* 가운데: 모바일 화면 그대로 (고정폭) */}
+                    <div className="min-[960px]:col-start-2 min-[960px]:w-[420px] min-[960px]:mx-auto min-[960px]:bg-white min-[960px]:rounded-2xl min-[960px]:shadow min-[960px]:overflow-hidden">
+                        {/* 지역 검색 바 */}
+                        <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    value={searchRegion}
+                                    onChange={(e) => setSearchRegion(e.target.value)}
+                                    placeholder="지역으로 검색"
+                                    className="w-full border border-gray-300 rounded-xl py-3 pl-11 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                                />
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
+                                <button
+                                    onClick={() => setSearchRegion(searchRegion.trim())}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+                                >
+                                    검색
+                                </button>
+                            </div>
+                            {searchRegion && (
+                                <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>
+                            )}
+                        </div>
+                        {/* Hero Section - 대형 슬라이드 (카드형) */}
+                        <section className="relative px-4 md:px-6">
+                            <div
+                                className="relative h-[300px] md:h-[520px] overflow-hidden shadow-xl mr-8 md:mr-16"
+                                style={{
+                                    transform: `translateX(${touchDeltaX * 0.15}px)`,
+                                    transition: isTouching ? "none" : "transform 300ms ease",
+                                }}
+                                onTouchStart={(e) => {
+                                    if (e.touches && e.touches.length > 0) {
+                                        setTouchStartX(e.touches[0].clientX);
+                                        setTouchDeltaX(0);
+                                        setIsTouching(true);
+                                    }
+                                }}
+                                onTouchMove={(e) => {
+                                    if (touchStartX !== null && e.touches && e.touches.length > 0) {
+                                        setTouchDeltaX(e.touches[0].clientX - touchStartX);
+                                    }
+                                }}
+                                onTouchEnd={() => {
+                                    const threshold = 40; // 스와이프 임계값(px)
+                                    const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
+                                    if (total === 0) return;
+                                    if (touchDeltaX > threshold) {
+                                        setCurrentSlide((prev) => (prev - 1 + total) % total);
+                                    } else if (touchDeltaX < -threshold) {
+                                        setCurrentSlide((prev) => (prev + 1) % total);
+                                    }
+                                    setTouchStartX(null);
+                                    setTouchDeltaX(0);
+                                    setIsTouching(false);
+                                }}
+                            >
+                                {/* 슬라이드 뷰포트 */}
+                                <div className="absolute inset-0">
+                                    {topCourses.map((course, index) => (
+                                        <div
+                                            key={course.id}
+                                            className={`absolute inset-0 transition-all duration-1000 ${
+                                                index === currentSlide ? "opacity-100 z-20" : "opacity-0 z-10"
+                                            }`}
+                                        >
+                                            {/* 배경 이미지 */}
+                                            <div className="absolute inset-0">
+                                                {course.imageUrl ? (
+                                                    <Image
+                                                        src={course.imageUrl}
+                                                        alt={course.title}
+                                                        fill
+                                                        priority={index === currentSlide}
+                                                        sizes="100vw"
+                                                        className="object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-white" />
+                                                )}
+                                                <div className="absolute inset-0 bg-black/50" />
+                                            </div>
+
+                                            {/* 오버레이 콘텐츠 (우하단 정렬) */}
+                                            <div className="absolute bottom-6 right-6 left-6 md:left-auto md:max-w-[70%] text-right">
+                                                <h2 className="text-white font-extrabold text-3xl md:text-5xl leading-tight drop-shadow-md">
+                                                    {course.location}
+                                                </h2>
+                                                <div className="text-white/90 text-sm mt-3 opacity-90">
+                                                    #{course.concept}
+                                                    {Array.isArray(course.tags) && course.tags.length > 0 && (
+                                                        <>
+                                                            {" "}
+                                                            {course.tags.slice(0, 3).map((t) => (
+                                                                <span key={t} className="ml-2">
+                                                                    #{t}
+                                                                </span>
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* 좌하단 슬라이드 카운터 */}
+                                            <div className="absolute bottom-4 left-4 z-30">
+                                                <span className="px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
+                                                    {currentSlide + 1}/{topCourses.length || 1}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            {/* 현재 슬라이드 바깥, 오른쪽 가장자리에서 살짝 보이는 다음 슬라이드 */}
+                            {topCourses.length > 1 && (
+                                <div
+                                    className="pointer-events-none absolute top-0 bottom-0 right-2 md:right-3 w-6 md:w-8 overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
+                                    style={{
+                                        transform: `translateX(${touchDeltaX * 0.15}px)`,
+                                        transition: isTouching ? "none" : "transform 300ms ease",
+                                    }}
+                                >
+                                    {topCourses[(currentSlide + 1) % topCourses.length].imageUrl ? (
+                                        <Image
+                                            src={topCourses[(currentSlide + 1) % topCourses.length].imageUrl}
+                                            alt="next preview"
+                                            fill
+                                            sizes="200px"
+                                            className="object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-200" />
+                                    )}
+                                    <div className="absolute inset-0 bg-black/20" />
+                                </div>
+                            )}
+                        </section>
+
+                        {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
+                        <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
+
+                        {/* 개인화 온보딩 섹션 */}
+                        <section className="py-8 pb-30">
+                            <div className="max-w-7xl mx-auto px-4">
+                                <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-700 text-2xl">
+                                            💫
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
+                                                더 정확한 추천을 원하시나요?
+                                            </h3>
+                                            <p className="text-gray-600 mb-4">
+                                                3분만 투자하면 완전히 다른 경험을 드릴게요
+                                            </p>
+                                            <button
+                                                onClick={handleStartOnboarding}
+                                                className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+                                            >
+                                                내 취향 설정하기
+                                                <span>→</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                </section>
+                </div>
             </main>
         </>
     );
@@ -622,9 +644,9 @@ function TabbedConcepts({
     ).sort((a, b) => b.count - a.count);
 
     const trackClasses =
-        "flex md:grid md:grid-cols-3 gap-4 overflow-x-auto md:overflow-visible snap-x md:snap-none snap-mandatory pb-2 no-scrollbar";
+        "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 no-scrollbar md:grid md:grid-cols-3 md:overflow-visible md:snap-none";
     const cardBase =
-        "snap-start w-[80px] md:w-auto min-w-[150px] md:min-w-0 bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
+        "snap-start w-[130px] min-w-[130px] md:w-auto md:min-w-0 bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
 
     return (
         <section className="py-12">
