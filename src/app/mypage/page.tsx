@@ -810,9 +810,7 @@ const MyPage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 typography-smooth">
-            <Header />
-
-            <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 pt-20 md:pt-24">
+            <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 pt-10 md:pt-24">
                 <div className="text-center mb-6 md:mb-8">
                     <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-1 md:mb-2 tracking-tight">
                         마이페이지
@@ -821,27 +819,28 @@ const MyPage = () => {
                 </div>
 
                 <div className="flex justify-center mb-6 md:mb-8">
-                    <div className="bg-white rounded-xl shadow-lg p-1">
-                        <div className="flex space-x-1">
+                    <div className="bg-white rounded-xl shadow-lg p-2 overflow-x-auto no-scrollbar">
+                        <div className="flex space-x-2 min-w-max">
                             {[
                                 { id: "profile", label: "프로필", icon: "👤" },
                                 { id: "preferences", label: "선호도", icon: "🎯" },
-                                { id: "favorites", label: "내 여행 보관함", icon: "💖" },
-                                { id: "completed", label: "완료한 코스", icon: "✅" },
+                                { id: "favorites", label: "보관함", icon: "💖" },
+                                { id: "completed", label: "완료", icon: "✅" },
                                 { id: "casefiles", label: "사건 파일", icon: "🗂️" },
                                 { id: "badges", label: "뱃지", icon: "🏅" },
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id)}
-                                    className={`px-4 md:px-6 py-2.5 md:py-3 rounded-lg font-medium transition-all cursor-pointer text-sm md:text-base ${
+                                    aria-selected={activeTab === tab.id}
+                                    className={`min-w-[88px] md:min-w-[110px] px-3 md:px-4 py-2.5 md:py-3 rounded-lg font-medium transition-all cursor-pointer text-sm md:text-base flex flex-col items-center gap-1 whitespace-nowrap ${
                                         activeTab === tab.id
                                             ? "bg-blue-600 text-white shadow-lg"
-                                            : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+                                            : "text-gray-700 hover:text-blue-600 hover:bg-gray-50"
                                     }`}
                                 >
-                                    <span className="mr-2">{tab.icon}</span>
-                                    {tab.label}
+                                    <span className="text-base md:text-lg">{tab.icon}</span>
+                                    <span>{tab.label}</span>
                                 </button>
                             ))}
                         </div>

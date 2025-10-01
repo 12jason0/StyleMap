@@ -18,6 +18,7 @@ export default function NaverMapComponent({
     const mapRef = useRef<any>(null);
     const markersRef = useRef<any[]>([]);
     const polylineRef = useRef<any>(null);
+    const routeAbortRef = useRef<AbortController | null>(null);
 
     const isFiniteNum = (v: any) => Number.isFinite(Number(v));
     const isValidLatLng = (lat?: any, lng?: any) => isFiniteNum(lat) && isFiniteNum(lng);
@@ -38,6 +39,15 @@ export default function NaverMapComponent({
     const loadNaverMapsScript = (): Promise<void> => {
         return new Promise((resolve) => {
             if ((window as any).naver?.maps) return resolve();
+            // RootLayout 등에서 미리 삽입된 스크립트가 있다면 그것을 기다림
+            const anyExisting = Array.from(document.getElementsByTagName("script")).find((s) =>
+                (s as HTMLScriptElement).src.includes("/openapi/v3/maps.js")
+            ) as HTMLScriptElement | undefined;
+            if (anyExisting) {
+                anyExisting.addEventListener("load", () => resolve(), { once: true });
+                if ((window as any).naver?.maps) resolve();
+                return;
+            }
             const existing = document.getElementById("naver-maps-script") as HTMLScriptElement | null;
             if (existing) {
                 existing.addEventListener("load", () => resolve(), { once: true });
@@ -136,45 +146,58 @@ export default function NaverMapComponent({
         // 경로(옵션)
         const buildRoute = async () => {
             if (!drawPath || valid.length < 2) return;
+            // 1) 즉시 직선 경로 먼저 표시 (체감 개선)
+            const simplePath = valid.map((p) => new naver.maps.LatLng(Number(p.latitude), Number(p.longitude)));
+            const simplePolyline = new naver.maps.Polyline({
+                map,
+                path: simplePath,
+                strokeWeight: 4,
+                strokeColor: "#111827",
+                strokeOpacity: 0.6,
+            });
+            polylineRef.current = simplePolyline;
 
-            // simple: 장소 간 직선 연결
-            if (!routeMode || routeMode === "simple") {
-                const path = valid.map((p) => new naver.maps.LatLng(Number(p.latitude), Number(p.longitude)));
-                polylineRef.current = new naver.maps.Polyline({
-                    map,
-                    path,
-                    strokeWeight: 4,
-                    strokeColor: "#111827",
-                    strokeOpacity: 0.9,
-                });
-                return;
-            }
+            // simple 모드면 종료
+            if (!routeMode || routeMode === "simple") return;
 
-            // 네트워크 라우팅: 인접 장소 쌍마다 OSRM 호출 후 이어붙임
-            const allLatLngs: any[] = [];
-            for (let i = 0; i < valid.length - 1; i++) {
-                const a = valid[i];
-                const b = valid[i + 1];
-                const coords = `${a.longitude},${a.latitude};${b.longitude},${b.latitude}`;
-                try {
-                    const res = await fetch(
-                        `/api/directions?coords=${encodeURIComponent(coords)}&mode=${encodeURIComponent(routeMode)}`,
-                        { cache: "no-store" }
-                    );
-                    if (!res.ok) throw new Error("route fetch failed");
-                    const data = await res.json();
-                    const coordinates: Array<[number, number]> = Array.isArray(data?.coordinates)
-                        ? data.coordinates
-                        : [];
-                    if (coordinates.length > 1) {
-                        const pairLatLngs = coordinates.map(
-                            ([lng, lat]) => new naver.maps.LatLng(Number(lat), Number(lng))
+            // 2) 네트워크 경로를 비동기 계산, 2초 타임아웃/취소
+            try {
+                if (routeAbortRef.current) routeAbortRef.current.abort();
+                const aborter = new AbortController();
+                routeAbortRef.current = aborter;
+                const { signal } = aborter;
+                const timeoutId = setTimeout(() => aborter.abort(), 2000);
+
+                const allLatLngs: any[] = [];
+                for (let i = 0; i < valid.length - 1; i++) {
+                    const a = valid[i];
+                    const b = valid[i + 1];
+                    const coords = `${a.longitude},${a.latitude};${b.longitude},${b.latitude}`;
+                    let pairLatLngs: any[] | null = null;
+                    try {
+                        const res = await fetch(
+                            `/api/directions?coords=${encodeURIComponent(coords)}&mode=${encodeURIComponent(
+                                routeMode
+                            )}`,
+                            { cache: "no-store", signal }
                         );
-                        // 이어붙일 때 중복 점 하나 제거
-                        if (allLatLngs.length > 0 && pairLatLngs.length > 0) pairLatLngs.shift();
+                        if (res.ok) {
+                            const data = await res.json();
+                            const coordinates: Array<[number, number]> = Array.isArray(data?.coordinates)
+                                ? data.coordinates
+                                : [];
+                            if (coordinates.length > 1) {
+                                pairLatLngs = coordinates.map(
+                                    ([lng, lat]) => new naver.maps.LatLng(Number(lat), Number(lng))
+                                );
+                            }
+                        }
+                    } catch {}
+
+                    if (pairLatLngs && pairLatLngs.length > 1) {
+                        if (allLatLngs.length > 0) pairLatLngs.shift();
                         allLatLngs.push(...pairLatLngs);
                     } else {
-                        // 폴백: 직선
                         const straight = [
                             new naver.maps.LatLng(Number(a.latitude), Number(a.longitude)),
                             new naver.maps.LatLng(Number(b.latitude), Number(b.longitude)),
@@ -182,24 +205,23 @@ export default function NaverMapComponent({
                         if (allLatLngs.length > 0) straight.shift();
                         allLatLngs.push(...straight);
                     }
-                } catch {
-                    const straight = [
-                        new naver.maps.LatLng(Number(a.latitude), Number(a.longitude)),
-                        new naver.maps.LatLng(Number(b.latitude), Number(b.longitude)),
-                    ];
-                    if (allLatLngs.length > 0) straight.shift();
-                    allLatLngs.push(...straight);
                 }
-            }
 
-            if (allLatLngs.length > 1) {
-                polylineRef.current = new naver.maps.Polyline({
-                    map,
-                    path: allLatLngs,
-                    strokeWeight: 5,
-                    strokeColor: "#4169E1",
-                    strokeOpacity: 0.9,
-                });
+                clearTimeout(timeoutId);
+                if (!signal.aborted && allLatLngs.length > 1) {
+                    try {
+                        simplePolyline.setMap(null);
+                    } catch {}
+                    polylineRef.current = new naver.maps.Polyline({
+                        map,
+                        path: allLatLngs,
+                        strokeWeight: 5,
+                        strokeColor: "#4169E1",
+                        strokeOpacity: 0.9,
+                    });
+                }
+            } finally {
+                routeAbortRef.current = null;
             }
         };
 

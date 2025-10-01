@@ -136,7 +136,7 @@ function CoursesPageInner() {
         <div className="min-h-screen bg-gray-50 ">
             {/* 헤더 */}
             <div className="bg-white shadow-sm">
-                <div className="max-w-[500px] mx-auto px-4 py-6">
+                <div className="max-w-[400px] mx-auto px-4 py-5">
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">
@@ -172,7 +172,7 @@ function CoursesPageInner() {
                             }}
                         >
                             {/* 이미지 */}
-                            <div className="relative h-48 rounded-t-2xl overflow-hidden">
+                            <div className="relative h-40 rounded-t-2xl overflow-hidden">
                                 {course.imageUrl ? (
                                     <Image
                                         src={course.imageUrl}

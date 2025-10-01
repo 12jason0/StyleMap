@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id: courseId } = params;
+        const { id: courseId } = await params;
 
         // ✅ [수정됨] prisma.courses -> prisma.course
         const course = await prisma.course.findUnique({

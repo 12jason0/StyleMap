@@ -1,17 +1,14 @@
 "use client";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import dynamic from "next/dynamic";
 
 import ReviewModal from "@/components/ReviewModal";
 import NaverMap from "@/components/NaverMap";
 import { Place as MapPlace, UserLocation } from "@/types/map";
 
-// 인터페이스 정의
+// --- 타입 정의 ---
 interface Place {
     id: number;
     name: string;
@@ -67,30 +64,20 @@ interface Highlight {
     description: string;
 }
 
-interface Benefit {
-    id: number;
-    benefit_text: string;
-    category: string;
-    display_order?: number;
-}
-
-interface Notice {
-    id: number;
-    notice_text: string;
-    type?: string;
-}
-
 interface CourseData extends Course {
     highlights?: Highlight[];
-    benefits?: Benefit[];
-    notices?: Notice[];
     coursePlaces?: CoursePlace[];
 }
 
-// 카카오맵 전역 함수 정의
-// 네이버맵으로 변경됨: 별도 전역 초기화 훅 불필요
+interface Review {
+    id: number;
+    rating: number;
+    userName: string;
+    createdAt: string;
+    content: string;
+}
 
-// 토스트 알림 컴포넌트
+// --- 유틸리티 컴포넌트 ---
 const Toast = ({
     message,
     type,
@@ -105,11 +92,7 @@ const Toast = ({
         return () => clearTimeout(timer);
     }, [onClose]);
 
-    const bgColor = {
-        success: "bg-green-500",
-        error: "bg-red-500",
-        info: "bg-blue-500",
-    }[type];
+    const bgColor = { success: "bg-green-500", error: "bg-red-500", info: "bg-blue-500" }[type];
 
     return (
         <div
@@ -125,13 +108,11 @@ const Toast = ({
     );
 };
 
-// 로딩 스피너 컴포넌트
 const LoadingSpinner = ({ size = "large" }: { size?: "small" | "large" }) => {
     const sizeClasses = size === "large" ? "h-32 w-32" : "h-6 w-6";
     return <div className={`animate-spin rounded-full ${sizeClasses} border-b-2 border-blue-600`} />;
 };
 
-// 에러 컴포넌트
 const ErrorDisplay = ({ error, onRetry }: { error: string; onRetry?: () => void }) => (
     <div className="text-center py-8">
         <div className="text-red-500 mb-4">
@@ -156,38 +137,12 @@ const ErrorDisplay = ({ error, onRetry }: { error: string; onRetry?: () => void 
     </div>
 );
 
-// 지도 대체 UI 컴포넌트
-const MapFallbackUI = ({ places }: { places: CoursePlace[] }) => (
-    <div className="w-full h-80 bg-gray-100 rounded-2xl flex flex-col items-center justify-center p-6">
-        <div className="text-center">
-            <div className="text-6xl mb-4">🗺️</div>
-            <h3 className="text-xl font-bold text-gray-700 mb-2">지도 로딩 중...</h3>
-            <p className="text-gray-500 mb-6">잠시만 기다려주세요</p>
-            <div className="bg-white rounded-lg p-4 max-w-md">
-                <h4 className="font-semibold mb-2">코스 장소 목록</h4>
-                <div className="space-y-2 text-left">
-                    {places.slice(0, 3).map((place, index) => (
-                        <div key={place.id} className="flex items-center gap-2 text-sm">
-                            <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs">
-                                {index + 1}
-                            </span>
-                            <span>{place.place.name}</span>
-                        </div>
-                    ))}
-                    {places.length > 3 && (
-                        <div className="text-xs text-gray-500 text-center pt-2">외 {places.length - 3}개 장소</div>
-                    )}
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
+// --- 메인 컴포넌트 ---
 export default function CourseDetailPage() {
     const params = useParams();
     const router = useRouter();
 
-    // params가 null이거나 id가 없는 경우 처리
+    // courseId가 유효하지 않으면 페이지를 렌더링하지 않고 조기 반환
     if (!params || !params.id) {
         return (
             <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -203,302 +158,135 @@ export default function CourseDetailPage() {
             </main>
         );
     }
+    const courseId = params.id as string;
 
-    const courseId = params.id as string; // 이제 안전하게 타입 단언 가능
-
-    // 상태 관리
+    // --- 상태 관리 ---
+    // 데이터 상태
     const [courseData, setCourseData] = useState<CourseData | null>(null);
+    const [reviews, setReviews] = useState<Review[]>([]);
+    const [isSaved, setIsSaved] = useState(false);
+
+    // UI 및 로딩 상태
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isSaved, setIsSaved] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-    const [isShareLoading, setIsShareLoading] = useState(false);
     const [showShareModal, setShowShareModal] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
-    const [reviews, setReviews] = useState<any[]>([]);
-    const [reviewsLoading, setReviewsLoading] = useState(false);
-    const [reviewsError, setReviewsError] = useState<string | null>(null);
-
-    // 지도 관련 상태 (간소화)
-    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-    const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
     const [showPlaceModal, setShowPlaceModal] = useState(false);
 
-    // 성능 최적화를 위한 메모이제이션
+    // 지도 관련 상태
+    const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+    const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+
+    // --- 메모이제이션 (성능 최적화) ---
     const sortedCoursePlaces = useMemo(() => {
         if (!courseData?.coursePlaces) return [];
         return [...courseData.coursePlaces].sort((a, b) => a.order_index - b.order_index);
     }, [courseData?.coursePlaces]);
 
-    const hasPlaces = useMemo(() => {
-        return sortedCoursePlaces.length > 0;
-    }, [sortedCoursePlaces]);
-
-    const firstPlace = useMemo(() => {
-        return sortedCoursePlaces[0];
-    }, [sortedCoursePlaces]);
-
     const heroImageUrl = useMemo(() => {
-        return courseData?.imageUrl || firstPlace?.place?.image_url || "";
-    }, [courseData?.imageUrl, firstPlace?.place?.image_url]);
+        if (courseData?.imageUrl) return courseData.imageUrl;
+        if (sortedCoursePlaces.length > 0) return sortedCoursePlaces[0].place.image_url || "";
+        return "/images/placeholder.png"; // Fallback Image
+    }, [courseData?.imageUrl, sortedCoursePlaces]);
 
-    // 토스트 표시 함수
+    const totalCost = useMemo(() => courseData?.price || "정보 없음", [courseData]);
+
+    // --- 함수 및 핸들러 ---
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
         setToast({ message, type });
     }, []);
 
-    // 비로그인 사용자 조회수 증가 (중복 방지: 30분 쿨다운)
-    useEffect(() => {
-        const key = `course_view_${courseId}`;
-        try {
-            const last = localStorage.getItem(key);
-            const now = Date.now();
-            if (!last || now - parseInt(last) > 10 * 60 * 1000) {
-                fetch(`/api/courses/${courseId}/view`, { method: "POST", keepalive: true }).catch(() => {});
-                localStorage.setItem(key, String(now));
-            }
-        } catch {}
-    }, [courseId]);
-
-    // 마커 이미지 생성 함수
-    const createMarkerImageSrc = useCallback((orderIndex: number): string => {
-        const svg = `
-            <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="20" cy="20" r="18" fill="#4F46E5" stroke="white" stroke-width="3"/>
-                <text x="20" y="26" text-anchor="middle" fill="white" font-size="14" font-weight="bold" font-family="Arial, sans-serif">
-                    ${orderIndex}
-                </text>
-            </svg>
-        `;
-
-        return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
-    }, []);
-
-    // 정보창 생성 함수
-    const createInfoWindow = useCallback((coursePlace: CoursePlace) => {
-        const content = `
-            <div style="padding: 12px; min-width: 200px; max-width: 250px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-                <div style="margin-bottom: 8px;">
-                    <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1f2937; line-height: 1.3;">
-                        ${coursePlace.place.name}
-                    </h3>
-                </div>
-                <div style="margin-bottom: 6px;">
-                    <span style="display: inline-block; padding: 2px 8px; background-color: #3b82f6; color: white; font-size: 12px; border-radius: 12px;">
-                        ${coursePlace.place.category}
-                    </span>
-                </div>
-                <div style="font-size: 13px; color: #6b7280; line-height: 1.4;">
-                    ${coursePlace.place.address}
-                </div>
-                ${
-                    coursePlace.place.phone
-                        ? `
-                    <div style="font-size: 12px; color: #9ca3af; margin-top: 4px;">
-                        📞 ${coursePlace.place.phone}
-                    </div>
-                `
-                        : ""
-                }
-            </div>
-        `;
-
-        return { content } as any;
-    }, []);
-
-    // 장소 선택 핸들러
-    const handlePlaceClick = useCallback((place: MapPlace) => {
-        try {
-            // Preload image to make modal display faster (browser only)
-            if (typeof window !== "undefined" && place?.imageUrl) {
-                const img = document.createElement("img");
-                img.src = place.imageUrl;
-            }
-        } catch {}
-        setSelectedPlace(place);
-        setShowPlaceModal(true);
-    }, []);
-
     // 길찾기 핸들러
     const createNavigationHandler = useCallback(
-        (name: string, lat: number, lng: number) => () => {
+        (name: string, lat: number, lng: number) => (e: React.MouseEvent) => {
+            e.stopPropagation(); // 이벤트 버블링 방지
             const url = `https://map.naver.com/v5/search/${encodeURIComponent(name)}?c=${lng},${lat},15,0,0,0,dh`;
             window.open(url, "_blank");
         },
         []
     );
 
-    // 지도에서 보기 핸들러
-    const createMapViewHandler = useCallback(
-        (name: string, lat: number, lng: number) => () => {
-            router.push(`/map?lat=${lat}&lng=${lng}&name=${encodeURIComponent(name)}`);
-        },
-        [router]
-    );
+    // 타임라인 장소 클릭 핸들러
+    const handleTimelinePlaceClick = (coursePlace: CoursePlace) => {
+        setSelectedPlace({
+            id: coursePlace.place.id,
+            name: coursePlace.place.name,
+            latitude: coursePlace.place.latitude,
+            longitude: coursePlace.place.longitude,
+            address: coursePlace.place.address,
+            imageUrl: coursePlace.place.image_url,
+            description: coursePlace.place.description,
+        });
+        setShowPlaceModal(true);
+    };
 
-    // 전체 지도 보기 (간소화)
-    const handleShowFullMap = useCallback(() => {
-        console.log("전체 지도 보기");
-    }, []);
-
-    // 후기 목록 가져오기
     const fetchReviews = useCallback(async () => {
-        try {
-            setReviewsLoading(true);
-            setReviewsError(null);
-            const response = await fetch(`/api/reviews?courseId=${courseId}`);
-            const data = await response.json();
-
-            if (response.ok && Array.isArray(data)) {
-                setReviews(
-                    data.map((r: any) => ({
-                        id: r.id,
-                        rating: r.rating,
-                        userName: r.user?.nickname || "익명",
-                        createdAt: r.createdAt,
-                        content: r.comment,
-                    }))
-                );
-            } else {
-                console.error("후기 목록 가져오기 실패:", data.error);
-                setReviewsError(data.error || "후기 목록을 가져오는데 실패했습니다.");
-                setReviews([]);
-            }
-        } catch (error) {
-            console.error("후기 목록 가져오기 오류:", error);
-            setReviewsError("네트워크 오류가 발생했습니다.");
-            setReviews([]);
-        } finally {
-            setReviewsLoading(false);
-        }
-    }, [courseId]);
-
-    // 찜 상태 확인
-    const checkFavoriteStatus = useCallback(async () => {
-        try {
-            const token = localStorage.getItem("authToken");
-            if (!token) return;
-
-            const response = await fetch("/api/users/favorites", {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            if (response.ok) {
-                const favorites = await response.json();
-                const isFavorited = favorites.some((fav: any) => fav.course_id.toString() === courseId);
-                setIsSaved(isFavorited);
-            }
-        } catch (error) {
-            console.error("Error checking favorite status:", error);
-        }
-    }, [courseId]);
-
-    // 로그인 여부와 관계없이 상세 페이지 진입 시 조회수 증가
-    useEffect(() => {
         if (!courseId) return;
         try {
-            fetch(`/api/courses/${courseId}/view`, { method: "POST", keepalive: true }).catch(() => {});
-        } catch {}
-    }, [courseId]);
-
-    // 코스 데이터 가져오기
-    const fetchCourseData = useCallback(async () => {
-        try {
-            setLoading(true);
-            setError(null);
-
-            console.log("Fetching course data for ID:", courseId);
-            console.log("Course ID type:", typeof courseId);
-
-            // ✅ 수정된 부분: request.url 대신 window.location.href 사용
-            if (typeof window !== "undefined") {
-                console.log("API: Request URL:", window.location.href);
+            const response = await fetch(`/api/reviews?courseId=${courseId}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    setReviews(
+                        data.map((r: any) => ({
+                            id: r.id,
+                            rating: r.rating,
+                            userName: r.user?.nickname || "익명",
+                            createdAt: r.createdAt,
+                            content: r.comment,
+                        }))
+                    );
+                }
             }
-
-            // 캐시 확인 (임시로 비활성화)
-            const cacheKey = `course_${courseId}`;
-            const cachedData = sessionStorage.getItem(cacheKey);
-            console.log("Cache check for key:", cacheKey);
-            console.log("Cached data exists:", !!cachedData);
-
-            // API 하나로 통합된 응답 사용
-            const courseRes = await fetch(`/api/courses/${courseId}`, { cache: "no-store" });
-            if (!courseRes.ok) {
-                throw new Error("코스 정보를 가져오는데 실패했습니다.");
-            }
-            const finalCourseData = await courseRes.json();
-            console.log("API Response - Aggregated Course:", finalCourseData);
-
-            console.log("Final Course Data:", finalCourseData);
-            setCourseData(finalCourseData);
-            document.title = `StyleMap | ${finalCourseData.title}`;
-        } catch (err) {
-            console.error("Error fetching course data:", err);
-            setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
-        } finally {
-            setLoading(false);
+        } catch (error) {
+            console.error("후기 목록 업데이트 실패:", error);
         }
     }, [courseId]);
 
     const handleSaveCourse = async () => {
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+            showToast("로그인이 필요합니다.", "error");
+            router.push("/login");
+            return;
+        }
+
+        const endpoint = `/api/users/favorites`;
+        const options: RequestInit = {
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        };
+
         try {
-            const token = localStorage.getItem("authToken");
-            if (!token) {
-                showToast("로그인이 필요합니다.", "error");
-                router.push("/login");
-                return;
-            }
-
             if (isSaved) {
-                // 찜 해제 로직 (기존과 동일)
-                const response = await fetch(`/api/users/favorites?courseId=${courseId}`, {
-                    method: "DELETE",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
-                if (response.ok) {
-                    setIsSaved(false);
-                    showToast("찜 목록에서 제거되었습니다.", "success");
-                    window.dispatchEvent(new CustomEvent("favoritesChanged"));
-                } else {
-                    showToast("찜 삭제에 실패했습니다.", "error");
-                }
+                options.method = "DELETE";
+                const response = await fetch(`${endpoint}?courseId=${courseId}`, options);
+                if (!response.ok) throw new Error("찜 해제에 실패했습니다.");
+                setIsSaved(false);
+                showToast("찜 목록에서 제거했습니다.", "success");
             } else {
-                // 찜 추가 로직 (method: 'POST' 추가)
-                const response = await fetch("/api/users/favorites", {
-                    method: "POST", // 이 부분을 추가합니다.
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({ courseId: courseId }),
-                });
-
-                if (response.ok) {
-                    setIsSaved(true);
-                    showToast("찜 목록에 추가되었습니다.", "success");
-                    window.dispatchEvent(new CustomEvent("favoritesChanged"));
-                } else {
+                options.method = "POST";
+                options.body = JSON.stringify({ courseId });
+                const response = await fetch(endpoint, options);
+                if (!response.ok) {
                     const errorData = await response.json();
                     if (errorData.error === "Already favorited") {
                         setIsSaved(true);
                         showToast("이미 찜한 코스입니다.", "info");
                     } else {
-                        showToast("찜 추가에 실패했습니다.", "error");
+                        throw new Error("찜 추가에 실패했습니다.");
                     }
+                } else {
+                    setIsSaved(true);
+                    showToast("찜 목록에 추가했습니다.", "success");
                 }
             }
+            window.dispatchEvent(new CustomEvent("favoritesChanged"));
         } catch (error) {
-            console.error("Error handling favorite:", error);
-            showToast("오류가 발생했습니다.", "error");
+            showToast(error instanceof Error ? error.message : "요청 처리 중 오류가 발생했습니다.", "error");
         }
     };
 
-    // 공유하기 처리
     const handleShareCourse = () => {
         setShowShareModal(true);
     };
@@ -506,7 +294,6 @@ export default function CourseDetailPage() {
     const handleKakaoShare = async () => {
         const url = typeof window !== "undefined" ? window.location.href : "";
         try {
-            // 1) Kakao JS SDK 로드 및 초기화
             const ensureKakao = () =>
                 new Promise<void>((resolve, reject) => {
                     const w = window as any;
@@ -552,14 +339,12 @@ export default function CourseDetailPage() {
                 ],
             });
 
-            // 링크도 복사 (사용자 편의)
             try {
                 await navigator.clipboard.writeText(url);
             } catch {}
             setShowShareModal(false);
         } catch (error) {
             console.error("Kakao share error:", error);
-            // 폴백: 링크 복사만 수행
             try {
                 await navigator.clipboard.writeText(url);
                 showToast("링크가 복사되었습니다.", "success");
@@ -596,110 +381,137 @@ export default function CourseDetailPage() {
         }
     };
 
-    // 총 비용 계산
-    const totalCost = useMemo(() => {
-        return courseData?.price || "정보 없음";
-    }, [courseData]);
+    // --- useEffect 훅 ---
 
-    // 초기 데이터 로드
-    // 사용자 위치 가져오기 (watchPosition으로 업데이트 지속)
+    // 초기 데이터 로딩 (코스 정보, 후기, 찜 상태)
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                // 코스 정보와 후기 목록을 병렬로 요청
+                const [courseRes, reviewsRes] = await Promise.all([
+                    fetch(`/api/courses/${courseId}`, { cache: "no-store" }),
+                    fetch(`/api/reviews?courseId=${courseId}`),
+                ]);
+
+                if (!courseRes.ok) throw new Error("코스 정보를 가져오는데 실패했습니다.");
+
+                const courseData = await courseRes.json();
+                setCourseData(courseData);
+                document.title = `StyleMap | ${courseData.title}`;
+
+                if (reviewsRes.ok) {
+                    const reviewsData = await reviewsRes.json();
+                    if (Array.isArray(reviewsData)) {
+                        setReviews(
+                            reviewsData.map((r: any) => ({
+                                id: r.id,
+                                rating: r.rating,
+                                userName: r.user?.nickname || "익명",
+                                createdAt: r.createdAt,
+                                content: r.comment,
+                            }))
+                        );
+                    }
+                } else {
+                    console.warn("후기 목록을 가져오지 못했습니다.");
+                }
+
+                // 로그인 상태라면 찜 여부 확인 (페이지 로딩을 막지 않음)
+                const token = localStorage.getItem("authToken");
+                if (token) {
+                    fetch("/api/users/favorites", { headers: { Authorization: `Bearer ${token}` } })
+                        .then((res) => (res.ok ? res.json() : []))
+                        .then((favorites) => {
+                            const isFavorited = favorites.some((fav: any) => fav.course_id.toString() === courseId);
+                            setIsSaved(isFavorited);
+                        })
+                        .catch((err) => console.error("찜 상태 확인 실패:", err));
+                }
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchInitialData();
+    }, [courseId]);
+
+    // 조회수 증가 로직 (30분 쿨다운)
+    useEffect(() => {
+        const key = `course_view_${courseId}`;
+        const now = Date.now();
+        const lastView = localStorage.getItem(key);
+        if (!lastView || now - parseInt(lastView) > 30 * 60 * 1000) {
+            fetch(`/api/courses/${courseId}/view`, { method: "POST" })
+                .then(() => {
+                    localStorage.setItem(key, String(now));
+                })
+                .catch((err) => console.error("조회수 증가 API 호출 실패:", err));
+        }
+    }, [courseId]);
+
+    // 사용자 현재 위치 가져오기
     useEffect(() => {
         if (!navigator.geolocation) return;
+        const geoOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 };
         const onOk = (pos: GeolocationPosition) =>
             setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        const onErr = (error: GeolocationPositionError) => {
-            console.log("위치 정보를 가져올 수 없습니다:", error);
-        };
-        navigator.geolocation.getCurrentPosition(onOk, onErr, {
-            enableHighAccuracy: true,
-            timeout: 8000,
-            maximumAge: 60000,
-        });
-        const id = navigator.geolocation.watchPosition(onOk, onErr, {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 60000,
-        });
-        return () => navigator.geolocation.clearWatch?.(id);
-    }, []);
+        const onErr = () => showToast("위치 정보를 가져올 수 없습니다.", "info");
 
-    useEffect(() => {
-        if (courseId) {
-            fetchCourseData();
-        }
-    }, [courseId, fetchCourseData]);
+        navigator.geolocation.getCurrentPosition(onOk, onErr, geoOptions);
+        const watchId = navigator.geolocation.watchPosition(onOk, onErr, geoOptions);
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [showToast]);
 
-    // 첫 번째 장소를 기본 선택으로 설정
+    // 첫 장소를 기본 선택 장소로 설정
     useEffect(() => {
         if (sortedCoursePlaces.length > 0 && !selectedPlace) {
-            const firstPlace = sortedCoursePlaces[0];
+            const first = sortedCoursePlaces[0];
             setSelectedPlace({
-                id: firstPlace.place.id,
-                name: firstPlace.place.name,
-                latitude: firstPlace.place.latitude,
-                longitude: firstPlace.place.longitude,
-                address: firstPlace.place.address,
-                imageUrl: firstPlace.place.image_url,
-                description: firstPlace.place.description,
+                id: first.place.id,
+                name: first.place.name,
+                latitude: first.place.latitude,
+                longitude: first.place.longitude,
+                address: first.place.address,
+                imageUrl: first.place.image_url,
+                description: first.place.description,
             });
-            console.log(`첫 번째 장소 자동 선택: ${firstPlace.place.name}`);
         }
     }, [sortedCoursePlaces, selectedPlace]);
 
-    // 찜 상태 확인
+    // 후기 작성 완료 시 목록 새로고침
     useEffect(() => {
-        if (courseData) {
-            checkFavoriteStatus();
-        }
-    }, [courseData, checkFavoriteStatus]);
-
-    // 후기 목록 가져오기
-    useEffect(() => {
-        if (courseData) {
-            fetchReviews();
-        }
-    }, [courseData, fetchReviews]);
-
-    // 후기 작성 완료 이벤트 리스너
-    useEffect(() => {
-        const handleReviewSubmitted = () => {
-            fetchReviews();
-        };
-
+        const handleReviewSubmitted = () => fetchReviews();
         window.addEventListener("reviewSubmitted", handleReviewSubmitted);
-        return () => {
-            window.removeEventListener("reviewSubmitted", handleReviewSubmitted);
-        };
+        return () => window.removeEventListener("reviewSubmitted", handleReviewSubmitted);
     }, [fetchReviews]);
 
-    // 로딩 상태
+    // --- 렌더링 로직 ---
     if (loading) {
         return (
             <main className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <LoadingSpinner />
                     <p className="mt-4 text-gray-600">코스 정보를 불러오는 중...</p>
-                    <p className="mt-2 text-sm text-gray-500">잠시만 기다려주세요</p>
                 </div>
             </main>
         );
     }
 
-    // 에러 상태
     if (error || !courseData) {
         return (
             <main className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center max-w-md">
                     <ErrorDisplay
                         error={error || "요청하신 코스가 존재하지 않습니다."}
-                        onRetry={() => {
-                            setError(null);
-                            fetchCourseData();
-                        }}
+                        onRetry={() => window.location.reload()}
                     />
                     <button
                         onClick={() => router.push("/courses")}
-                        className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                         코스 목록으로 돌아가기
                     </button>
@@ -708,27 +520,23 @@ export default function CourseDetailPage() {
         );
     }
 
+    // --- JSX 반환 ---
     return (
         <>
-            {/* 토스트 알림 */}
             {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-            <div className="min-h-screen bg-gray-50 text-black pt-10">
+            <div className="min-h-screen bg-gray-50 text-black">
                 {/* Hero Section */}
-                <section className="relative h-[360px] md:h-[520px] overflow-hidden pt-10">
+                <section className="relative h-[300px] md:h-[500px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
-                        {heroImageUrl ? (
-                            <Image
-                                src={heroImageUrl}
-                                alt={courseData.title}
-                                fill
-                                priority
-                                sizes="100vw"
-                                className="object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gray-200" />
-                        )}
+                        <Image
+                            src={heroImageUrl}
+                            alt={courseData.title}
+                            fill
+                            priority
+                            sizes="100vw"
+                            className="object-cover"
+                        />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
 
@@ -748,7 +556,7 @@ export default function CourseDetailPage() {
                                 </span>
                             </div>
 
-                            <h1 className="text-lg md:text-s font-bold text-white mb-4">{courseData.title}</h1>
+                            <h1 className="text-lg md:text-4xl font-bold text-white mb-4">{courseData.title}</h1>
                             <p
                                 className="text-base md:text-xl text-white/90 mb-6"
                                 style={{
@@ -764,7 +572,7 @@ export default function CourseDetailPage() {
                             <div className="flex items-center gap-4 md:gap-6 text-white text-sm md:text-base flex-wrap">
                                 <div className="flex items-center gap-2">
                                     <span className="text-yellow-400 text-2xl">★</span>
-                                    <span className="font-bold text-lg">{courseData.rating}</span>
+                                    <span className="font-bold">{courseData.rating}</span>
                                 </div>
                                 <span>📍 {courseData.coursePlaces?.length || 0}개 장소</span>
                                 <span>⏱ {courseData.duration}</span>
@@ -776,7 +584,7 @@ export default function CourseDetailPage() {
                 </section>
 
                 {/* Course Details */}
-                <section className="py-16">
+                <section className="py-10">
                     <div className="max-w-[500px] mx-auto px-4">
                         <div className="grid grid-cols-1 gap-8">
                             {/* Main Content */}
@@ -817,7 +625,7 @@ export default function CourseDetailPage() {
                                     {/* 지도 섹션 */}
                                     <div className="mb-8 rounded-2xl overflow-hidden shadow-lg">
                                         <div className="relative">
-                                            {hasPlaces ? (
+                                            {sortedCoursePlaces.length > 0 ? (
                                                 <NaverMap
                                                     places={sortedCoursePlaces.map((cp) => ({
                                                         id: cp.place.id,
@@ -830,7 +638,7 @@ export default function CourseDetailPage() {
                                                     }))}
                                                     userLocation={userLocation}
                                                     selectedPlace={selectedPlace}
-                                                    onPlaceClick={handlePlaceClick}
+                                                    onPlaceClick={setSelectedPlace}
                                                     drawPath={true}
                                                     routeMode="walking"
                                                     className="w-full h-64 md:h-96 rounded-2xl"
@@ -851,7 +659,7 @@ export default function CourseDetailPage() {
                                     <div className="relative pl-6 md:pl-10" style={{ willChange: "transform" }}>
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
 
-                                        {hasPlaces ? (
+                                        {sortedCoursePlaces.length > 0 ? (
                                             sortedCoursePlaces.map((coursePlace, idx) => (
                                                 <div key={coursePlace.id} className="relative mb-6 md:mb-8">
                                                     <div className="absolute -left-7 md:-left-8 top-6 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white shadow-lg"></div>
@@ -862,23 +670,15 @@ export default function CourseDetailPage() {
                                                     {/* 장소 카드 */}
                                                     <div
                                                         className=" hover:cursor-pointer bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow "
-                                                        onClick={() => {
-                                                            setSelectedPlace({
-                                                                id: coursePlace.place.id,
-                                                                name: coursePlace.place.name,
-                                                                latitude: coursePlace.place.latitude,
-                                                                longitude: coursePlace.place.longitude,
-                                                                address: coursePlace.place.address,
-                                                                imageUrl: coursePlace.place.image_url,
-                                                                description: coursePlace.place.description,
-                                                            });
-                                                            setShowPlaceModal(true);
-                                                        }}
+                                                        onClick={() => handleTimelinePlaceClick(coursePlace)}
                                                     >
                                                         <div className="flex flex-col sm:flex-row gap-4">
                                                             {/* 좌: 이미지 / 우: 주요 정보 */}
                                                             <div className="w-full sm:w-36 flex-shrink-0">
                                                                 <div className="relative h-32 sm:h-24 bg-gray-200 rounded-lg overflow-hidden">
+                                                                    <span className="absolute top-1 right-1 z-10 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                                        {coursePlace.place.category || "기타"}
+                                                                    </span>
                                                                     {coursePlace.place.image_url ? (
                                                                         <Image
                                                                             src={coursePlace.place.image_url}
@@ -904,9 +704,6 @@ export default function CourseDetailPage() {
                                                                     </span>
                                                                 </div>
                                                                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                                                        {coursePlace.place.category || "기타"}
-                                                                    </span>
                                                                     <span className="text-sm text-gray-600">
                                                                         💰 {coursePlace.place.avg_cost_range}
                                                                     </span>
@@ -967,24 +764,7 @@ export default function CourseDetailPage() {
                                         </button>
                                     </div>
 
-                                    {reviewsLoading ? (
-                                        <div className="text-center py-8">
-                                            <LoadingSpinner />
-                                            <p className="mt-2 text-gray-500">후기를 불러오는 중...</p>
-                                        </div>
-                                    ) : reviewsError ? (
-                                        <div className="text-center py-8">
-                                            <div className="text-4xl mb-4">⚠️</div>
-                                            <p className="text-lg mb-2 text-red-600">후기 목록을 불러올 수 없습니다</p>
-                                            <p className="text-sm text-gray-500 mb-4">{reviewsError}</p>
-                                            <button
-                                                onClick={fetchReviews}
-                                                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-                                            >
-                                                다시 시도
-                                            </button>
-                                        </div>
-                                    ) : reviews.length > 0 ? (
+                                    {reviews.length > 0 ? (
                                         <div className="space-y-4">
                                             {reviews.map((review) => (
                                                 <div key={review.id} className="border border-gray-200 rounded-lg p-4">
@@ -1048,19 +828,8 @@ export default function CourseDetailPage() {
                                             <div className="border-t pt-4 space-y-3 ">
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        try {
-                                                            router.push(
-                                                                `/courses/${encodeURIComponent(String(courseId))}/start`
-                                                            );
-                                                        } catch (e) {
-                                                            console.error("start navigation failed", e);
-                                                            window.location.assign(
-                                                                `/courses/${encodeURIComponent(String(courseId))}/start`
-                                                            );
-                                                        }
-                                                    }}
-                                                    className={` w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700`}
+                                                    onClick={() => router.push(`/courses/${courseId}/start`)}
+                                                    className={`hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700`}
                                                 >
                                                     🚀 코스 시작하기
                                                 </button>
@@ -1077,18 +846,10 @@ export default function CourseDetailPage() {
                                                 </button>
                                                 <button
                                                     onClick={handleShareCourse}
-                                                    disabled={isShareLoading}
                                                     className="hover:cursor-pointer w-full py-3 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                                     aria-label="코스 공유하기"
                                                 >
-                                                    {isShareLoading ? (
-                                                        <span className="flex items-center justify-center gap-2">
-                                                            <LoadingSpinner size="small" />
-                                                            공유 중...
-                                                        </span>
-                                                    ) : (
-                                                        "📤 공유하기"
-                                                    )}
+                                                    📤 공유하기
                                                 </button>
                                             </div>
                                         </div>
@@ -1134,19 +895,6 @@ export default function CourseDetailPage() {
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* 관련 코스 추천 */}
-                                    <div className="bg-white rounded-2xl shadow-lg p-6">
-                                        <h3 className="text-xl font-bold mb-4">비슷한 코스</h3>
-                                        <div className="text-center py-8 text-gray-500">
-                                            <div className="text-4xl mb-2">🎯</div>
-                                            <p className="text-sm text-black">
-                                                곧 추천 코스를
-                                                <br />
-                                                제공할 예정입니다!
-                                            </p>
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1166,10 +914,9 @@ export default function CourseDetailPage() {
                         </button>
                         <button
                             onClick={handleShareCourse}
-                            disabled={isShareLoading}
                             className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-lg disabled:opacity-50"
                         >
-                            {isShareLoading ? "공유 중..." : "📤 공유하기"}
+                            📤 공유하기
                         </button>
                     </div>
                 </div>
@@ -1191,48 +938,35 @@ export default function CourseDetailPage() {
                                 ×
                             </button>
                         </div>
-
                         <div className="space-y-4">
                             <button
                                 onClick={handleKakaoShare}
-                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-yellow-400 text-white rounded-xl hover:bg-yellow-500 transition-colors"
+                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-yellow-400 text-black rounded-xl hover:bg-yellow-500"
                             >
                                 <div className="text-2xl">💬</div>
                                 <div className="text-left">
                                     <div className="font-bold">카카오톡으로 공유</div>
-                                    <div className="text-sm opacity-90">카카오톡 채팅으로 공유하기</div>
                                 </div>
                             </button>
-
                             <button
                                 onClick={handleDMShare}
-                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-colors"
+                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl"
                             >
                                 <div className="text-2xl">📱</div>
                                 <div className="text-left">
                                     <div className="font-bold">디엠으로 공유</div>
-                                    <div className="text-sm opacity-90">인스타그램 디엠으로 공유하기</div>
                                 </div>
                             </button>
-
                             <button
                                 onClick={handleCopyLink}
-                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200"
                             >
                                 <div className="text-2xl">📋</div>
                                 <div className="text-left">
                                     <div className="font-bold">링크 복사</div>
-                                    <div className="text-sm opacity-90">클립보드에 링크 복사하기</div>
                                 </div>
                             </button>
                         </div>
-
-                        <button
-                            onClick={() => setShowShareModal(false)}
-                            className="hover:cursor-pointer w-full mt-6 py-3 text-gray-500 hover:text-gray-700 transition-colors"
-                        >
-                            취소
-                        </button>
                     </div>
                 </div>
             )}
@@ -1255,33 +989,16 @@ export default function CourseDetailPage() {
                         name: courseData.title,
                         description: courseData.description,
                         image: heroImageUrl,
-                        touristType: courseData.courseType,
-                        duration: courseData.duration,
-                        offers: {
-                            "@type": "Offer",
-                            price: courseData.price,
-                            priceCurrency: "KRW",
-                        },
-                        aggregateRating: {
-                            "@type": "AggregateRating",
-                            ratingValue: courseData.rating,
-                            bestRating: 5,
-                        },
-                        itinerary:
-                            courseData.coursePlaces?.map((place) => ({
-                                "@type": "TouristDestination",
-                                name: place.place.name,
-                                description: place.place.description,
-                                address: place.place.address,
-                                geo: {
-                                    "@type": "GeoCoordinates",
-                                    latitude: place.place.latitude,
-                                    longitude: place.place.longitude,
-                                },
-                            })) || [],
+                        itinerary: sortedCoursePlaces.map((cp) => ({
+                            "@type": "TouristDestination",
+                            name: cp.place.name,
+                            description: cp.place.description,
+                            address: cp.place.address,
+                        })),
                     }),
                 }}
             />
+
             {/* 장소 상세 모달 */}
             {showPlaceModal && selectedPlace && (
                 <div
@@ -1305,11 +1022,6 @@ export default function CourseDetailPage() {
                                     height={800}
                                     className="w-full h-auto object-contain"
                                     priority
-                                    placeholder="blur"
-                                    blurDataURL={
-                                        heroImageUrl ||
-                                        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMTAwJScgaGVpZ2h0PSc2MCUnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zyc+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsbD0nI2U1ZTVlNScvPjwvc3ZnPg=="
-                                    }
                                 />
                             </div>
                         ) : (
@@ -1322,10 +1034,7 @@ export default function CourseDetailPage() {
                             <div className="mt-4 flex justify-end gap-2">
                                 <button
                                     className="hover:cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                                    onClick={() => {
-                                        setShowPlaceModal(false);
-                                        // 상세페이지 내이므로 닫기만 하면 원래 화면 유지
-                                    }}
+                                    onClick={() => setShowPlaceModal(false)}
                                 >
                                     확인
                                 </button>

@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -17,6 +17,8 @@ const Header = () => {
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+    const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+    const drawerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         const checkLoginStatus = async () => {
@@ -149,6 +151,43 @@ const Header = () => {
         }
     }, [isMenuOpen]);
 
+    // 접근성: 드로어 열림/닫힘 시 inert 적용 및 포커스 이동 처리
+    useEffect(() => {
+        const drawerEl = drawerRef.current;
+        if (!drawerEl) return;
+
+        if (isMenuOpen) {
+            try {
+                drawerEl.removeAttribute("inert");
+            } catch {}
+            // 드로어가 열릴 때 첫 번째 포커스 가능한 요소로 포커스 이동
+            setTimeout(() => {
+                try {
+                    const firstFocusable = drawerEl.querySelector(
+                        'a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                    ) as HTMLElement | null;
+                    firstFocusable?.focus();
+                } catch {}
+            }, 0);
+        } else {
+            // 닫힐 때 드로어 내부에 포커스가 남아있다면 해제하고 토글 버튼으로 포커스 복귀
+            try {
+                const active = document.activeElement as HTMLElement | null;
+                if (active && drawerEl.contains(active)) {
+                    active.blur();
+                }
+            } catch {}
+            try {
+                drawerEl.setAttribute("inert", "");
+            } catch {}
+            setTimeout(() => {
+                try {
+                    menuButtonRef.current?.focus();
+                } catch {}
+            }, 0);
+        }
+    }, [isMenuOpen]);
+
     const handleLogout = async () => {
         try {
             await fetch("/api/auth/logout", { method: "POST" });
@@ -215,6 +254,7 @@ const Header = () => {
                             onClick={toggleMenu}
                             className="p-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition-colors cursor-pointer"
                             aria-label="메뉴"
+                            ref={menuButtonRef}
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path
@@ -244,7 +284,7 @@ const Header = () => {
                             ? "translate-x-0 opacity-100 pointer-events-auto"
                             : "translate-x-full opacity-0 pointer-events-none"
                     }`}
-                    aria-hidden={!isMenuOpen}
+                    ref={drawerRef}
                     onClick={(e) => e.stopPropagation()}
                     style={{ right: panelRight, width: Math.max(240, drawerWidth) }}
                 >

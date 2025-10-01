@@ -32,9 +32,15 @@ type Course = {
 // 로딩 컴포넌트
 function LoadingSpinner() {
     return (
-        <div className="fixed inset-0 bg-white flex items-center justify-center z-50">
-            <p className="text-xl text-gray-700">코스를 불러오는 중...</p>
-        </div>
+        <main className="min-h-screen bg-white">
+            <div className="max-w-[500px] mx-auto px-4 py-16">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="h-6 w-6 rounded-full border-2 border-blue-600 border-t-transparent animate-spin" />
+                    <p className="text-gray-700">코스를 불러오는 중...</p>
+                </div>
+                <div className="h-64 rounded-2xl bg-gray-200 animate-pulse" />
+            </div>
+        </main>
     );
 }
 
@@ -77,32 +83,28 @@ function GuidePageInner() {
         fetchCourse();
     }, [courseId]);
 
-    // 전체 스크롤 비활성화 + 현재 위치 가져오기 (watchPosition으로 지속 업데이트)
+    // 현재 위치 가져오기 (watchPosition으로 지속 업데이트)
     useEffect(() => {
-        const original = typeof document !== "undefined" ? document.body.style.overflow : "";
-        if (typeof document !== "undefined") document.body.style.overflow = "hidden";
         if (typeof navigator !== "undefined" && navigator.geolocation) {
             const onOk = (pos: GeolocationPosition) =>
                 setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
             const onErr = () => setUserLocation(null);
+            // 빠른 초기 위치: 캐시 우선 (maximumAge 크게), 고정밀은 비활성화
             navigator.geolocation.getCurrentPosition(onOk, onErr, {
-                enableHighAccuracy: true,
-                timeout: 8000,
-                maximumAge: 60000,
+                enableHighAccuracy: false,
+                timeout: 6000,
+                maximumAge: 5 * 60 * 1000,
             });
             const id = navigator.geolocation.watchPosition(onOk, onErr, {
-                enableHighAccuracy: true,
-                timeout: 20000,
-                maximumAge: 60000,
+                enableHighAccuracy: false,
+                timeout: 15000,
+                maximumAge: 2 * 60 * 1000,
             });
             return () => {
-                if (typeof document !== "undefined") document.body.style.overflow = original;
                 navigator.geolocation.clearWatch?.(id);
             };
         }
-        return () => {
-            if (typeof document !== "undefined") document.body.style.overflow = original;
-        };
+        return () => {};
     }, []);
 
     // 현재 단계의 장소 정보
