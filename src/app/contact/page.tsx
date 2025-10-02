@@ -1,12 +1,36 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 
 const ContactPage = () => {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [subject, setSubject] = useState("");
+    const [message, setMessage] = useState("");
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmedName = name.trim();
+        const trimmedEmail = email.trim();
+        const trimmedSubject = subject.trim();
+        const trimmedMessage = message.trim();
+        if (!trimmedName || !trimmedEmail || !trimmedSubject || !trimmedMessage) {
+            alert("이름, 이메일, 제목, 문의 내용을 모두 입력해주세요.");
+            return;
+        }
+
+        const mailto = `mailto:12jason@naver.com?subject=${encodeURIComponent(
+            trimmedSubject
+        )}&body=${encodeURIComponent(
+            `이름: ${trimmedName}\n이메일: ${trimmedEmail}\n\n문의 내용:\n${trimmedMessage}`
+        )}`;
+        window.location.href = mailto;
+    };
+
     return (
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
@@ -26,7 +50,7 @@ const ContactPage = () => {
                     <div className="grid md:grid-cols-2 gap-8 mb-12">
                         <div className="bg-blue-50 rounded-lg p-6">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4">이메일 문의</h2>
-                            <p className="text-blue-600 font-medium">contact@stylemap.com</p>
+                            <p className="text-blue-600 font-medium">12jason@naver.com</p>
                         </div>
 
                         <div className="bg-green-50 rounded-lg p-6">
@@ -53,7 +77,7 @@ const ContactPage = () => {
                     {/* 문의 폼 */}
                     <div className="bg-gray-50 rounded-lg p-8">
                         <h2 className="text-xl font-semibold text-gray-900 mb-6">문의 양식</h2>
-                        <form className="space-y-6">
+                        <form className="space-y-6" onSubmit={handleSubmit}>
                             <div>
                                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                                     이름
@@ -61,7 +85,9 @@ const ContactPage = () => {
                                 <input
                                     type="text"
                                     id="name"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-800 text-gray-800 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="이름을 입력해주세요"
                                 />
                             </div>
@@ -73,7 +99,9 @@ const ContactPage = () => {
                                 <input
                                     type="email"
                                     id="email"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 text-gray-800 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="이메일을 입력해주세요"
                                 />
                             </div>
@@ -85,7 +113,9 @@ const ContactPage = () => {
                                 <input
                                     type="text"
                                     id="subject"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    value={subject}
+                                    onChange={(e) => setSubject(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 text-gray-800 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="문의 제목을 입력해주세요"
                                 />
                             </div>
@@ -97,7 +127,9 @@ const ContactPage = () => {
                                 <textarea
                                     id="message"
                                     rows={6}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    value={message}
+                                    onChange={(e) => setMessage(e.target.value)}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 text-gray-800 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="문의 내용을 자세히 입력해주세요"
                                 ></textarea>
                             </div>

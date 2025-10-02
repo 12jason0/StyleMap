@@ -212,9 +212,12 @@ const StoryCard = ({
     };
 
     return (
-        <div className="group flex flex-col gap-4 border-b" onClick={() => onDetails(story.id)}>
+        <div
+            className="group flex flex-col gap-4 border rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white"
+            onClick={() => onDetails(story.id)}
+        >
             {imageSrc ? (
-                <div className="relative h-40 rounded-t-2xl overflow-hidden">
+                <div className="relative h-40 rounded-2xl overflow-hidden">
                     <Image
                         src={imageSrc}
                         alt={story.title}
@@ -227,7 +230,7 @@ const StoryCard = ({
             ) : (
                 <div className="h-40 rounded-2xl bg-gray-100" />
             )}
-            <div className="p-4">
+            <div className="pt-1 pr-4 pb-4 pl-4">
                 <div className="mb-2 flex items-center justify-between">
                     <div>
                         {story.region && (

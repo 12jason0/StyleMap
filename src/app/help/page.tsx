@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Header from "@/components/Header";
-import Footer from "@/components/Footer";
 
 interface FAQItem {
     id: number;
@@ -63,6 +62,23 @@ const FAQPage = () => {
 
     const [selectedCategory, setSelectedCategory] = useState<string>("전체");
     const [searchTerm, setSearchTerm] = useState<string>("");
+    const categoriesTrackRef = useRef<HTMLDivElement | null>(null);
+
+    const handleSelectCategory = (category: string, ev: React.MouseEvent<HTMLButtonElement>) => {
+        setSelectedCategory(category);
+        try {
+            const container = categoriesTrackRef.current;
+            const button = ev.currentTarget as HTMLButtonElement;
+            if (!container || !button) return;
+            const containerRect = container.getBoundingClientRect();
+            const buttonRect = button.getBoundingClientRect();
+            const currentScrollLeft = container.scrollLeft;
+            const deltaToCenter =
+                buttonRect.left - containerRect.left - (containerRect.width / 2 - buttonRect.width / 2);
+            const target = currentScrollLeft + deltaToCenter;
+            container.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+        } catch {}
+    };
 
     const categories = ["전체", "서비스 소개", "계정 관리", "서비스 이용", "결제", "기술 문제"];
 
@@ -80,38 +96,47 @@ const FAQPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-white">
-            <Header />
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
                 <div className="max-w-4xl mx-auto">
-                    <h1 className="text-3xl font-bold mb-6 text-center">자주 묻는 질문</h1>
+                    <h1 className="text-3xl font-bold mb-6 text-center text-black">자주 묻는 질문</h1>
 
                     {/* 검색 및 필터 */}
                     <div className="mb-8">
-                        <div className="flex flex-col md:flex-row gap-4 mb-6">
-                            <div className="flex-1">
+                        {/* 검색창 영역 */}
+                        <div className="mb-4">
+                            <div className="relative">
+                                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    🔎
+                                </span>
                                 <input
                                     type="text"
                                     placeholder="질문을 검색해보세요..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="text-gray-700 w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="text-gray-800 w-full pl-10 pr-4 py-3 border border-gray-300 rounded-2xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400"
                                 />
                             </div>
-                            <div className="flex gap-2">
-                                {categories.map((category) => (
-                                    <button
-                                        key={category}
-                                        onClick={() => setSelectedCategory(category)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:cursor-pointer ${
-                                            selectedCategory === category
-                                                ? "bg-blue-600 text-white"
-                                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                        }`}
-                                    >
-                                        {category}
-                                    </button>
-                                ))}
-                            </div>
+                        </div>
+
+                        {/* 카테고리 버튼 영역 */}
+                        <div
+                            className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1"
+                            ref={categoriesTrackRef}
+                        >
+                            {categories.map((category) => (
+                                <button
+                                    key={category}
+                                    onClick={(e) => handleSelectCategory(category, e)}
+                                    aria-pressed={selectedCategory === category}
+                                    className={`${
+                                        selectedCategory === category
+                                            ? "bg-blue-600 text-white border-blue-600 shadow"
+                                            : "bg-gray-100 text-gray-800 border-gray-200 hover:bg-white"
+                                    } min-w-[88px] px-4 py-3 rounded-2xl text-sm font-semibold border text-center leading-snug break-keep hover:cursor-pointer`}
+                                >
+                                    {category}
+                                </button>
+                            ))}
                         </div>
                     </div>
 

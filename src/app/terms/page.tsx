@@ -123,6 +123,10 @@ export default function TermsOfServicePage() {
                                 사진 등 콘텐츠 업로드 시, 타인의 저작권, 초상권 등 제3자의 권리를 침해하는 콘텐츠를
                                 게시하는 행위. 회원이 게시하는 모든 콘텐츠에 대한 법적 책임은 회원 본인에게 있습니다.
                             </li>
+                            <li className="font-semibold text-blue-800 bg-blue-50 p-2 rounded-md">
+                                이용자가 업로드한 사진 데이터는 오직 서비스 내 '추억 액자' 기능 제공을 위한 목적으로만
+                                사용되며, 추천 알고리즘 학습, 광고 타게팅, 외부 제공 등 다른 용도로 사용하지 않습니다.
+                            </li>
                         </ul>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제8조 (서비스의 중단)</h2>

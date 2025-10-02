@@ -81,7 +81,9 @@ export async function GET(request: NextRequest) {
             const withPlaceImages = (enriched as CourseWithDistance[]).filter(
                 (c) => Array.isArray(c.coursePlaces) && c.coursePlaces.some((cp: any) => !!cp?.place?.imageUrl)
             );
-            const resultRegion = withPlaceImages.slice(0, 20);
+            // 장소 사진이 없는 코스만 있을 때도 결과를 보여주기 위해 폴백 제공
+            const baselineSorted = (enriched as CourseWithDistance[]).slice(0, 200);
+            const resultRegion = (withPlaceImages.length > 0 ? withPlaceImages : baselineSorted).slice(0, 20);
             return NextResponse.json({ success: true, courses: resultRegion });
         } catch (error) {
             console.error("지역 코스 검색 오류:", error);
@@ -154,7 +156,10 @@ export async function GET(request: NextRequest) {
         const withPlaceImages = (withinRadius as CourseWithDistance[]).filter(
             (c) => Array.isArray(c.coursePlaces) && c.coursePlaces.some((cp: any) => !!cp?.place?.imageUrl)
         );
-        const filtered = withPlaceImages.sort((a, b) => a.distance - b.distance).slice(0, 20);
+        const baselineSorted = withinRadius.sort((a, b) => a.distance - b.distance);
+        const filtered = (withPlaceImages.length > 0 ? withPlaceImages : baselineSorted)
+            .sort((a, b) => a.distance - b.distance)
+            .slice(0, 20);
 
         return NextResponse.json({ success: true, courses: filtered });
     } catch (error) {

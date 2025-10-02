@@ -70,7 +70,7 @@ const CookiesPolicyPage = () => {
 
     return (
         <div className="flex flex-col min-h-screen bg-white">
-            <main className="flex-grow container mx-auto px-4 py-8 bg-white pt-20">
+            <main className="flex-grow container mx-auto px-4 py-8 bg-white">
                 <div className="max-w-4xl mx-auto">
                     <h1 className="text-3xl font-bold text-gray-900 mb-8">쿠키 정책</h1>
 
@@ -121,6 +121,14 @@ const CookiesPolicyPage = () => {
                                     <h3 className="font-semibold mb-2">🎯 개인화</h3>
                                     <p className="text-sm">사용자의 선호도에 맞는 맞춤형 여행 코스를 추천합니다.</p>
                                 </div>
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                    <h3 className="font-semibold mb-2">🖼️ 사진 데이터 이용 범위</h3>
+                                    <p className="text-sm">
+                                        이용자가 업로드한 사진 데이터는 오직 서비스 내 '추억 액자' 기능 제공을 위한
+                                        목적으로만 사용되며, 추천 알고리즘 학습, 광고 타게팅, 외부 제공 등 그 밖의
+                                        용도로는 사용하지 않습니다.
+                                    </p>
+                                </div>
                             </div>
                         </section>
 
@@ -132,7 +140,7 @@ const CookiesPolicyPage = () => {
                             <div className="mb-6">
                                 <button
                                     onClick={() => toggleSection("essential")}
-                                    className="w-full flex justify-between items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
+                                    className="hover:cursor-pointer w-full flex justify-between items-center p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
                                 >
                                     <div className="flex items-center">
                                         <span className="text-2xl mr-3">🔒</span>
@@ -171,7 +179,7 @@ const CookiesPolicyPage = () => {
                             <div className="mb-6">
                                 <button
                                     onClick={() => toggleSection("functional")}
-                                    className="w-full flex justify-between items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                    className="hover:cursor-pointer w-full flex justify-between items-center p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                 >
                                     <div className="flex items-center">
                                         <span className="text-2xl mr-3">⚙️</span>
@@ -209,7 +217,7 @@ const CookiesPolicyPage = () => {
                             <div className="mb-6">
                                 <button
                                     onClick={() => toggleSection("performance")}
-                                    className="w-full flex justify-between items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+                                    className="hover:cursor-pointer w-full flex justify-between items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
                                 >
                                     <div className="flex items-center">
                                         <span className="text-2xl mr-3">📊</span>
@@ -246,7 +254,7 @@ const CookiesPolicyPage = () => {
                             <div className="mb-6">
                                 <button
                                     onClick={() => toggleSection("thirdparty")}
-                                    className="w-full flex justify-between items-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
+                                    className="hover:cursor-pointer w-full flex justify-between items-center p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
                                 >
                                     <div className="flex items-center">
                                         <span className="text-2xl mr-3">🌐</span>
@@ -304,12 +312,12 @@ const CookiesPolicyPage = () => {
                                     <tbody className="divide-y divide-gray-200">
                                         {cookieData.map((cookie, index) => (
                                             <tr key={index} className="hover:bg-gray-50">
-                                                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                                <td className="px-2 py-2 text-sm font-medium text-gray-900">
                                                     {cookie.name}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-gray-500">
+                                                <td className="px-2 py-1 text-sm text-gray-500 whitespace-nowrap">
                                                     <span
-                                                        className={`px-2 py-1 rounded-full text-xs ${
+                                                        className={`px-2 py-1 rounded-full text-xs inline-block whitespace-nowrap ${
                                                             cookie.type === "필수"
                                                                 ? "bg-green-100 text-green-800"
                                                                 : cookie.type === "기능성"

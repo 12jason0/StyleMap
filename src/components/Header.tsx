@@ -289,46 +289,6 @@ const Header = () => {
                     style={{ right: panelRight, width: Math.max(240, drawerWidth) }}
                 >
                     <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-2">
-                        <div className="pt-4 mt-2 border-t border-gray-200 grid grid-cols-2 gap-3">
-                            <Link
-                                href="/about"
-                                onClick={closeMenu}
-                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
-                            >
-                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
-                                    <svg
-                                        className="w-5 h-5 text-gray-700"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                    >
-                                        <path d="M12 20l9-5-9-5-9 5 9 5z" />
-                                        <path d="M12 12l9-5-9-5-9 5 9 5z" />
-                                    </svg>
-                                </span>
-                                <span className="text-sm font-semibold text-gray-800">서비스 소개</span>
-                            </Link>
-                            <Link
-                                href="/help"
-                                onClick={closeMenu}
-                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
-                            >
-                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
-                                    <svg
-                                        className="w-5 h-5 text-gray-700"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                    >
-                                        <path d="M11 10h2v6h-2z" />
-                                        <path d="M12 6h.01" />
-                                    </svg>
-                                </span>
-                                <span className="text-sm font-semibold text-gray-800">이용안내</span>
-                            </Link>
-                        </div>
                         <Link
                             href="/"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
@@ -406,6 +366,73 @@ const Header = () => {
                                     </Link>
                                 </>
                             )}
+                        </div>
+
+                        {/* 쿠키/정책 링크: 회원가입 아래, 서비스 소개 이전 */}
+                        <div className="pt-2 mt-2 border-t border-gray-200">
+                            <Link
+                                href="/cookies"
+                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                onClick={closeMenu}
+                            >
+                                쿠키 정책
+                            </Link>
+                            <Link
+                                href="/privacy"
+                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                onClick={closeMenu}
+                            >
+                                개인정보 처리방침
+                            </Link>
+                            <Link
+                                href="/terms"
+                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                onClick={closeMenu}
+                            >
+                                이용약관
+                            </Link>
+                        </div>
+
+                        {/* 하단 고정: 서비스 소개 / 이용안내 */}
+                        <div className="pt-4 mt-2 border-t border-gray-200 grid grid-cols-2 gap-3">
+                            <Link
+                                href="/about"
+                                onClick={closeMenu}
+                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
+                            >
+                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
+                                    <svg
+                                        className="w-5 h-5 text-gray-700"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M12 20l9-5-9-5-9 5 9 5z" />
+                                        <path d="M12 12l9-5-9-5-9 5 9 5z" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-semibold text-gray-800">서비스 소개</span>
+                            </Link>
+                            <Link
+                                href="/help"
+                                onClick={closeMenu}
+                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
+                            >
+                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
+                                    <svg
+                                        className="w-5 h-5 text-gray-700"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M11 10h2v6h-2z" />
+                                        <path d="M12 6h.01" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-semibold text-gray-800">이용안내</span>
+                            </Link>
                         </div>
                     </div>
                 </div>

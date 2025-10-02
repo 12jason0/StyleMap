@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 
@@ -86,6 +86,22 @@ const MyPage = () => {
     >([]);
     const [badges, setBadges] = useState<UserBadgeItem[]>([]);
     const [activeTab, setActiveTab] = useState("profile");
+    const tabsTrackRef = useRef<HTMLDivElement | null>(null);
+    const handleSelectTab = (id: string, ev: React.MouseEvent<HTMLButtonElement>) => {
+        setActiveTab(id);
+        try {
+            const container = tabsTrackRef.current;
+            const button = ev.currentTarget as HTMLButtonElement;
+            if (!container || !button) return;
+            const containerRect = container.getBoundingClientRect();
+            const buttonRect = button.getBoundingClientRect();
+            const currentScrollLeft = container.scrollLeft;
+            const deltaToCenter =
+                buttonRect.left - containerRect.left - (containerRect.width / 2 - buttonRect.width / 2);
+            const target = currentScrollLeft + deltaToCenter;
+            container.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+        } catch {}
+    };
     const [casefiles, setCasefiles] = useState<
         Array<{
             story_id: number;
@@ -598,7 +614,7 @@ const MyPage = () => {
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">내 여행 보관함</h3>
 
                 {favorites.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                         {favorites.map((favorite) => (
                             <div
                                 key={favorite.id}
@@ -758,7 +774,7 @@ const MyPage = () => {
                     <h3 className="text-xl md:text-2xl font-bold text-gray-900">내 뱃지</h3>
                 </div>
                 {badges.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 gap-6">
                         {badges.map((b) => (
                             <div
                                 key={b.id}
@@ -796,7 +812,6 @@ const MyPage = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-                <Header />
                 <main className="max-w-4xl mx-auto px-4 py-8 pt-24">
                     <div className="text-center">
                         <div className="text-6xl mb-4">⏳</div>
@@ -810,7 +825,7 @@ const MyPage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 typography-smooth">
-            <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 pt-10 md:pt-24">
+            <main className="max-w-4xl mx-auto px-4 py-6 md:py-8 pt-10 ">
                 <div className="text-center mb-6 md:mb-8">
                     <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-1 md:mb-2 tracking-tight">
                         마이페이지
@@ -819,7 +834,7 @@ const MyPage = () => {
                 </div>
 
                 <div className="flex justify-center mb-6 md:mb-8">
-                    <div className="bg-white rounded-xl shadow-lg p-2 overflow-x-auto no-scrollbar">
+                    <div className="bg-white rounded-xl shadow-lg p-2 overflow-x-auto no-scrollbar" ref={tabsTrackRef}>
                         <div className="flex space-x-2 min-w-max">
                             {[
                                 { id: "profile", label: "프로필", icon: "👤" },
@@ -831,7 +846,7 @@ const MyPage = () => {
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
+                                    onClick={(e) => handleSelectTab(tab.id, e)}
                                     aria-selected={activeTab === tab.id}
                                     className={`min-w-[88px] md:min-w-[110px] px-3 md:px-4 py-2.5 md:py-3 rounded-lg font-medium transition-all cursor-pointer text-sm md:text-base flex flex-col items-center gap-1 whitespace-nowrap ${
                                         activeTab === tab.id
@@ -1176,7 +1191,7 @@ const MyPage = () => {
                             </div>
                             <div className="flex gap-2">
                                 <button
-                                    className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50"
+                                    className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 text-black"
                                     onClick={() => selectedBadge && shareBadgeToKakao(selectedBadge)}
                                 >
                                     자랑하기

@@ -18,6 +18,7 @@ interface Place {
     imageUrl?: string;
     latitude: number;
     longitude: number;
+    courseId?: number; // 코스에서 변환된 항목일 경우 연결용 아이디
 }
 
 interface Course {
@@ -61,6 +62,26 @@ function MapPageInner() {
         return () => clearInterval(timer);
     }, []);
 
+    // 메인 컨테이너(main) 스크롤 비활성화 및 전체 화면 고정
+    useEffect(() => {
+        try {
+            const mainEl = document.querySelector("main") as HTMLElement | null;
+            if (!mainEl) return;
+            const previousClassName = mainEl.className;
+            const previousStyle = { overflow: mainEl.style.overflow, height: mainEl.style.height } as const;
+            mainEl.classList.remove("overflow-y-auto", "overscroll-contain", "no-scrollbar", "scrollbar-hide");
+            mainEl.classList.add("overflow-hidden");
+            if (!mainEl.style.height) mainEl.style.height = "100vh";
+            return () => {
+                try {
+                    mainEl.className = previousClassName;
+                    mainEl.style.overflow = previousStyle.overflow;
+                    mainEl.style.height = previousStyle.height;
+                } catch {}
+            };
+        } catch {}
+    }, []);
+
     // --- 상태 관리 ---
     const [center, setCenter] = useState<{ lat: number; lng: number }>({ lat: 37.5665, lng: 126.978 });
     const [zoom, setZoom] = useState(15);
@@ -72,8 +93,9 @@ function MapPageInner() {
     const [activeTab, setActiveTab] = useState<"places" | "courses">("places");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isMobile, setIsMobile] = useState(false);
+    const [isMobile, setIsMobile] = useState(true);
     const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+    const prevPanOffsetYRef = useRef(0);
     const [showMapSearchButton, setShowMapSearchButton] = useState(false);
 
     const triggerMapResize = useCallback(() => {
@@ -106,19 +128,49 @@ function MapPageInner() {
 
             if (!placesRes.ok) throw new Error("장소 정보를 가져오는 데 실패했습니다.");
             const placesData = await placesRes.json();
-            const fetchedPlaces = (placesData.success ? placesData.places : []).map((p: any) => ({
+            const fetchedPlaces: Place[] = (placesData.success ? placesData.places : []).map((p: any) => ({
                 ...p,
                 latitude: parseFloat(p.latitude),
                 longitude: parseFloat(p.longitude),
             }));
-            setPlaces(fetchedPlaces);
+
+            let courseList: any[] = [];
 
             if (courseRes.ok) {
                 const courseData = await courseRes.json();
-                setCourses(courseData.success ? courseData.courses : []);
+                const list = courseData.success ? courseData.courses : [];
+                courseList = list;
+                setCourses(list);
+                // 검색어가 있을 때 코스가 존재하면 추천 코스 탭으로 자동 전환
+                if (keyword && keyword.trim() && Array.isArray(list) && list.length > 0) {
+                    setActiveTab("courses");
+                }
             } else {
                 console.warn("코스 정보를 가져오는 데 실패했습니다.");
                 setCourses([]);
+            }
+
+            // 장소 탭에도 코스 시작 지점을 함께 노출 (검색어가 있을 때만)
+            if (keyword && keyword.trim() && Array.isArray(courseList) && courseList.length > 0) {
+                const courseAsPlaces: Place[] = courseList
+                    .map((c: any) => {
+                        const sp = c?.coursePlaces?.[0]?.place;
+                        if (!sp || sp.latitude == null || sp.longitude == null) return null;
+                        return {
+                            id: `course-${c.id}`,
+                            name: `코스: ${c.title}`,
+                            category: "추천 코스",
+                            address: sp.name || c.region || "",
+                            imageUrl: c.imageUrl || sp.imageUrl,
+                            latitude: parseFloat(sp.latitude),
+                            longitude: parseFloat(sp.longitude),
+                            courseId: Number(c.id),
+                        } as Place;
+                    })
+                    .filter(Boolean) as Place[];
+                setPlaces([...courseAsPlaces, ...fetchedPlaces]);
+            } else {
+                setPlaces(fetchedPlaces);
             }
         } catch (e: any) {
             setError(e.message || "데이터를 불러오는 데 실패했습니다.");
@@ -147,7 +199,6 @@ function MapPageInner() {
                 // 검색된 장소의 위치를 중심으로 주변 장소와 코스를 다시 불러옵니다.
                 setCenter(foundPlaceLocation);
                 await fetchPlacesAndCourses(foundPlaceLocation, searchInput);
-                setActiveTab("places"); // 검색 후 장소 탭을 활성화
                 setSearchInput(""); // 검색 후 입력창 초기화
             } else {
                 throw new Error(data.error || "검색 결과가 없습니다.");
@@ -163,14 +214,9 @@ function MapPageInner() {
 
     // --- UI 로직 ---
     useEffect(() => {
-        const checkMobile = () => {
-            const mobile = window.innerWidth < 768;
-            setIsMobile(mobile);
-            if (mobile) setLeftPanelOpen(true); // 모바일에서는 기본적으로 패널을 열어둡니다.
-        };
-        checkMobile();
-        window.addEventListener("resize", checkMobile);
-        return () => window.removeEventListener("resize", checkMobile);
+        // 웹에서도 항상 모바일 UI를 사용하도록 강제
+        setIsMobile(true);
+        setLeftPanelOpen(true);
     }, []);
 
     useEffect(() => {
@@ -195,6 +241,38 @@ function MapPageInner() {
             }
         );
     }, [mapsReady, fetchPlacesAndCourses]);
+
+    // 패널이 열릴 때 지도 중심을 패널을 제외한 영역의 시각적 중앙으로 보정
+    useEffect(() => {
+        let timer: any;
+        try {
+            if (!navermaps || !mapRef.current) return;
+            // 패널 애니메이션 완료 후 보정. "열릴 때만" 지도 위치를 이동시키고, 닫힐 때는 이동하지 않음.
+            timer = setTimeout(() => {
+                try {
+                    if (isMobile && leftPanelOpen) {
+                        const map = mapRef.current as any;
+                        const containerEl = document.getElementById("naver-map-container") as HTMLElement | null;
+                        const containerHeight = containerEl?.clientHeight || window.innerHeight;
+                        const desiredOffsetY = Math.round(-0.3 * containerHeight);
+                        const delta = desiredOffsetY - (prevPanOffsetYRef.current || 0);
+                        if (delta !== 0) {
+                            map.panBy(0, delta);
+                            prevPanOffsetYRef.current = desiredOffsetY;
+                        }
+                    } else if (!leftPanelOpen) {
+                        // 닫힐 때는 중심을 움직이지 않고 기준값만 리셋하여 다음에 열릴 때 보정이 다시 적용되도록 함
+                        prevPanOffsetYRef.current = 0;
+                    }
+                } catch {}
+            }, 350);
+        } catch {}
+        return () => {
+            try {
+                if (timer) clearTimeout(timer);
+            } catch {}
+        };
+    }, [leftPanelOpen, isMobile, navermaps]);
 
     const handlePlaceClick = (place: Place) => {
         setSelectedPlace(place);
@@ -291,13 +369,13 @@ function MapPageInner() {
     }
 
     return (
-        <div className="flex h-screen overflow-hidden">
+        <div className="flex h-screen overflow-hidden relative">
             {/* --- 왼쪽 정보 패널 --- */}
             <div
-                className={`z-20 flex flex-col bg-white
+                className={`z-40 flex flex-col bg-white overflow-hidden
                     ${
                         isMobile
-                            ? `transition-transform duration-300 fixed inset-x-0 bottom-0 h-[60vh] rounded-t-2xl shadow-2xl ${
+                            ? `transition-transform duration-300 absolute inset-x-0 bottom-0 h-[60vh] rounded-t-2xl shadow-2xl ${
                                   leftPanelOpen ? "translate-y-0" : "translate-y-full"
                               }`
                             : `transition-[width] duration-300 h-full border-r border-gray-200 ${
@@ -308,7 +386,7 @@ function MapPageInner() {
             >
                 {/* 검색창 및 헤더 */}
                 <div className="flex-shrink-0 sticky top-0 z-10 p-3 md:p-4 bg-white/80 backdrop-blur border-b">
-                    <div className="flex gap-2 md:pt-20">
+                    <div className="flex gap-2">
                         <input
                             type="text"
                             placeholder="장소, 음식, 카페 검색"
@@ -391,7 +469,13 @@ function MapPageInner() {
                             (selectedPlace ? [selectedPlace] : places).map((place) => (
                                 <div
                                     key={place.id}
-                                    onClick={() => handlePlaceClick(place)}
+                                    onClick={() => {
+                                        if ((place as any).courseId) {
+                                            router.push(`/courses/${(place as any).courseId}`);
+                                        } else {
+                                            handlePlaceClick(place);
+                                        }
+                                    }}
                                     className="group p-4 mb-2 cursor-pointer bg-white hover:bg-gray-50 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition"
                                 >
                                     <div className="flex items-center justify-between mb-1">
@@ -430,7 +514,7 @@ function MapPageInner() {
             </div>
 
             {/* --- 네이버 지도 --- */}
-            <div className="flex-1 h-full relative">
+            <div className="flex-1 h-full relative overflow-hidden">
                 <MapDiv style={{ width: "100%", height: "100%" }} id="naver-map-container">
                     <NaverMap
                         ref={mapRef}
@@ -483,13 +567,13 @@ function MapPageInner() {
 
                 {/* --- 지도 위 UI 컨트롤 --- */}
                 {showMapSearchButton && (
-                    <div className={`absolute ${isMobile ? "top-20" : "bottom-6"} left-1/2 -translate-x-1/2 z-50`}>
+                    <div className={`absolute ${isMobile ? "top-5" : "bottom-6"} left-1/2 -translate-x-1/2 z-50`}>
                         <button
                             onClick={async () => {
                                 setShowMapSearchButton(false);
                                 await fetchPlacesAndCourses(center);
                             }}
-                            className="px-5 py-2.5 bg-white text-gray-900 border border-gray-300 rounded-full shadow-xl hover:bg-gray-50 hover:cursor-pointer backdrop-blur"
+                            className="px-3 py-1.5 bg-white text-gray-700 border text-sm  border-gray-300 rounded-full shadow-xl hover:bg-gray-50 hover:cursor-pointer backdrop-blur"
                         >
                             현재 지도에서 검색
                         </button>
@@ -562,11 +646,11 @@ function MapPageInner() {
                             setLeftPanelOpen((v) => !v);
                             setTimeout(triggerMapResize, 320);
                         }}
-                        className="hover:cursor-pointer fixed left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-5 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-50"
+                        className="hover:cursor-pointer absolute left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-3 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-50"
                         style={{ bottom: leftPanelOpen ? "calc(60vh + 16px)" : "80px" }}
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >
-                        <span className="text-gray-700 text-2xl ">{leftPanelOpen ? "▾" : "▴"}</span>
+                        <span className="text-gray-700 text-xl ">{leftPanelOpen ? "▾" : "▴"}</span>
                     </button>
                 )}
             </div>
