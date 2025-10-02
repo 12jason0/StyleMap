@@ -4,9 +4,51 @@ export default function PrivacyPolicyPage() {
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
                 <div className="max-w-4xl mx-auto">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-8">개인정보처리방침</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">개인정보처리방침</h1>
+                    <p className="text-gray-600 mb-6">
+                        개인정보의 수집·이용 목적과 보관 기간을 항목별로 쉽게 확인할 수 있도록 구성했습니다.
+                    </p>
 
-                    <div className="prose prose-lg max-w-none">
+                    <div className="prose prose-lg max-w-none leading-relaxed">
+                        {/* 빠른 이동 */}
+                        <div className="mb-6 flex flex-wrap gap-2">
+                            <a
+                                href="#purpose"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                처리 목적
+                            </a>
+                            <a
+                                href="#retention"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                보유 기간
+                            </a>
+                            <a
+                                href="#items"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                처리 항목
+                            </a>
+                            <a
+                                href="#behavior"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                행태정보
+                            </a>
+                            <a
+                                href="#rights"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                권리
+                            </a>
+                            <a
+                                href="#security"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                안전조치
+                            </a>
+                        </div>
                         {/* 베타 서비스 안내 */}
                         <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
                             <p className="text-sm text-blue-800">
@@ -21,7 +63,9 @@ export default function PrivacyPolicyPage() {
                             수립·공개합니다.
                         </p>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제1조 개인정보의 처리목적</h2>
+                        <h2 id="purpose" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제1조 개인정보의 처리목적
+                        </h2>
                         <p className="text-gray-700 mb-4">
                             StyleMap은 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적
                             이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 개인정보보호법 제18조에 따라
@@ -38,7 +82,7 @@ export default function PrivacyPolicyPage() {
                             <li>고객 지원: 문의사항 처리 및 공지사항 전달</li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                        <h2 id="retention" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
                             제2조 개인정보의 처리 및 보유기간
                         </h2>
                         <p className="text-gray-700 mb-4">
@@ -57,7 +101,9 @@ export default function PrivacyPolicyPage() {
                             </li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제3조 처리하는 개인정보 항목</h2>
+                        <h2 id="items" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제3조 처리하는 개인정보 항목
+                        </h2>
                         <p className="text-gray-700 mb-4">StyleMap은 다음의 개인정보 항목을 처리하고 있습니다.</p>
 
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">1. 회원가입 시</h3>
@@ -95,7 +141,7 @@ export default function PrivacyPolicyPage() {
                         </ul>
 
                         {/* [추가된 부분] 구글 애널리틱스 관련 내용을 명시적으로 추가합니다. */}
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                        <h2 id="behavior" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
                             제4조 행태정보의 수집·이용 및 거부 등에 관한 사항
                         </h2>
                         <p className="text-gray-700 mb-4">
@@ -151,7 +197,7 @@ export default function PrivacyPolicyPage() {
                         {/* 이하 내용은 기존과 동일하므로 생략합니다. 가독성을 위해 기존 코드를 그대로 붙여넣으시면 됩니다. */}
                         {/* ... 제7조부터 부칙까지 ... */}
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                        <h2 id="rights" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
                             제7조 정보주체의 권리·의무 및 행사방법
                         </h2>
                         <p className="text-gray-700 mb-4">
@@ -175,7 +221,9 @@ export default function PrivacyPolicyPage() {
                             지체없이 해당 개인정보를 파기합니다.
                         </p>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제9조 개인정보의 안전성 확보조치</h2>
+                        <h2 id="security" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제9조 개인정보의 안전성 확보조치
+                        </h2>
                         <p className="text-gray-700 mb-4">
                             StyleMap은 개인정보보호법 제29조에 따라 다음과 같이 안전성 확보에 필요한 기술적/관리적 및
                             물리적 조치를 하고 있습니다.

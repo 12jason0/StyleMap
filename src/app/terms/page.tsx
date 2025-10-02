@@ -4,9 +4,51 @@ export default function TermsOfServicePage() {
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
                 <div className="max-w-4xl mx-auto">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-8">이용약관</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">이용약관</h1>
+                    <p className="text-gray-600 mb-6">
+                        서비스 이용에 필요한 핵심 조항을 빠르게 찾아볼 수 있도록 구성했습니다.
+                    </p>
 
-                    <div className="prose prose-lg max-w-none">
+                    <div className="prose prose-lg max-w-none leading-relaxed">
+                        {/* 빠른 이동 */}
+                        <div className="mb-6 flex flex-wrap gap-2">
+                            <a
+                                href="#def"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                정의
+                            </a>
+                            <a
+                                href="#change"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                약관 변경
+                            </a>
+                            <a
+                                href="#service"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                서비스 제공
+                            </a>
+                            <a
+                                href="#signup"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                회원가입
+                            </a>
+                            <a
+                                href="#duty"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                회원 의무
+                            </a>
+                            <a
+                                href="#ip"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                저작권
+                            </a>
+                        </div>
                         {/* 베타 서비스 안내 */}
                         <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
                             <p className="text-sm text-blue-800">
@@ -22,7 +64,9 @@ export default function TermsOfServicePage() {
                             규정함을 목적으로 합니다.
                         </p>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제2조 (용어의 정의)</h2>
+                        <h2 id="def" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제2조 (용어의 정의)
+                        </h2>
                         <ul className="list-decimal pl-6 mb-6 text-gray-700 space-y-2">
                             <li>
                                 <strong>"서비스"</strong>라 함은 StyleMap이 제공하는 여행 코스 추천, 지도 서비스, 사용자
@@ -41,7 +85,9 @@ export default function TermsOfServicePage() {
                             </li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제3조 (약관의 효력 및 변경)</h2>
+                        <h2 id="change" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제3조 (약관의 효력 및 변경)
+                        </h2>
                         <ul className="list-decimal pl-6 mb-6 text-gray-700 space-y-2">
                             <li>
                                 본 약관은 서비스 화면에 게시하거나 기타의 방법으로 이용자에게 공지함으로써 효력을
@@ -56,7 +102,9 @@ export default function TermsOfServicePage() {
                             </li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제4조 (서비스의 제공)</h2>
+                        <h2 id="service" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제4조 (서비스의 제공)
+                        </h2>
                         <p className="text-gray-700 mb-4">서비스는 다음과 같은 업무를 제공합니다.</p>
                         <ul className="list-disc pl-6 mb-6 text-gray-700 space-y-1">
                             <li>AI 기반 여행 코스 추천 서비스</li>
@@ -67,7 +115,9 @@ export default function TermsOfServicePage() {
                             <li>기타 여행 관련 부가 서비스</li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제5조 (회원가입)</h2>
+                        <h2 id="signup" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제5조 (회원가입)
+                        </h2>
                         <ul className="list-decimal pl-6 mb-6 text-gray-700 space-y-2">
                             <li>
                                 이용자는 서비스에서 정한 가입 양식에 따라 회원정보를 기입한 후 본 약관에 동의한다는
@@ -106,7 +156,9 @@ export default function TermsOfServicePage() {
                             </li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제7조 (회원의 의무)</h2>
+                        <h2 id="duty" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
+                            제7조 (회원의 의무)
+                        </h2>
                         <p className="text-gray-700 mb-4">회원은 다음 행위를 하여서는 안됩니다.</p>
                         <ul className="list-disc pl-6 mb-6 text-gray-700 space-y-1">
                             <li>신청 또는 변경 시 허위내용의 등록</li>
@@ -142,7 +194,7 @@ export default function TermsOfServicePage() {
                             </li>
                         </ul>
 
-                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                        <h2 id="ip" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
                             제9조 (저작권의 귀속 및 이용제한)
                         </h2>
                         <ul className="list-decimal pl-6 mb-6 text-gray-700 space-y-2">

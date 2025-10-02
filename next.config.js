@@ -20,11 +20,18 @@ const nextConfig = {
         ];
     },
     images: {
-        domains: [
-            "images.unsplash.com",
-            "stylemap-images.s3.ap-southeast-2.amazonaws.com",
+        remotePatterns: [
+            { protocol: "https", hostname: "images.unsplash.com" },
+            // ✅ 새 서울 버킷 주소 추가
+            { protocol: "https", hostname: "stylemap-seoul.s3.ap-northeast-2.amazonaws.com" },
+            // 기존 시드니 버킷 주소 (이제 필요 없다면 이 줄은 삭제해도 됩니다)
+            { protocol: "https", hostname: "stylemap-images.s3.ap-southeast-2.amazonaws.com" },
+            // 환경변수로 추가 도메인 허용 (이 부분은 그대로 둡니다)
             ...(process.env.NEXT_IMAGE_EXTRA_DOMAINS
-                ? process.env.NEXT_IMAGE_EXTRA_DOMAINS.split(",").map((d) => d.trim())
+                ? process.env.NEXT_IMAGE_EXTRA_DOMAINS.split(",")
+                      .map((d) => d.trim())
+                      .filter(Boolean)
+                      .map((host) => ({ protocol: "https", hostname: host }))
                 : []),
         ],
     },

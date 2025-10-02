@@ -72,7 +72,10 @@ const CookiesPolicyPage = () => {
         <div className="flex flex-col min-h-screen bg-white">
             <main className="flex-grow container mx-auto px-4 py-8 bg-white">
                 <div className="max-w-4xl mx-auto">
-                    <h1 className="text-3xl font-bold text-gray-900 mb-8">쿠키 정책</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">쿠키 정책</h1>
+                    <p className="text-gray-600 mb-6">
+                        쿠키의 사용 목적과 관리 방법을 한눈에 확인할 수 있도록 정리했습니다.
+                    </p>
 
                     {/* 베타 서비스 안내 */}
                     <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
@@ -82,11 +85,56 @@ const CookiesPolicyPage = () => {
                         </p>
                     </div>
 
-                    <div className="prose prose-lg max-w-none text-gray-700">
+                    <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed">
+                        {/* 빠른 이동 */}
+                        <div className="mb-6 flex flex-wrap gap-2">
+                            <a
+                                href="#what"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                쿠키란?
+                            </a>
+                            <a
+                                href="#why"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                사용 목적
+                            </a>
+                            <a
+                                href="#types"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                쿠키 유형
+                            </a>
+                            <a
+                                href="#details"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                상세 정보
+                            </a>
+                            <a
+                                href="#manage"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                관리 방법
+                            </a>
+                            <a
+                                href="#contact"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                문의처
+                            </a>
+                            <a
+                                href="#updates"
+                                className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-800 text-sm hover:bg-white border"
+                            >
+                                정책 업데이트
+                            </a>
+                        </div>
                         <p className="mb-6">최종 업데이트: 2025년 1월 10일</p>
 
                         {/* 쿠키란? */}
-                        <section className="mb-8">
+                        <section id="what" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">쿠키란 무엇인가요?</h2>
                             <p className="mb-4">
                                 쿠키는 웹사이트를 방문할 때 브라우저에 저장되는 작은 텍스트 파일입니다. 쿠키는
@@ -100,7 +148,7 @@ const CookiesPolicyPage = () => {
                         </section>
 
                         {/* 쿠키 사용 목적 */}
-                        <section className="mb-8">
+                        <section id="why" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">쿠키를 사용하는 이유</h2>
                             <div className="space-y-4">
                                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -133,7 +181,7 @@ const CookiesPolicyPage = () => {
                         </section>
 
                         {/* 쿠키 유형 */}
-                        <section className="mb-8">
+                        <section id="types" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">사용하는 쿠키 유형</h2>
 
                             {/* 필수 쿠키 */}
@@ -286,11 +334,11 @@ const CookiesPolicyPage = () => {
                         </section>
 
                         {/* 쿠키 상세 정보 테이블 */}
-                        <section className="mb-8">
+                        <section id="details" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">쿠키 상세 정보</h2>
                             <div className="overflow-x-auto">
                                 <table className="min-w-full bg-white border border-gray-200 rounded-lg">
-                                    <thead className="bg-gray-50">
+                                    <thead className="bg-gray-50 sticky top-0 z-10">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                 쿠키명
@@ -311,8 +359,8 @@ const CookiesPolicyPage = () => {
                                     </thead>
                                     <tbody className="divide-y divide-gray-200">
                                         {cookieData.map((cookie, index) => (
-                                            <tr key={index} className="hover:bg-gray-50">
-                                                <td className="px-2 py-2 text-sm font-medium text-gray-900">
+                                            <tr key={index} className="hover:bg-gray-50 odd:bg-white even:bg-gray-50">
+                                                <td className="px-2 py-2 text-sm font-medium text-gray-900 whitespace-nowrap">
                                                     {cookie.name}
                                                 </td>
                                                 <td className="px-2 py-1 text-sm text-gray-500 whitespace-nowrap">
@@ -341,7 +389,7 @@ const CookiesPolicyPage = () => {
                         </section>
 
                         {/* 쿠키 관리 방법 */}
-                        <section className="mb-8">
+                        <section id="manage" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">쿠키를 관리하는 방법</h2>
 
                             <div className="bg-gray-50 rounded-lg p-6 mb-4">
@@ -394,7 +442,7 @@ const CookiesPolicyPage = () => {
                         </section>
 
                         {/* 문의처 */}
-                        <section className="mb-8">
+                        <section id="contact" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">문의하기</h2>
                             <div className="bg-gray-50 rounded-lg p-6">
                                 <p className="mb-4">쿠키 정책에 대한 문의사항이 있으시면 아래로 연락해 주세요.</p>
@@ -410,7 +458,7 @@ const CookiesPolicyPage = () => {
                         </section>
 
                         {/* 정책 업데이트 */}
-                        <section className="mb-8">
+                        <section id="updates" className="mb-8 scroll-mt-24">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">정책 업데이트</h2>
                             <p>
                                 이 쿠키 정책은 필요에 따라 업데이트될 수 있습니다. 중요한 변경사항이 있을 경우
