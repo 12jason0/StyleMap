@@ -42,7 +42,7 @@ interface Course {
     title: string;
     description: string;
     duration: string;
-    price: string;
+    price?: string;
     imageUrl: string;
     concept: string;
     rating: number;
@@ -190,7 +190,7 @@ export default function CourseDetailPage() {
         return "/images/placeholder.png"; // Fallback Image
     }, [courseData?.imageUrl, sortedCoursePlaces]);
 
-    const totalCost = useMemo(() => courseData?.price || "정보 없음", [courseData]);
+    const totalCost = useMemo(() => courseData?.price || "", [courseData]);
 
     // --- 함수 및 핸들러 ---
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
@@ -439,7 +439,7 @@ export default function CourseDetailPage() {
         fetchInitialData();
     }, [courseId]);
 
-    // 조회수 증가 로직 (30분 쿨다운)
+    // 조회수 증가 로직 (30분 쿨다운, 비로그인 포함)
     useEffect(() => {
         const key = `course_view_${courseId}`;
         const now = Date.now();
@@ -527,21 +527,20 @@ export default function CourseDetailPage() {
 
             <div className="min-h-screen bg-gray-50 text-black">
                 {/* Hero Section */}
-                <section className="relative h-[300px] md:h-[500px] overflow-hidden pt-10">
+                <section className="relative h-[300px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
-                        <Image
+                        <img
                             src={heroImageUrl}
                             alt={courseData.title}
-                            fill
-                            priority
-                            sizes="100vw"
-                            className="object-cover"
+                            className="object-cover w-full h-full"
+                            loading="eager"
+                            decoding="async"
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
 
                     <div className="relative h-full max-w-[500px] mx-auto px-4 flex items-center">
-                        <div className="max-w-[85%] md:max-w-2xl">
+                        <div className="max-w-[85%]">
                             <div className="mb-4 flex items-center gap-3 flex-wrap">
                                 {courseData.isPopular && (
                                     <span className="px-4 py-1.5 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
@@ -556,9 +555,9 @@ export default function CourseDetailPage() {
                                 </span>
                             </div>
 
-                            <h1 className="text-lg md:text-4xl font-bold text-white mb-4">{courseData.title}</h1>
+                            <h1 className="text-2xl font-bold text-white mb-4">{courseData.title}</h1>
                             <p
-                                className="text-base md:text-xl text-white/90 mb-6"
+                                className="text-base text-white/90 mb-6"
                                 style={{
                                     display: "-webkit-box",
                                     WebkitLineClamp: 2,
@@ -569,14 +568,13 @@ export default function CourseDetailPage() {
                                 {courseData.description}
                             </p>
 
-                            <div className="flex items-center gap-4 md:gap-6 text-white text-sm md:text-base flex-wrap">
+                            <div className="flex items-center gap-4 text-white text-sm flex-wrap">
                                 <div className="flex items-center gap-2">
                                     <span className="text-yellow-400 text-2xl">★</span>
                                     <span className="font-bold">{courseData.rating}</span>
                                 </div>
                                 <span>📍 {courseData.coursePlaces?.length || 0}개 장소</span>
                                 <span>⏱ {courseData.duration}</span>
-                                <span>💰 {totalCost}</span>
                                 <span className="hidden md:inline">🕒 {courseData.recommendedTime}</span>
                             </div>
                         </div>
@@ -641,7 +639,7 @@ export default function CourseDetailPage() {
                                                     onPlaceClick={setSelectedPlace}
                                                     drawPath={true}
                                                     routeMode="walking"
-                                                    className="w-full h-64 md:h-96 rounded-2xl"
+                                                    className="w-full h-64 rounded-2xl"
                                                     style={{ minHeight: "260px" }}
                                                 />
                                             ) : (
@@ -656,7 +654,7 @@ export default function CourseDetailPage() {
                                     </div>
 
                                     {/* 타임라인 */}
-                                    <div className="relative pl-6 md:pl-10" style={{ willChange: "transform" }}>
+                                    <div className="relative pl-6" style={{ willChange: "transform" }}>
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
 
                                         {sortedCoursePlaces.length > 0 ? (
@@ -680,13 +678,12 @@ export default function CourseDetailPage() {
                                                                         {coursePlace.place.category || "기타"}
                                                                     </span>
                                                                     {coursePlace.place.image_url ? (
-                                                                        <Image
+                                                                        <img
                                                                             src={coursePlace.place.image_url}
                                                                             alt={coursePlace.place.name}
-                                                                            fill
-                                                                            sizes="(max-width: 640px) 100vw, 144px"
-                                                                            className="object-cover"
-                                                                            priority={idx === 0}
+                                                                            className="object-cover w-full h-full"
+                                                                            loading={idx === 0 ? "eager" : "lazy"}
+                                                                            decoding="async"
                                                                         />
                                                                     ) : null}
                                                                 </div>
@@ -1015,13 +1012,12 @@ export default function CourseDetailPage() {
                         </div>
                         {selectedPlace.imageUrl ? (
                             <div className="w-full max-h-64 md:max-h-96 bg-gray-100 overflow-hidden flex items-center justify-center">
-                                <Image
+                                <img
                                     src={selectedPlace.imageUrl}
                                     alt={selectedPlace.name}
-                                    width={1200}
-                                    height={800}
                                     className="w-full h-auto object-contain"
-                                    priority
+                                    loading="eager"
+                                    decoding="async"
                                 />
                             </div>
                         ) : (

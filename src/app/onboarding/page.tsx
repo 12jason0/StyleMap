@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface UserPreferences {
@@ -31,6 +31,26 @@ const AIOnboarding = () => {
     });
 
     const totalSteps = 8;
+
+    // 전체 화면 고정: 온보딩 동안 스크롤 제거 및 높이 고정
+    useEffect(() => {
+        try {
+            const mainEl = document.querySelector("main") as HTMLElement | null;
+            if (!mainEl) return;
+            const previousClassName = mainEl.className;
+            const previousStyle = { overflow: mainEl.style.overflow, height: mainEl.style.height } as const;
+            mainEl.classList.remove("overflow-y-auto", "overscroll-contain", "no-scrollbar", "scrollbar-hide");
+            mainEl.classList.add("overflow-hidden");
+            if (!mainEl.style.height) mainEl.style.height = "100vh";
+            return () => {
+                try {
+                    mainEl.className = previousClassName;
+                    mainEl.style.overflow = previousStyle.overflow;
+                    mainEl.style.height = previousStyle.height;
+                } catch {}
+            };
+        } catch {}
+    }, []);
 
     const handleMultiSelect = (key: keyof UserPreferences, value: string) => {
         const currentValues = preferences[key] as string[];
@@ -435,7 +455,7 @@ const AIOnboarding = () => {
                 </div>
 
                 {/* 단계별 컨텐츠 */}
-                <div className="bg-white rounded-2xl shadow-xl p-4 md:p-8 mb-8">
+                <div className="bg-white rounded-2xl shadow-xl p-4  mb-8">
                     <div className="md:hidden grid gap-3" style={{ gridTemplateColumns: "1fr" }}>
                         {/* 모바일: 스크롤 없이 한 화면에 담기도록 요소 간격과 폰트 사이즈 축소 */}
                         <div className="text-center space-y-2 text-sm">{renderStep()}</div>
@@ -448,7 +468,7 @@ const AIOnboarding = () => {
                     <button
                         onClick={prevStep}
                         disabled={currentStep === 1}
-                        className="px-4 md:px-6 py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-100 cursor-pointer"
+                        className="px-4  py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-100 cursor-pointer"
                     >
                         이전
                     </button>
@@ -456,14 +476,14 @@ const AIOnboarding = () => {
                     <button
                         onClick={nextStep}
                         disabled={!isStepValid()}
-                        className="px-4 md:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                         {currentStep === totalSteps ? "완료" : "다음"}
                     </button>
                 </div>
 
                 {/* 건너뛰기 옵션 */}
-                <div className="text-center mt-6 md:mt-6 mb-20 md:mb-0">
+                <div className="text-center mt-6 mb-20 ">
                     <button
                         onClick={() => router.push("/")}
                         className="text-gray-500 hover:text-gray-700 text-sm underline cursor-pointer"

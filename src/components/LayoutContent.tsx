@@ -5,6 +5,7 @@
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import Header from "@/components/Header";
+import AppInstallQR from "@/components/AppInstallQR";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -99,42 +100,8 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                         onClick={() => setIsQrOpen(false)}
                     >
                         <div className="absolute inset-0 flex items-center justify-center p-4">
-                            <div
-                                className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-gray-900">앱 설치 QR 코드</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <img
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                                                    "https://apps.apple.com/kr/app"
-                                                )}`}
-                                                alt="App Store QR"
-                                                className="w-full max-w-[220px] h-auto"
-                                            />
-                                            <span className="text-xs text-gray-600">App Store</span>
-                                        </div>
-                                        <div className="flex flex-col items-center gap-2">
-                                            <img
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
-                                                    "https://play.google.com/store/apps"
-                                                )}`}
-                                                alt="Google Play QR"
-                                                className="w-full max-w-[220px] h-auto"
-                                            />
-                                            <span className="text-xs text-gray-600">Google Play</span>
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className=" mt-2 w-full py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-black/90 hover:cursor-pointer"
-                                        onClick={() => setIsQrOpen(false)}
-                                    >
-                                        닫기
-                                    </button>
-                                </div>
+                            <div onClick={(e) => e.stopPropagation()}>
+                                <AppInstallQR onClose={() => setIsQrOpen(false)} />
                             </div>
                         </div>
                     </div>

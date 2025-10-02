@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
-import { filterCoursesByImagePolicy, type ImagePolicy, CourseWithPlaces } from "@/lib/imagePolicy";
+import { filterCoursesByImagePolicy, type ImagePolicy, type CourseWithPlaces } from "@/lib/imagePolicy";
 import { getUserIdFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
     try {
@@ -39,30 +40,34 @@ export async function GET(request: NextRequest) {
             orderBy: [{ id: "desc" }],
             take: effectiveLimit,
             skip: effectiveOffset,
-            // 기본적으로 조인 없음 (일부 환경에서 조인 테이블이 없을 수 있음)
-        };
-
-        if (imagePolicy === "none-or-all" || imagePolicy === "all-or-one-missing") {
-            prismaQuery.include = {
-                coursePlaces: {
-                    include: { place: true },
-                },
-            };
-        } else if (lean) {
-            prismaQuery.select = {
+            select: {
                 id: true,
                 title: true,
                 description: true,
                 duration: true,
                 region: true,
-                price: true,
                 imageUrl: true,
                 concept: true,
                 rating: true,
                 current_participants: true,
                 view_count: true,
-            };
-        }
+                coursePlaces: {
+                    orderBy: { order_index: "asc" },
+                    select: {
+                        order_index: true,
+                        place: {
+                            select: {
+                                id: true,
+                                name: true,
+                                imageUrl: true,
+                                latitude: true,
+                                longitude: true,
+                            },
+                        },
+                    },
+                },
+            },
+        };
 
         const results = await prisma.course.findMany(prismaQuery);
         const imagePolicyApplied = filterCoursesByImagePolicy(results as CourseWithPlaces[], imagePolicy);
@@ -103,13 +108,13 @@ export async function GET(request: NextRequest) {
                 description: course.description || "",
                 duration: course.duration || "",
                 location: course.region || "",
-                price: course.price || "",
                 imageUrl: resolvedImageUrl,
                 concept: course.concept || "",
                 rating: Number(course.rating) || 0,
                 reviewCount: 0,
                 participants: course.current_participants || 0,
                 view_count: course.view_count || 0,
+                viewCount: course.view_count || 0,
                 tags: courseIdToTags.get(idNumber) ?? [],
             };
         });
@@ -140,7 +145,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { title, description, duration, location, price, imageUrl, concept } = body;
+        const { title, description, duration, location, imageUrl, concept } = body;
 
         if (!title) {
             return NextResponse.json({ error: "제목은 필수입니다" }, { status: 400 });
@@ -164,7 +169,6 @@ export async function POST(request: NextRequest) {
                 description: description || null,
                 duration: duration || null,
                 region: location || null,
-                price: price || null,
                 imageUrl: imageUrl || null,
                 concept: concept || null,
                 userId: numericUserId, // 수정된 변수 사용
@@ -178,7 +182,6 @@ export async function POST(request: NextRequest) {
                 description: created.description || "",
                 duration: created.duration || "",
                 location: created.region || "",
-                price: created.price || "",
                 imageUrl: created.imageUrl || "",
                 concept: created.concept || "",
                 rating: 0,

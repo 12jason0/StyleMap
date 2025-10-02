@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { MapProps, Place } from "@/types/map";
 
 export default function NaverMapComponent({
@@ -123,11 +123,35 @@ export default function NaverMapComponent({
             bounds.extend(pos);
         }
 
+        // 아이콘 팩토리
+        const getMarkerIcon = (category?: string) => {
+            try {
+                const isCafe = typeof category === "string" && category.includes("카페");
+                const isFood =
+                    typeof category === "string" &&
+                    (category.includes("음식") || category.includes("맛집") || category.includes("식당"));
+                const url = isCafe ? "/images/cafeMaker.png" : isFood ? "/images/maker1.png" : undefined;
+                if (!url) return undefined;
+                return {
+                    url,
+                    size: new naver.maps.Size(24, 37),
+                    anchor: new naver.maps.Point(12, 37),
+                } as any;
+            } catch {
+                return undefined;
+            }
+        };
+
         // 장소들
         const valid: Place[] = (places || []).filter((p) => isValidLatLng(p?.latitude, p?.longitude)) as Place[];
         valid.forEach((p) => {
             const pos = new naver.maps.LatLng(Number(p.latitude), Number(p.longitude));
-            const marker = new naver.maps.Marker({ position: pos, map, title: p.name });
+            const marker = new naver.maps.Marker({
+                position: pos,
+                map,
+                title: p.name,
+                icon: getMarkerIcon((p as any).category),
+            });
             naver.maps.Event.addListener(marker, "click", () => onPlaceClick(p));
             markersRef.current.push(marker);
             bounds.extend(pos);

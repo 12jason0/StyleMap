@@ -4,6 +4,7 @@ export interface Place {
     latitude: number;
     longitude: number;
     address?: string;
+    category?: string;
     imageUrl?: string;
     description?: string;
     iconUrl?: string; // 커스텀 마커 아이콘 (고대 룬 등)

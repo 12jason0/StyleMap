@@ -654,13 +654,10 @@ const MyPage = () => {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1">
                                             <span className="text-yellow-400">★</span>
-                                            <span className="text-xs md:text-sm font-medium">
+                                            <span className="text-xs md:text-sm font-medium text-gray-900">
                                                 {favorite.course.rating}
                                             </span>
                                         </div>
-                                        <span className="text-blue-600 font-semibold text-sm md:text-base">
-                                            {favorite.course.price}
-                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -1191,7 +1188,7 @@ const MyPage = () => {
                             </div>
                             <div className="flex gap-2">
                                 <button
-                                    className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 text-black"
+                                    className="hover:cursor-pointer px-4 py-2 rounded-lg border bg-white hover:bg-gray-50 text-black    "
                                     onClick={() => selectedBadge && shareBadgeToKakao(selectedBadge)}
                                 >
                                     자랑하기

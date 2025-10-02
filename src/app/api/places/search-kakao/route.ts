@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const keywords = keyword ? [keyword] : ["맛집", "카페", "관광명소"];
+        const keywords = keyword ? [keyword] : ["맛집", "카페", "관광명소", "명소", "랜드마크"];
         let combinedResults: any[] = [];
 
         for (const kw of keywords) {
@@ -65,8 +65,13 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // id 기준 중복 제거
-        const uniquePlaces = Array.from(new Map(combinedResults.map((p) => [p.id, p])).values());
+        // 저수지 제외 + id 기준 중복 제거
+        const filtered = combinedResults.filter((p) => {
+            const name = String(p.name || "");
+            const cat = String(p.category || "");
+            return !name.includes("저수지") && !cat.includes("저수지");
+        });
+        const uniquePlaces = Array.from(new Map(filtered.map((p) => [p.id, p])).values());
 
         return NextResponse.json({ success: true, places: uniquePlaces });
     } catch (error) {

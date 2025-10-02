@@ -107,6 +107,26 @@ function GuidePageInner() {
         return () => {};
     }, []);
 
+    // 전체 화면 고정: start 페이지에서 스크롤 비활성화 및 높이 고정
+    useEffect(() => {
+        try {
+            const mainEl = document.querySelector("main") as HTMLElement | null;
+            if (!mainEl) return;
+            const previousClassName = mainEl.className;
+            const previousStyle = { overflow: mainEl.style.overflow, height: mainEl.style.height } as const;
+            mainEl.classList.remove("overflow-y-auto", "overscroll-contain", "no-scrollbar", "scrollbar-hide");
+            mainEl.classList.add("overflow-hidden");
+            if (!mainEl.style.height) mainEl.style.height = "100vh";
+            return () => {
+                try {
+                    mainEl.className = previousClassName;
+                    mainEl.style.overflow = previousStyle.overflow;
+                    mainEl.style.height = previousStyle.height;
+                } catch {}
+            };
+        } catch {}
+    }, []);
+
     // 현재 단계의 장소 정보
     const currentPlace = course?.coursePlaces?.[currentStep]?.place;
 

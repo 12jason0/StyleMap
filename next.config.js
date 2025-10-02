@@ -34,6 +34,8 @@ const nextConfig = {
                       .map((host) => ({ protocol: "https", hostname: host }))
                 : []),
         ],
+        // S3 원본 403 이슈 회피 및 탐색 속도 개선: 개발 단계에서는 이미지 최적화 비활성화
+        unoptimized: true,
     },
     // experimental 옵션 제거 (빌드 경고 방지)
 };

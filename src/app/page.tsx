@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import SectionHeader from "@/components/SectionHeader";
+import HeroSlider from "@/components/HeroSlider";
+import OnboardingSection from "@/components/OnboardingSection";
 
 type Course = {
     id: string;
@@ -28,10 +30,7 @@ type Course = {
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [searchRegion, setSearchRegion] = useState("");
-    const [currentSlide, setCurrentSlide] = useState(0);
-    const [touchStartX, setTouchStartX] = useState<number | null>(null);
-    const [touchDeltaX, setTouchDeltaX] = useState(0);
-    const [isTouching, setIsTouching] = useState(false);
+    const [currentSlide] = useState(0);
     const [, setLoading] = useState(true);
     const [showWelcome, setShowWelcome] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
@@ -59,7 +58,7 @@ export default function Home() {
                     setCourses(data);
                 } else if (data.error) {
                     console.error("API Error:", data.error, data.details);
-                    alert("데이터베이스 연결에 실패했습니다. 환경 변수와 데이터베이스 설정을 확인해주세요.");
+                    setErrorMessage("데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.");
                     setCourses([]);
                 } else {
                     console.error("Unexpected data format:", data);
@@ -67,7 +66,7 @@ export default function Home() {
                 }
             } catch (error) {
                 console.error("Failed to fetch courses:", error);
-                alert("코스 데이터를 가져오는데 실패했습니다. 네트워크 연결을 확인해주세요.");
+                setErrorMessage("코스 데이터를 가져오는데 실패했습니다. 네트워크 연결을 확인해주세요.");
                 setCourses([]);
             } finally {
                 setLoading(false);
@@ -126,6 +125,7 @@ export default function Home() {
         return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
     }, []);
 
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const topCourses = courses.slice(0, 5);
     const hotCourses = courses
         .filter((c) => c.participants > 10 || c.rating >= 4.5)
@@ -143,6 +143,21 @@ export default function Home() {
 
     return (
         <>
+            {errorMessage && (
+                <div className="mx-4 my-3 rounded-xl bg-red-50 border border-red-200 text-red-800 p-4">
+                    <div className="flex items-start gap-2">
+                        <span>⚠️</span>
+                        <div className="flex-1 text-sm">{errorMessage}</div>
+                        <button
+                            onClick={() => setErrorMessage(null)}
+                            className="text-red-700/70 hover:text-red-900"
+                            aria-label="닫기"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
             {showWelcome && (
                 <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
                     <div className="flex items-center space-x-2">
@@ -251,11 +266,15 @@ export default function Home() {
                             </svg>
                         </button>
                         <div className="text-4xl mb-4">🤖</div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2">AI 코스 이용해보세요!</h2>
-                        <p className="text-gray-600 mb-4">개인 맞춤 AI 추천 코스를 경험해보세요</p>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">
+                            AI가 당신에게 꼭 맞는 여행 코스를 찾아드려요
+                        </h2>
+                        <p className="text-gray-600 mb-4">
+                            몇 가지 질문에 답하면 취향에 맞는 특별한 코스가 완성됩니다.
+                        </p>
                         <div className="bg-sky-500 text-white p-4 rounded-lg mb-4">
-                            <div className="text-2xl font-bold mb-1">AI 맞춤 추천</div>
-                            <div className="text-sm opacity-90">당신만을 위한 특별한 여행 코스</div>
+                            <div className="text-2xl font-bold mb-1">나만의 맞춤 추천</div>
+                            <div className="text-sm opacity-90">고민 없이 바로 추천받고 시작해보세요</div>
                         </div>
                         <div className="flex flex-col gap-2">
                             <button
@@ -265,7 +284,7 @@ export default function Home() {
                                 }}
                                 className="btn-primary hover:cursor-pointer"
                             >
-                                AI 코스 시작하기
+                                AI로 나만의 코스 추천받기
                             </button>
                             <button
                                 onClick={() => {
@@ -275,7 +294,7 @@ export default function Home() {
                                 }}
                                 className="text-gray-500 text-sm hover:text-gray-700 transition-colors hover:cursor-pointer"
                             >
-                                1시간 동안 보지 않기
+                                다음에 할게요 · 1시간 동안 보지 않기
                             </button>
                         </div>
                     </div>
@@ -347,179 +366,19 @@ export default function Home() {
                     {searchRegion && <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>}
                 </div>
                 {/* Hero Section - 대형 슬라이드 (카드형) */}
-                <section className="relative px-4">
-                    <div
-                        className="relative h-[200px] overflow-hidden shadow-xl mr-8 cursor-grab select-none"
-                        style={{
-                            transform: `translateX(${touchDeltaX * 0.15}px)`,
-                            transition: isTouching ? "none" : "transform 300ms ease",
-                        }}
-                        onTouchStart={(e) => {
-                            if (e.touches && e.touches.length > 0) {
-                                setTouchStartX(e.touches[0].clientX);
-                                setTouchDeltaX(0);
-                                setIsTouching(true);
-                            }
-                        }}
-                        onTouchMove={(e) => {
-                            if (touchStartX !== null && e.touches && e.touches.length > 0) {
-                                setTouchDeltaX(e.touches[0].clientX - touchStartX);
-                            }
-                        }}
-                        onTouchEnd={() => {
-                            const threshold = 40;
-                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
-                            if (total === 0) return;
-                            if (touchDeltaX > threshold) {
-                                setCurrentSlide((prev) => (prev - 1 + total) % total);
-                            } else if (touchDeltaX < -threshold) {
-                                setCurrentSlide((prev) => (prev + 1) % total);
-                            }
-                            setTouchStartX(null);
-                            setTouchDeltaX(0);
-                            setIsTouching(false);
-                        }}
-                        onMouseDown={(e) => {
-                            e.preventDefault();
-                            setTouchStartX(e.clientX);
-                            setTouchDeltaX(0);
-                            setIsTouching(true);
-                        }}
-                        onMouseMove={(e) => {
-                            if (isTouching && touchStartX !== null) {
-                                setTouchDeltaX(e.clientX - touchStartX);
-                            }
-                        }}
-                        onMouseLeave={() => {
-                            if (!isTouching) return;
-                            const threshold = 40;
-                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
-                            if (total !== 0) {
-                                if (touchDeltaX > threshold) {
-                                    setCurrentSlide((prev) => (prev - 1 + total) % total);
-                                } else if (touchDeltaX < -threshold) {
-                                    setCurrentSlide((prev) => (prev + 1) % total);
-                                }
-                            }
-                            setTouchStartX(null);
-                            setTouchDeltaX(0);
-                            setIsTouching(false);
-                        }}
-                        onMouseUp={() => {
-                            if (!isTouching) return;
-                            const threshold = 40;
-                            const total = topCourses.length > 0 ? Math.min(5, topCourses.length) : 0;
-                            if (total !== 0) {
-                                if (touchDeltaX > threshold) {
-                                    setCurrentSlide((prev) => (prev - 1 + total) % total);
-                                } else if (touchDeltaX < -threshold) {
-                                    setCurrentSlide((prev) => (prev + 1) % total);
-                                }
-                            }
-                            setTouchStartX(null);
-                            setTouchDeltaX(0);
-                            setIsTouching(false);
-                        }}
-                    >
-                        <div className="absolute inset-0">
-                            {topCourses.map((course, index) => (
-                                <div
-                                    key={course.id}
-                                    className={`absolute inset-0 transition-all duration-1000 ${
-                                        index === currentSlide ? "opacity-100 z-20" : "opacity-100 z-10"
-                                    }`}
-                                >
-                                    <div className="absolute inset-0">
-                                        {course.imageUrl ? (
-                                            <Image
-                                                src={course.imageUrl}
-                                                alt={course.title}
-                                                fill
-                                                priority={index === currentSlide}
-                                                sizes="100vw"
-                                                className="object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-white" />
-                                        )}
-                                        <div className="absolute inset-0 bg-black/50" />
-                                    </div>
-                                    <div className="absolute bottom-6 right-6 left-6 text-right">
-                                        <h2 className="text-white font-extrabold text-3xl leading-tight drop-shadow-md">
-                                            {course.location}
-                                        </h2>
-                                        <div className="text-white/90 text-sm mt-3 opacity-90">
-                                            #{course.concept}
-                                            {Array.isArray(course.tags) && course.tags.length > 0 && (
-                                                <>
-                                                    {" "}
-                                                    {course.tags.slice(0, 3).map((t) => (
-                                                        <span key={t} className="ml-2">
-                                                            #{t}
-                                                        </span>
-                                                    ))}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="absolute bottom-4 left-4 z-30">
-                                        <span className="px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
-                                            {currentSlide + 1}/{topCourses.length || 1}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    {topCourses.length > 1 && (
-                        <div
-                            className="pointer-events-none absolute top-0 bottom-0 right-2 w-6 overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
-                            style={{
-                                transform: `translateX(${touchDeltaX * 0.15}px)`,
-                                transition: isTouching ? "none" : "transform 300ms ease",
-                            }}
-                        >
-                            {topCourses[(currentSlide + 1) % topCourses.length].imageUrl ? (
-                                <Image
-                                    src={topCourses[(currentSlide + 1) % topCourses.length].imageUrl}
-                                    alt="next preview"
-                                    fill
-                                    sizes="200px"
-                                    className="object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full bg-gray-200" />
-                            )}
-                            <div className="absolute inset-0 bg-black/20" />
-                        </div>
-                    )}
-                </section>
+                <HeroSlider
+                    items={topCourses.map((c) => ({
+                        id: c.id,
+                        imageUrl: c.imageUrl,
+                        location: c.location,
+                        concept: c.concept,
+                        tags: c.tags,
+                    }))}
+                />
                 {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
                 <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
                 {/* 개인화 온보딩 섹션 */}
-                <section className="py-8 pb-30">
-                    <div className="max-w-7xl mx-auto px-4">
-                        <div className="relative rounded-2xl overflow-hidden shadow-xl bg-white border border-sky-100 p-6 md:p-8">
-                            <div className="flex items-start gap-4">
-                                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-700 text-2xl">
-                                    💫
-                                </div>
-                                <div>
-                                    <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">
-                                        더 정확한 추천을 원하시나요?
-                                    </h3>
-                                    <p className="text-gray-600 mb-4">3분만 투자하면 완전히 다른 경험을 드릴게요</p>
-                                    <button
-                                        onClick={handleStartOnboarding}
-                                        className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
-                                    >
-                                        내 취향 설정하기<span>→</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                <OnboardingSection onStart={handleStartOnboarding} />
             </>
         </>
     );
@@ -574,7 +433,7 @@ function TabbedConcepts({
               ).map(([name, v]) => ({ name, count: v.count, imageUrl: v.imageUrl }))
     ).sort((a, b) => b.count - a.count);
     const trackClasses =
-        "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 no-scrollbar scrollbar-hide cursor-grab select-none";
+        "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 no-scrollbar scrollbar-hide cursor-grab select-none overscroll-contain touch-pan-x";
     const cardBase =
         "snap-start w-[130px] min-w-[130px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
 
@@ -611,14 +470,25 @@ function TabbedConcepts({
         trackRef.current.scrollLeft = scrollLeftRef.current - dx;
     };
 
-    const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-        if (!trackRef.current) return;
-        // 세로 휠을 가로 스크롤로 변환
-        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-            e.preventDefault();
-            trackRef.current.scrollLeft += e.deltaY;
-        }
-    };
+    // 네이티브 wheel 이벤트를 passive: false로 등록하여 콘솔 경고 없이 세로휠→가로스크롤 처리
+    useEffect(() => {
+        const el = trackRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            try {
+                if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                    e.preventDefault();
+                    el.scrollLeft += e.deltaY;
+                }
+            } catch {}
+        };
+        el.addEventListener("wheel", onWheel, { passive: false });
+        return () => {
+            try {
+                el.removeEventListener("wheel", onWheel as any);
+            } catch {}
+        };
+    }, []);
 
     return (
         <section className="py-12">
@@ -650,7 +520,6 @@ function TabbedConcepts({
                         onMouseLeave={handleMouseLeave}
                         onMouseUp={handleMouseUp}
                         onMouseMove={handleMouseMove}
-                        onWheel={handleWheel}
                     >
                         {conceptItems.map((item) => (
                             <button
@@ -685,7 +554,6 @@ function TabbedConcepts({
                         onMouseLeave={handleMouseLeave}
                         onMouseUp={handleMouseUp}
                         onMouseMove={handleMouseMove}
-                        onWheel={handleWheel}
                     >
                         {hotCourses.slice(0, 10).map((c) => (
                             <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
@@ -716,7 +584,6 @@ function TabbedConcepts({
                         onMouseLeave={handleMouseLeave}
                         onMouseUp={handleMouseUp}
                         onMouseMove={handleMouseMove}
-                        onWheel={handleWheel}
                     >
                         {newCourses
                             .slice()

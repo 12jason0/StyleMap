@@ -1,6 +1,6 @@
 // src/lib/imagePolicy.ts
 
-import { Course, CoursePlace, Place } from "@prisma/client";
+import type { Course, CoursePlace, Place } from "@prisma/client";
 
 export type ImagePolicy = "any" | "all" | "none" | "all-or-one-missing" | "none-or-all";
 

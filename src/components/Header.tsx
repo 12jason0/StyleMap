@@ -273,13 +273,13 @@ const Header = () => {
             <div>
                 {isMenuOpen && (
                     <div
-                        className="fixed top-16 bottom-0 z-40 bg-black/30"
+                        className="fixed top-16 bottom-0 z-[1400] bg-black/30"
                         style={{ right: panelRight, width: panelWidth }}
                         onClick={closeMenu}
                     />
                 )}
                 <div
-                    className={`fixed top-16 bottom-0 z-50 bg-white border-l border-gray-200 shadow-2xl transform transition-all ease-in-out duration-300 flex flex-col ${
+                    className={`fixed top-16 bottom-0 z-[1500] bg-white border-l border-gray-200 shadow-2xl transform transition-all ease-in-out duration-300 flex flex-col ${
                         isMenuOpen
                             ? "translate-x-0 opacity-100 pointer-events-auto"
                             : "translate-x-full opacity-0 pointer-events-none"

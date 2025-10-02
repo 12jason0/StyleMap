@@ -43,6 +43,7 @@ function MapPageInner() {
     const [mapsReady, setMapsReady] = useState(false);
     const navermaps = typeof window !== "undefined" ? (window as any).naver?.maps : null;
     const mapRef = useRef<any>(null);
+    const suppressSearchButtonRef = useRef<boolean>(false);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -87,6 +88,7 @@ function MapPageInner() {
     const [zoom, setZoom] = useState(15);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [places, setPlaces] = useState<Place[]>([]);
+    const [viewBounds, setViewBounds] = useState<BoundsBox | null>(null); // 현재 화면에 표시할 바운드(있으면 이 범위 내로만 표시)
     const [courses, setCourses] = useState<Course[]>([]);
     const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
     const [searchInput, setSearchInput] = useState("");
@@ -97,6 +99,7 @@ function MapPageInner() {
     const [leftPanelOpen, setLeftPanelOpen] = useState(true);
     const prevPanOffsetYRef = useRef(0);
     const [showMapSearchButton, setShowMapSearchButton] = useState(false);
+    const fetchAbortRef = useRef<AbortController | null>(null);
 
     const triggerMapResize = useCallback(() => {
         try {
@@ -109,77 +112,192 @@ function MapPageInner() {
     }, [navermaps]);
 
     // --- 데이터 fetching 및 핸들러 ---
-    const fetchPlacesAndCourses = useCallback(async (location: { lat: number; lng: number }, keyword?: string) => {
-        setLoading(true);
-        setError(null);
-        setSelectedPlace(null);
+    type BoundsBox = { sw: { lat: number; lng: number }; ne: { lat: number; lng: number } };
+    type FetchOptions = { bounds?: BoundsBox; skipCourses?: boolean; limit?: number; injectPlace?: Place };
 
-        try {
-            let placesUrl = `/api/places/search-kakao?lat=${location.lat}&lng=${location.lng}`;
-            if (keyword && keyword.trim()) {
-                placesUrl += `&keyword=${encodeURIComponent(keyword)}`;
-            }
+    const fetchPlacesAndCourses = useCallback(
+        async (location: { lat: number; lng: number }, keyword?: string, opts?: FetchOptions) => {
+            setLoading(true);
+            setError(null);
+            setSelectedPlace(null);
 
-            const regionParam = keyword && keyword.trim() ? `&region=${encodeURIComponent(keyword.trim())}` : "";
-            const [placesRes, courseRes] = await Promise.all([
-                fetch(placesUrl),
-                fetch(`/api/courses/nearby?lat=${location.lat}&lng=${location.lng}${regionParam}`),
-            ]);
+            try {
+                // 이전 요청 중단
+                try {
+                    fetchAbortRef.current?.abort();
+                } catch {}
+                const aborter = new AbortController();
+                fetchAbortRef.current = aborter;
 
-            if (!placesRes.ok) throw new Error("장소 정보를 가져오는 데 실패했습니다.");
-            const placesData = await placesRes.json();
-            const fetchedPlaces: Place[] = (placesData.success ? placesData.places : []).map((p: any) => ({
-                ...p,
-                latitude: parseFloat(p.latitude),
-                longitude: parseFloat(p.longitude),
-            }));
-
-            let courseList: any[] = [];
-
-            if (courseRes.ok) {
-                const courseData = await courseRes.json();
-                const list = courseData.success ? courseData.courses : [];
-                courseList = list;
-                setCourses(list);
-                // 검색어가 있을 때 코스가 존재하면 추천 코스 탭으로 자동 전환
-                if (keyword && keyword.trim() && Array.isArray(list) && list.length > 0) {
-                    setActiveTab("courses");
+                let placesUrl = `/api/places/search-kakao?lat=${location.lat}&lng=${location.lng}`;
+                if (keyword && keyword.trim()) {
+                    placesUrl += `&keyword=${encodeURIComponent(keyword)}`;
                 }
-            } else {
-                console.warn("코스 정보를 가져오는 데 실패했습니다.");
-                setCourses([]);
-            }
+                // 뷰포트 반경을 근사치로 radius 전달(서버가 무시해도 무해)
+                if (opts?.bounds) {
+                    const { sw, ne } = opts.bounds;
+                    const dy = (ne.lat - sw.lat) * 111_320; // m (위도 1도 ≈ 111.32km)
+                    const dx = (ne.lng - sw.lng) * 88_000; // m (한국 위도대 근사)
+                    const radius = Math.round(Math.sqrt(dx * dx + dy * dy) / 2);
+                    if (Number.isFinite(radius) && radius > 0) placesUrl += `&radius=${radius}`;
+                }
 
-            // 장소 탭에도 코스 시작 지점을 함께 노출 (검색어가 있을 때만)
-            if (keyword && keyword.trim() && Array.isArray(courseList) && courseList.length > 0) {
-                const courseAsPlaces: Place[] = courseList
-                    .map((c: any) => {
-                        const sp = c?.coursePlaces?.[0]?.place;
-                        if (!sp || sp.latitude == null || sp.longitude == null) return null;
-                        return {
-                            id: `course-${c.id}`,
-                            name: `코스: ${c.title}`,
-                            category: "추천 코스",
-                            address: sp.name || c.region || "",
-                            imageUrl: c.imageUrl || sp.imageUrl,
-                            latitude: parseFloat(sp.latitude),
-                            longitude: parseFloat(sp.longitude),
-                            courseId: Number(c.id),
-                        } as Place;
-                    })
-                    .filter(Boolean) as Place[];
-                setPlaces([...courseAsPlaces, ...fetchedPlaces]);
-            } else {
+                const regionParam = keyword && keyword.trim() ? `&region=${encodeURIComponent(keyword.trim())}` : "";
+                const placesRes = await fetch(placesUrl, { signal: aborter.signal });
+                let courseRes: Response | null = null;
+                if (!opts?.skipCourses) {
+                    try {
+                        courseRes = await fetch(
+                            `/api/courses/nearby?lat=${location.lat}&lng=${location.lng}${regionParam}`,
+                            {
+                                signal: aborter.signal,
+                            }
+                        );
+                    } catch {}
+                }
+
+                if (!placesRes.ok) throw new Error("장소 정보를 가져오는 데 실패했습니다.");
+                const placesData = await placesRes.json();
+                let fetchedPlaces: Place[] = (placesData.success ? placesData.places : []).map((p: any) => ({
+                    ...p,
+                    latitude: parseFloat(p.latitude),
+                    longitude: parseFloat(p.longitude),
+                }));
+
+                // 좌표 유효한 항목만 유지
+                fetchedPlaces = fetchedPlaces.filter(
+                    (p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)
+                );
+
+                // 카테고리 필터
+                // 기본: 음식점/카페만. 검색(keyword) 있을 때는 랜드마크(관광/명소/랜드마크/타워/박물관 등)도 허용
+                try {
+                    const allowLandmarks = Boolean(keyword && keyword.trim());
+                    fetchedPlaces = fetchedPlaces.filter((p) => {
+                        const c = String(p.category || "");
+                        const n = String(p.name || "");
+                        const isReservoir = n.includes("저수지") || c.includes("저수지");
+                        if (isReservoir) return false;
+                        const isCafeFood =
+                            c.includes("카페") || c.includes("음식") || c.includes("맛집") || c.includes("식당");
+                        const isLandmark =
+                            allowLandmarks &&
+                            (c.includes("관광") ||
+                                c.includes("명소") ||
+                                c.includes("랜드마크") ||
+                                c.includes("공원") ||
+                                c.includes("박물관") ||
+                                n.includes("타워") ||
+                                n.includes("전망") ||
+                                n.includes("랜드마크"));
+                        return isCafeFood || isLandmark;
+                    });
+                } catch {}
+
+                // 현재 지도 영역(bounds)이 주어지면 그 내부에 있는 장소만 표시
+                if (opts?.bounds) {
+                    try {
+                        const { sw, ne } = opts.bounds;
+                        fetchedPlaces = fetchedPlaces.filter(
+                            (p) =>
+                                Number.isFinite(p.latitude) &&
+                                Number.isFinite(p.longitude) &&
+                                p.latitude >= sw.lat &&
+                                p.latitude <= ne.lat &&
+                                p.longitude >= sw.lng &&
+                                p.longitude <= ne.lng
+                        );
+                    } catch {}
+                }
+
+                // 중심과의 거리 기준 정렬 후 제한 개수로 절단
+                try {
+                    const toRad = (v: number) => (v * Math.PI) / 180;
+                    const clat = location.lat;
+                    const clng = location.lng;
+                    fetchedPlaces.sort((a, b) => {
+                        const dlatA = toRad(a.latitude - clat);
+                        const dlngA = toRad(a.longitude - clng);
+                        const dA = dlatA * dlatA + dlngA * dlngA;
+                        const dlatB = toRad(b.latitude - clat);
+                        const dlngB = toRad(b.longitude - clng);
+                        const dB = dlatB * dlatB + dlngB * dlngB;
+                        return dA - dB;
+                    });
+                    if (opts?.limit && fetchedPlaces.length > opts.limit) {
+                        fetchedPlaces = fetchedPlaces.slice(0, opts.limit);
+                    }
+                } catch {}
+
+                // 검색으로 지정된 특정 장소를 목록에 반드시 포함 (중복 방지)
+                if (opts?.injectPlace) {
+                    try {
+                        const jp = opts.injectPlace;
+                        const cat = String(jp.category || "");
+                        const name = String(jp.name || "");
+                        const isReservoir = name.includes("저수지") || cat.includes("저수지");
+                        const allowLandmarks = Boolean(keyword && keyword.trim());
+                        const allow =
+                            !isReservoir &&
+                            (cat.includes("카페") ||
+                                cat.includes("음식") ||
+                                cat.includes("맛집") ||
+                                cat.includes("식당") ||
+                                (allowLandmarks &&
+                                    (cat.includes("관광") ||
+                                        cat.includes("명소") ||
+                                        cat.includes("랜드마크") ||
+                                        cat.includes("공원") ||
+                                        cat.includes("박물관") ||
+                                        name.includes("타워") ||
+                                        name.includes("전망") ||
+                                        name.includes("랜드마크"))));
+                        if (allow && Number.isFinite(jp.latitude) && Number.isFinite(jp.longitude)) {
+                            const exists = fetchedPlaces.some(
+                                (p) =>
+                                    (p.id && jp.id && String(p.id) === String(jp.id)) ||
+                                    (p.name === jp.name &&
+                                        Math.abs(p.latitude - jp.latitude) < 1e-5 &&
+                                        Math.abs(p.longitude - jp.longitude) < 1e-5)
+                            );
+                            if (!exists) {
+                                fetchedPlaces.unshift(jp);
+                            }
+                        }
+                    } catch {}
+                }
+
+                let courseList: any[] = [];
+                try {
+                    if (courseRes && courseRes.ok) {
+                        const courseData = await courseRes.json();
+                        const list = courseData.success ? courseData.courses : [];
+                        courseList = list;
+                        setCourses(list);
+                        // 검색어가 있을 때 코스가 존재하면 추천 코스 탭으로 자동 전환
+                        if (keyword && keyword.trim() && Array.isArray(list) && list.length > 0) {
+                            setActiveTab("courses");
+                        }
+                    } else if (!opts?.skipCourses) {
+                        console.warn("코스 정보를 가져오는 데 실패했습니다.");
+                        setCourses([]);
+                    }
+                } catch {}
+
+                // 검색 결과의 주변 장소는 카카오 데이터만 사용
                 setPlaces(fetchedPlaces);
+            } catch (e: any) {
+                if (e?.name === "AbortError") return; // 중단된 요청 무시
+                setError(e.message || "데이터를 불러오는 데 실패했습니다.");
+                setPlaces([]);
+                setCourses([]);
+            } finally {
+                setLoading(false);
+                fetchAbortRef.current = null;
             }
-        } catch (e: any) {
-            setError(e.message || "데이터를 불러오는 데 실패했습니다.");
-            setPlaces([]);
-            setCourses([]);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+        },
+        []
+    );
 
     const handleSearch = useCallback(async () => {
         // 검색은 현재 지도 중심이 아닌, 검색어 자체의 위치를 기준으로 합니다.
@@ -196,9 +314,36 @@ function MapPageInner() {
                     lat: parseFloat(data.place.lat),
                     lng: parseFloat(data.place.lng),
                 };
+                // 검색된 장소 객체를 구성 (패널/핀에 주입용)
+                const injected: Place = {
+                    id: data.place.id ?? `${Date.now()}`,
+                    name: data.place.name || searchInput,
+                    category: data.place.category || "",
+                    address: data.place.address || "",
+                    latitude: parseFloat(data.place.lat),
+                    longitude: parseFloat(data.place.lng),
+                    imageUrl: data.place.imageUrl || undefined,
+                };
+
                 // 검색된 장소의 위치를 중심으로 주변 장소와 코스를 다시 불러옵니다.
                 setCenter(foundPlaceLocation);
-                await fetchPlacesAndCourses(foundPlaceLocation, searchInput);
+                await fetchPlacesAndCourses(foundPlaceLocation, searchInput, { limit: 50, injectPlace: injected });
+
+                // 추천 코스에 해당 장소가 포함된 코스를 우선 노출하기 위해 region 파라미터에 장소명 포함
+                try {
+                    setActiveTab("courses");
+                    const params = new URLSearchParams({
+                        lat: String(foundPlaceLocation.lat),
+                        lng: String(foundPlaceLocation.lng),
+                        region: injected.name,
+                        radius: "2000",
+                    }).toString();
+                    const courseRes = await fetch(`/api/courses/nearby?${params}`);
+                    const courseData = await courseRes.json();
+                    if (courseRes.ok && courseData.success && Array.isArray(courseData.courses)) {
+                        setCourses(courseData.courses);
+                    }
+                } catch {}
                 setSearchInput(""); // 검색 후 입력창 초기화
             } else {
                 throw new Error(data.error || "검색 결과가 없습니다.");
@@ -219,28 +364,37 @@ function MapPageInner() {
         setLeftPanelOpen(true);
     }, []);
 
+    // 빠른 현재 위치 가져오기: 캐시 허용 + 낮은 정확도 + 짧은 타임아웃
+    const getQuickLocation = useCallback(async (): Promise<{ lat: number; lng: number }> => {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error("Geolocation 지원 안됨"));
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (err) => reject(err),
+                { enableHighAccuracy: false, timeout: 6000, maximumAge: 5 * 60 * 1000 }
+            );
+        });
+    }, []);
+
     useEffect(() => {
         if (!mapsReady) return; // 지도 SDK 준비 후 최초 데이터 로드 실행
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const location = { lat: position.coords.latitude, lng: position.coords.longitude };
-                setUserLocation(location);
-                setCenter(location);
-                fetchPlacesAndCourses(location);
-            },
-            () => {
-                // 위치 정보 권한이 거부되었을 경우 기본 위치(서울)에서 검색
-                console.warn("위치 정보 접근이 거부되었습니다. 기본 위치에서 검색합니다.");
-                fetchPlacesAndCourses(center);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0,
+        (async () => {
+            try {
+                const loc = await getQuickLocation();
+                setUserLocation(loc);
+                setCenter(loc);
+                fetchPlacesAndCourses(loc, undefined, { limit: 50, skipCourses: true });
+            } catch {
+                // 위치 권한 실패 시: 초기에는 검색을 수행하지 않고 사용자 조작을 기다림
+                setError("현재 위치를 가져오지 못했습니다. 위치 권한을 허용하거나 상단 검색을 이용하세요.");
+                setPlaces([]);
+                setCourses([]);
             }
-        );
-    }, [mapsReady, fetchPlacesAndCourses]);
+        })();
+    }, [mapsReady, fetchPlacesAndCourses, getQuickLocation]);
 
     // 패널이 열릴 때 지도 중심을 패널을 제외한 영역의 시각적 중앙으로 보정
     useEffect(() => {
@@ -278,11 +432,8 @@ function MapPageInner() {
         setSelectedPlace(place);
         setCenter({ lat: place.latitude, lng: place.longitude });
         setZoom(17); // 장소 클릭 시 더 확대
-        if (isMobile) {
-            // 모바일에서는 패널이 이미 열려있으므로 별도 조작 X
-        } else {
-            setLeftPanelOpen(true); // 데스크탑에서는 패널이 닫혀있을 수 있으므로 열어줌
-        }
+        setActiveTab("places"); // 패널은 항상 장소 탭
+        setLeftPanelOpen(true); // 모바일/데스크탑 상관없이 패널 열기
     };
 
     const resetPanelState = (closePanel: boolean = false) => {
@@ -323,39 +474,82 @@ function MapPageInner() {
         return new navermaps.LatLng(center.lat, center.lng);
     }, [center, navermaps]);
 
-    // 네이버 기본 핀 아이콘 반환 함수
+    // 화면 표시용 장소 목록 (viewBounds가 있으면 해당 영역 내로만 필터링)
+    const filteredPlaces = useMemo(() => {
+        const finite = places.filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
+        if (!viewBounds) return finite;
+        try {
+            const { sw, ne } = viewBounds;
+            return finite.filter(
+                (p) => p.latitude >= sw.lat && p.latitude <= ne.lat && p.longitude >= sw.lng && p.longitude <= ne.lng
+            );
+        } catch {
+            return finite;
+        }
+    }, [places, viewBounds]);
+
+    // 핀 아이콘 매핑 (로컬 이미지 사용: 음식점=maker1.png, 카페=cafeMaker.png)
     const getNaverPinIcon = useCallback(
         (type: "user" | "cafe" | "food" | "default") => {
             if (!navermaps) return undefined as any;
             const urlMap: Record<string, string> = {
-                user: "https://navermaps.github.io/maps.js/docs/img/example/pin_icon.png",
-                cafe: "https://navermaps.github.io/maps.js/docs/img/example/pin_spot.png",
-                food: "https://navermaps.github.io/maps.js/docs/img/example/pin_default.png",
+                user: "/images/maker.png",
+                cafe: "/images/cafeMaker.png",
+                food: "/images/maker1.png",
                 default: "https://navermaps.github.io/maps.js/docs/img/example/pin_default.png",
             };
             const url = urlMap[type] || urlMap.default;
             return {
                 url,
-                size: new navermaps.Size(24, 37),
-                anchor: new navermaps.Point(12, 37),
+                size: new navermaps.Size(32, 44),
+                scaledSize: new navermaps.Size(32, 44),
+                anchor: new navermaps.Point(14, 40),
             } as any;
         },
         [navermaps]
     );
 
-    // /map 페이지에서는 경로를 그리지 않습니다. (코스 상세 페이지에서만 표시)
-
-    // 지도 클릭 시: 선택 해제하고, 모바일은 패널 닫기
+    // 지도 클릭 시: 선택 해제하고 목록으로 복귀 (패널은 유지)
     useEffect(() => {
         if (!navermaps || !mapRef.current) return;
         const map = mapRef.current as any;
-        const listener = navermaps.Event.addListener(map, "click", () => {
-            setSelectedPlace(null);
-            if (isMobile) setLeftPanelOpen(false);
+        const clickListener = navermaps.Event.addListener(map, "click", () => {
+            // 패널 내 "목록으로" 버튼과 동일 동작
+            try {
+                resetPanelState();
+            } catch {
+                setSelectedPlace(null);
+            }
         });
+        const dragStartListener = navermaps.Event.addListener(map, "dragstart", () => {
+            suppressSearchButtonRef.current = false;
+            setShowMapSearchButton(true);
+        });
+        const dragEndListener = navermaps.Event.addListener(map, "dragend", () => {
+            setShowMapSearchButton(true);
+        });
+        const idleListener = navermaps.Event.addListener(map, "idle", () => {
+            // 이동이 완료되어도 버튼이 노출되도록 보장
+            setShowMapSearchButton(true);
+        });
+        // 사용자의 임의 상호작용(터치/포인터 다운) 시에도 버튼 재활성화
+        const containerEl = document.getElementById("naver-map-container");
+        const resetSuppression = () => {
+            suppressSearchButtonRef.current = false;
+            setShowMapSearchButton(true);
+        };
+        try {
+            containerEl?.addEventListener("pointerdown", resetSuppression, { passive: true } as any);
+            containerEl?.addEventListener("touchstart", resetSuppression, { passive: true } as any);
+        } catch {}
         return () => {
             try {
-                if (listener) navermaps.Event.removeListener(listener);
+                if (clickListener) navermaps.Event.removeListener(clickListener);
+                if (dragStartListener) navermaps.Event.removeListener(dragStartListener);
+                if (dragEndListener) navermaps.Event.removeListener(dragEndListener);
+                if (idleListener) navermaps.Event.removeListener(idleListener);
+                containerEl?.removeEventListener("pointerdown", resetSuppression as any);
+                containerEl?.removeEventListener("touchstart", resetSuppression as any);
             } catch {}
         };
     }, [navermaps, mapRef, isMobile]);
@@ -372,7 +566,7 @@ function MapPageInner() {
         <div className="flex h-screen overflow-hidden relative">
             {/* --- 왼쪽 정보 패널 --- */}
             <div
-                className={`z-40 flex flex-col bg-white overflow-hidden
+                className={`z-40 flex flex-col bg-white overflow-hidden pb-20
                     ${
                         isMobile
                             ? `transition-transform duration-300 absolute inset-x-0 bottom-0 h-[60vh] rounded-t-2xl shadow-2xl ${
@@ -416,7 +610,7 @@ function MapPageInner() {
                             activeTab === "places" ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-500"
                         }`}
                     >
-                        주변 장소 ({selectedPlace ? 1 : places.length})
+                        주변 장소 ({selectedPlace ? 1 : filteredPlaces.length})
                     </button>
                     <button
                         onClick={() => setActiveTab("courses")}
@@ -465,8 +659,8 @@ function MapPageInner() {
                                 </div>
                             </div>
                         ) : // 장소 목록
-                        (selectedPlace ? [selectedPlace] : places).length > 0 ? (
-                            (selectedPlace ? [selectedPlace] : places).map((place) => (
+                        (selectedPlace ? [selectedPlace] : filteredPlaces).length > 0 ? (
+                            (selectedPlace ? [selectedPlace] : filteredPlaces).map((place) => (
                                 <div
                                     key={place.id}
                                     onClick={() => {
@@ -543,7 +737,7 @@ function MapPageInner() {
                                 icon={getNaverPinIcon("user")}
                             />
                         )}
-                        {(selectedPlace ? [selectedPlace] : places).map((place) => {
+                        {(selectedPlace ? [selectedPlace] : filteredPlaces).map((place) => {
                             const isSel = selectedPlace?.id === place.id;
                             return (
                                 <Marker
@@ -567,11 +761,67 @@ function MapPageInner() {
 
                 {/* --- 지도 위 UI 컨트롤 --- */}
                 {showMapSearchButton && (
-                    <div className={`absolute ${isMobile ? "top-5" : "bottom-6"} left-1/2 -translate-x-1/2 z-50`}>
+                    <div className={`absolute ${isMobile ? "top-5" : "bottom-6"} left-1/2 -translate-x-1/2 z-20`}>
                         <button
                             onClick={async () => {
                                 setShowMapSearchButton(false);
-                                await fetchPlacesAndCourses(center);
+                                suppressSearchButtonRef.current = true;
+                                setLeftPanelOpen(true);
+                                // 이전 코스 결과 제거 후 현재 지도에서만 추천 코스 재검색
+                                setCourses([]);
+                                setActiveTab("courses");
+                                // 현재 지도 영역의 바운드를 구해 그 안의 장소만 표시
+                                let boundsArg: BoundsBox | undefined = undefined;
+                                try {
+                                    const map = mapRef.current as any;
+                                    const b = map?.getBounds?.();
+                                    if (b && typeof b.getSW === "function" && typeof b.getNE === "function") {
+                                        const sw = b.getSW();
+                                        const ne = b.getNE();
+                                        const swLat = typeof sw.lat === "function" ? sw.lat() : sw.y;
+                                        const swLng = typeof sw.lng === "function" ? sw.lng() : sw.x;
+                                        const neLat = typeof ne.lat === "function" ? ne.lat() : ne.y;
+                                        const neLng = typeof ne.lng === "function" ? ne.lng() : ne.x;
+                                        if ([swLat, swLng, neLat, neLng].every((v) => Number.isFinite(v))) {
+                                            boundsArg = {
+                                                sw: { lat: swLat, lng: swLng },
+                                                ne: { lat: neLat, lng: neLng },
+                                            };
+                                        }
+                                    }
+                                } catch {}
+                                setViewBounds(boundsArg || null);
+                                await fetchPlacesAndCourses(center, undefined, {
+                                    bounds: boundsArg,
+                                    limit: 50,
+                                    skipCourses: true,
+                                });
+
+                                // 추천 코스: 현재 지도 중심/바운드 기반 반경 추정 후 조회
+                                try {
+                                    let radius = 2000;
+                                    if (boundsArg) {
+                                        const { sw, ne } = boundsArg;
+                                        const dy = (ne.lat - sw.lat) * 111_320;
+                                        const dx = (ne.lng - sw.lng) * 88_000;
+                                        const r = Math.round(Math.sqrt(dx * dx + dy * dy) / 2);
+                                        if (Number.isFinite(r) && r > 0) radius = r;
+                                    }
+                                    const params = new URLSearchParams({
+                                        lat: String(center.lat),
+                                        lng: String(center.lng),
+                                        radius: String(radius),
+                                    }).toString();
+                                    const cr = await fetch(`/api/courses/nearby?${params}`);
+                                    const cd = await cr.json();
+                                    if (cr.ok && cd?.success && Array.isArray(cd.courses) && cd.courses.length > 0) {
+                                        setCourses(cd.courses);
+                                    } else {
+                                        setCourses([]);
+                                    }
+                                } catch {
+                                    setCourses([]);
+                                }
                             }}
                             className="px-3 py-1.5 bg-white text-gray-700 border text-sm  border-gray-300 rounded-full shadow-xl hover:bg-gray-50 hover:cursor-pointer backdrop-blur"
                         >
@@ -585,29 +835,41 @@ function MapPageInner() {
                         isMobile ? "top-20" : "bottom-6"
                     } z-10 flex flex-col gap-2 items-end`}
                 >
-                    {userLocation && (
-                        <button
-                            onClick={() => {
-                                setCenter(userLocation);
-                                setZoom(15);
-                            }}
-                            className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 hover:cursor-pointer"
-                            title="내 위치로 이동"
+                    <button
+                        onClick={() => {
+                            (async () => {
+                                try {
+                                    const loc = await getQuickLocation();
+                                    setUserLocation(loc);
+                                    setCenter(loc);
+                                    setZoom(15);
+                                } catch {
+                                    if (userLocation) {
+                                        setCenter(userLocation);
+                                        setZoom(15);
+                                    } else {
+                                        setError("현재 위치를 가져오지 못했습니다. 위치 권한을 확인해 주세요.");
+                                    }
+                                }
+                            })();
+                        }}
+                        className="bg-white p-3 rounded-full shadow-lg hover:bg-gray-100 hover:cursor-pointer text-black"
+                        title="내 위치로 이동"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-5 w-5"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
                         >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                                    clipRule="evenodd"
-                                />
-                            </svg>
-                        </button>
-                    )}
+                            <path
+                                fillRule="evenodd"
+                                d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                clipRule="evenodd"
+                            />
+                        </svg>
+                    </button>
+
                     <div className="bg-white rounded-full shadow-lg border border-gray-200 overflow-hidden flex flex-col">
                         <button
                             onClick={() => setZoom((z) => Math.min(21, z + 1))}
@@ -646,7 +908,7 @@ function MapPageInner() {
                             setLeftPanelOpen((v) => !v);
                             setTimeout(triggerMapResize, 320);
                         }}
-                        className="hover:cursor-pointer absolute left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-3 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-50"
+                        className="hover:cursor-pointer absolute left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-3 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-20"
                         style={{ bottom: leftPanelOpen ? "calc(60vh + 16px)" : "80px" }}
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >

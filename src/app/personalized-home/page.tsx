@@ -43,7 +43,7 @@ interface Course {
     description: string;
     duration: string;
     location: string;
-    price: string;
+    price?: string;
     tags: string[];
     rating: number;
     reviewCount: number;
@@ -370,7 +370,7 @@ const AIRecommender = () => {
             <div className="bg-white rounded-3xl max-w-md w-full p-8 relative">
                 <button
                     onClick={() => setShowLogin(false)}
-                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-all active:scale-95"
+                    className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-all active:scale-95 hover:cursor-pointer"
                 >
                     <XCircle className="w-6 h-6" />
                 </button>
@@ -379,7 +379,7 @@ const AIRecommender = () => {
                     <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
                         <User className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold mb-2">로그인하고 AI 추천받기</h2>
+                    <h2 className="text-2xl font-bold mb-2 text-gray-600">로그인하고 AI 추천받기</h2>
                     <p className="text-gray-600">로그인하면 무료 쿠폰 1개를 드려요! 🎁</p>
                 </div>
 
@@ -387,7 +387,7 @@ const AIRecommender = () => {
                     <input
                         type="text"
                         placeholder="닉네임을 입력하세요"
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="text-gray-600 w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
                         onKeyPress={(e) => {
                             if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
                                 handleLogin((e.target as HTMLInputElement).value.trim());
@@ -401,7 +401,7 @@ const AIRecommender = () => {
                                 handleLogin(input.value.trim());
                             }
                         }}
-                        className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all active:scale-95"
+                        className="hover:cursor-pointer w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all active:scale-95"
                     >
                         로그인하고 쿠폰받기
                     </button>
@@ -656,7 +656,7 @@ const AIRecommender = () => {
                                 ) : (
                                     <button
                                         onClick={() => setShowLogin(true)}
-                                        className="px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/25 transition-all active:scale-95"
+                                        className="hover:cursor-pointer px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/25 transition-all active:scale-95"
                                     >
                                         로그인하기
                                     </button>

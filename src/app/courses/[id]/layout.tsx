@@ -598,7 +598,7 @@ function CourseDetailPage() {
 
     // 총 비용 계산
     const totalCost = useMemo(() => {
-        return courseData?.price || "정보 없음";
+        return "";
     }, [courseData]);
 
     // 초기 데이터 로드
@@ -764,7 +764,7 @@ function CourseDetailPage() {
                                 </div>
                                 <span>📍 {courseData.coursePlaces?.length || 0}개 장소</span>
                                 <span>⏱ {courseData.duration}</span>
-                                <span>💰 {totalCost}</span>
+                                {totalCost ? <span>💰 {totalCost}</span> : null}
                                 <span className="hidden md:inline">🕒 {courseData.recommendedTime}</span>
                             </div>
                         </div>
@@ -818,6 +818,7 @@ function CourseDetailPage() {
                                                     places={sortedCoursePlaces.map((cp) => ({
                                                         id: cp.place.id,
                                                         name: cp.place.name,
+                                                        category: cp.place.category,
                                                         latitude: cp.place.latitude,
                                                         longitude: cp.place.longitude,
                                                         address: cp.place.address,
@@ -1249,11 +1250,7 @@ function CourseDetailPage() {
                         image: heroImageUrl,
                         touristType: courseData.courseType,
                         duration: courseData.duration,
-                        offers: {
-                            "@type": "Offer",
-                            price: courseData.price,
-                            priceCurrency: "KRW",
-                        },
+                        // price removed
                         aggregateRating: {
                             "@type": "AggregateRating",
                             ratingValue: courseData.rating,

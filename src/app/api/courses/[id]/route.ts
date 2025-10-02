@@ -1,12 +1,26 @@
+// ✅ [수정] 필요한 모듈들을 import 합니다.
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const { id: courseId } = await params;
+        const { id: courseId } = params;
 
-        // ✅ [수정됨] prisma.courses -> prisma.course
+        // id가 숫자가 아닌 경우를 대비한 방어 코드
+        if (isNaN(Number(courseId))) {
+            return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });
+        }
+
+        // 조회수 1 증가 (비로그인 포함)
+        try {
+            await prisma.course.update({ where: { id: Number(courseId) }, data: { view_count: { increment: 1 } } });
+        } catch (e) {
+            // 조회수 증가에 실패하더라도 코스 상세 정보 조회는 계속 진행합니다.
+            console.warn("View count increment failed for course", courseId, e);
+        }
+
         const course = await prisma.course.findUnique({
             where: { id: Number(courseId) },
             include: {
@@ -28,10 +42,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             description: course.description || "",
             duration: course.duration || "",
             location: course.region || "",
-            price: course.price || "",
             imageUrl: course.imageUrl || "",
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
+            view_count: course.view_count || 0,
             reviewCount: 0,
             participants: course.current_participants || 0,
             maxParticipants: course.max_participants || 10,
@@ -68,8 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 reservation_required: !!cp.place.reservation_required,
                 latitude: Number(cp.place.latitude),
                 longitude: Number(cp.place.longitude),
-                image_url: cp.place.imageUrl || "",
-                imageUrl: cp.place.imageUrl || "",
+                imageUrl: cp.place.imageUrl || "", // ✅ 중복된 속성 중 하나만 남겼습니다.
             },
         }));
 
@@ -83,6 +96,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         return NextResponse.json(payload);
     } catch (error) {
+        // ✅ [개선] 에러 발생 시 터미널에 로그를 남겨서 디버깅이 쉽도록 합니다.
+        console.error(`API Error fetching course ${params.id}:`, error);
         return NextResponse.json(
             {
                 error: "Failed to fetch course",

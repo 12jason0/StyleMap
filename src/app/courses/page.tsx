@@ -10,7 +10,6 @@ interface Course {
     description: string;
     duration: string;
     location: string;
-    price: string;
     participants: number;
     imageUrl: string;
     concept: string;
@@ -156,7 +155,7 @@ function CoursesPageInner() {
             {/* 코스 목록 */}
             <div className="max-w-[500px] mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 gap-6">
-                    {courses.map((course) => (
+                    {courses.map((course, idx) => (
                         <div
                             key={course.id}
                             className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer block"
@@ -179,6 +178,7 @@ function CoursesPageInner() {
                                         alt={course.title}
                                         fill
                                         sizes="100vw"
+                                        priority={idx === 0}
                                         className="object-cover"
                                     />
                                 ) : (
@@ -225,9 +225,6 @@ function CoursesPageInner() {
                                     </span>
                                     <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
                                         📍 {course.location}
-                                    </span>
-                                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
-                                        💰 {course.price}
                                     </span>
                                 </div>
 
