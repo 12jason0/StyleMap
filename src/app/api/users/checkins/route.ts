@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
         const userId = Number(userIdStr);
         if (!Number.isFinite(userId)) return NextResponse.json({ success: false, error: "BAD_USER" }, { status: 400 });
 
-        const checkins = await prisma.userCheckin.findMany({
+        const checkins = await (prisma as any).userCheckin.findMany({
             where: { userId },
             orderBy: { date: "desc" },
             take: 120,
@@ -36,25 +36,25 @@ export async function POST(request: NextRequest) {
         const end = new Date(start);
         end.setDate(end.getDate() + 1);
 
-        const existing = await prisma.userCheckin.findFirst({
+        const existing = await (prisma as any).userCheckin.findFirst({
             where: { userId, date: { gte: start, lt: end } },
         });
         if (existing) {
             return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded });
         }
 
-        const created = await prisma.userCheckin.create({ data: { userId, date: now, rewarded: false } });
+        const created = await (prisma as any).userCheckin.create({ data: { userId, date: now, rewarded: false } });
 
-        const total = await prisma.userCheckin.count({ where: { userId } });
+        const total = await (prisma as any).userCheckin.count({ where: { userId } });
         let awarded = false;
         if (total % 7 === 0) {
             // 7회 달성 → 쿠폰 7개 지급
-            await prisma.$transaction([
-                prisma.userReward.create({
+            await (prisma as any).$transaction([
+                (prisma as any).userReward.create({
                     data: { userId, type: "checkin", amount: 7, unit: "coupon" as any },
                 }),
-                prisma.user.update({ where: { id: userId }, data: { couponCount: { increment: 7 } } }),
-                prisma.userCheckin.update({ where: { id: created.id }, data: { rewarded: true } }),
+                (prisma as any).user.update({ where: { id: userId }, data: { couponCount: { increment: 7 } } }),
+                (prisma as any).userCheckin.update({ where: { id: created.id }, data: { rewarded: true } }),
             ]);
             awarded = true;
         }

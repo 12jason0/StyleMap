@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/db";
 import { getJwtSecret } from "@/lib/auth";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
             grant_type: "authorization_code",
             client_id: kakaoClientId,
             code: code,
-            redirect_uri: redirectUri, // 수정된 변수를 사용합니다.
+            redirect_uri: redirectUri,
         });
         if (process.env.KAKAO_CLIENT_SECRET) {
             tokenParams.append("client_secret", process.env.KAKAO_CLIENT_SECRET);
@@ -74,30 +75,49 @@ export async function POST(request: NextRequest) {
 
         let user;
         let message = "카카오 로그인이 완료되었습니다.";
+        let isNewUser = false;
+        let couponsAwarded = 0;
 
-        const existing = await (prisma as any).user.findFirst({
+        // ✅ username 사용
+        const existing = await prisma.user.findFirst({
             where: { provider: "kakao", socialId },
-            select: { id: true, email: true, nickname: true },
+            select: { id: true, email: true, username: true, coinBalance: true },
         });
 
         if (existing) {
             user = existing;
         } else {
-            user = await (prisma as any).user.create({
+            // 새로운 유저 생성 + 코인 10개 지급
+            user = await prisma.user.create({
                 data: {
                     email,
-                    nickname: nickname || `user_${socialId}`,
+                    username: nickname || `user_${socialId}`,
                     socialId,
                     profileImageUrl,
                     provider: "kakao",
                     createdAt: new Date(),
+                    coinBalance: 10, // ✅ 시작 코인
                 },
-                select: { id: true, email: true, nickname: true },
+                select: { id: true, email: true, username: true, coinBalance: true },
             });
-            message = "카카오 회원가입이 완료되었습니다.";
+
+            // 보상 기록 남기기
+            await prisma.userReward.create({
+                data: {
+                    userId: user.id,
+                    type: "signup",
+                    amount: 10,
+                    unit: "coin",
+                },
+            });
+
+            message = "카카오 회원가입이 완료되었습니다. 코인 10개가 지급되었습니다.";
+            isNewUser = true;
+            couponsAwarded = 10;
         }
 
-        const token = jwt.sign({ userId: user.id, email: user.email, name: user.nickname }, JWT_SECRET, {
+        // ✅ 토큰에 username 반영
+        const token = jwt.sign({ userId: user.id, email: user.email, name: user.username }, JWT_SECRET, {
             expiresIn: "7d",
         });
 
@@ -105,21 +125,20 @@ export async function POST(request: NextRequest) {
             success: true,
             message,
             token,
-            user: { id: user.id, email: user.email, name: user.nickname },
+            user: { id: user.id, email: user.email, name: user.username, coins: user.coinBalance },
+            newUser: isNewUser,
+            coinsAwarded: couponsAwarded,
         };
 
-        // --- ⬇️ 수정된 부분 ⬇️ ---
-        // JSON 응답과 함께 httpOnly 쿠키를 설정합니다.
         const res = NextResponse.json(responsePayload);
         res.cookies.set("auth", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             path: "/",
-            maxAge: 60 * 60 * 24 * 7, // 7일
+            maxAge: 60 * 60 * 24 * 7,
         });
         return res;
-        // --- ⬆️ 여기까지 수정되었습니다 ⬆️ ---
     } catch (error) {
         console.error("카카오 로그인 API 전체 오류:", error);
         return NextResponse.json(

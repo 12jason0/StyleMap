@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
+
 export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const code = searchParams.get("code");
@@ -26,9 +28,7 @@ export async function GET(request: NextRequest) {
                 </body>
             </html>
         `,
-            {
-                headers: { "Content-Type": "text/html" },
-            }
+            { headers: { "Content-Type": "text/html" } }
         );
     }
 
@@ -49,13 +49,10 @@ export async function GET(request: NextRequest) {
                 </body>
             </html>
         `,
-            {
-                headers: { "Content-Type": "text/html" },
-            }
+            { headers: { "Content-Type": "text/html" } }
         );
     }
 
-    // 성공 시 부모 창에 코드 전달
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof location !== "undefined" ? location.origin : "");
     return new Response(
         `
@@ -72,8 +69,6 @@ export async function GET(request: NextRequest) {
             </body>
         </html>
     `,
-        {
-            headers: { "Content-Type": "text/html" },
-        }
+        { headers: { "Content-Type": "text/html" } }
     );
 }
