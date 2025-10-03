@@ -514,10 +514,12 @@ function MapPageInner() {
         if (!navermaps || !mapRef.current) return;
         const map = mapRef.current as any;
         const clickListener = navermaps.Event.addListener(map, "click", () => {
-            // 패널 내 "목록으로" 버튼과 동일 동작
+            // 패널 내 "목록으로" 버튼과 동일 동작 + 패널 열기
             try {
+                setLeftPanelOpen(true);
                 resetPanelState();
             } catch {
+                setLeftPanelOpen(true);
                 setSelectedPlace(null);
             }
         });

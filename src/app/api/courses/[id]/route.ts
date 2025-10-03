@@ -1,23 +1,29 @@
-// ✅ [수정] 필요한 모듈들을 import 합니다.
+// src/app/api/courses/[id]/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> } // ✅ Promise 타입으로 선언
+) {
     try {
-        const { id: courseId } = params;
+        const { id: courseId } = await context.params;
 
-        // id가 숫자가 아닌 경우를 대비한 방어 코드
+        // id가 숫자가 아닌 경우 방어 코드
         if (isNaN(Number(courseId))) {
             return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });
         }
 
-        // 조회수 1 증가 (비로그인 포함)
+        // 조회수 1 증가 (에러는 무시)
         try {
-            await prisma.course.update({ where: { id: Number(courseId) }, data: { view_count: { increment: 1 } } });
+            await prisma.course.update({
+                where: { id: Number(courseId) },
+                data: { view_count: { increment: 1 } },
+            });
         } catch (e) {
-            // 조회수 증가에 실패하더라도 코스 상세 정보 조회는 계속 진행합니다.
             console.warn("View count increment failed for course", courseId, e);
         }
 
@@ -27,7 +33,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
                 highlights: true,
                 benefits: true,
                 courseNotices: true,
-                coursePlaces: { include: { place: true }, orderBy: { order_index: "asc" } },
+                coursePlaces: {
+                    include: { place: true },
+                    orderBy: { order_index: "asc" },
+                },
                 _count: { select: { coursePlaces: true } },
             },
         });
@@ -36,13 +45,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             return NextResponse.json({ error: "Course not found" }, { status: 404 });
         }
 
+        // 기본 course 정보
         const formattedCourse = {
             id: course.id.toString(),
             title: course.title || "",
             description: course.description || "",
             duration: course.duration || "",
             location: course.region || "",
-            imageUrl: course.imageUrl || "",
+            imageUrl: course.imageUrl || "/images/maker.png", // ✅ 기본 이미지 fallback
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
             view_count: course.view_count || 0,
@@ -61,6 +71,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             updatedAt: course.updatedAt,
         };
 
+        // 코스 장소들 가공
         const coursePlaces = course.coursePlaces.map((cp) => ({
             id: cp.id,
             course_id: cp.course_id,
@@ -69,21 +80,27 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             estimated_duration: cp.estimated_duration,
             recommended_time: cp.recommended_time,
             notes: cp.notes,
-            place: {
-                id: cp.place.id,
-                name: cp.place.name,
-                address: cp.place.address,
-                description: cp.place.description,
-                category: cp.place.category,
-                avg_cost_range: cp.place.avg_cost_range,
-                opening_hours: cp.place.opening_hours,
-                phone: cp.place.phone,
-                parking_available: !!cp.place.parking_available,
-                reservation_required: !!cp.place.reservation_required,
-                latitude: Number(cp.place.latitude),
-                longitude: Number(cp.place.longitude),
-                imageUrl: cp.place.imageUrl || "", // ✅ 중복된 속성 중 하나만 남겼습니다.
-            },
+            place: cp.place
+                ? {
+                      id: cp.place.id,
+                      name: cp.place.name,
+                      address: cp.place.address,
+                      description: cp.place.description,
+                      category: cp.place.category,
+                      avg_cost_range: cp.place.avg_cost_range,
+                      opening_hours: cp.place.opening_hours,
+                      phone: cp.place.phone,
+                      parking_available: !!cp.place.parking_available,
+                      reservation_required: !!cp.place.reservation_required,
+                      latitude: cp.place.latitude ? Number(cp.place.latitude) : null,
+                      longitude: cp.place.longitude ? Number(cp.place.longitude) : null,
+                      // ✅ DB 값 있으면 그대로, 없으면 fallback
+                      imageUrl:
+                          cp.place.imageUrl && cp.place.imageUrl.trim() !== ""
+                              ? cp.place.imageUrl
+                              : "/images/maker.png",
+                  }
+                : null,
         }));
 
         const payload = {
@@ -96,8 +113,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
         return NextResponse.json(payload);
     } catch (error) {
-        // ✅ [개선] 에러 발생 시 터미널에 로그를 남겨서 디버깅이 쉽도록 합니다.
-        console.error(`API Error fetching course ${params.id}:`, error);
+        console.error("API Error fetching course:", error);
         return NextResponse.json(
             {
                 error: "Failed to fetch course",

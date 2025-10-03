@@ -1,56 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-export const dynamic = "force-dynamic";
 
-// 간단한 Directions 프록시: OSRM 데모 서버 사용
-// 쿼리: /api/directions?coords=lon,lat;lon,lat[;...]&mode=driving|walking
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const coords = searchParams.get("coords") || "";
-        const modeRaw = (searchParams.get("mode") || "walking").toLowerCase();
+        const { searchParams } = new URL(req.url);
+        const coords = searchParams.get("coords");
+        const mode = searchParams.get("mode") || "driving";
 
-        // 입력 검증
-        const pairs = coords
-            .split(";")
-            .map((p) => p.trim())
-            .filter(Boolean);
-        if (pairs.length < 2) {
-            return NextResponse.json(
-                { success: false, error: "At least two coordinates are required" },
-                { status: 400 }
-            );
+        if (!coords) {
+            return NextResponse.json({ error: "coords are required" }, { status: 400 });
         }
-        // 모드 매핑
-        // 보행 시 건물 관통 직선이 아닌 보행 네트워크를 따라가도록 우선 foot 프로필을 시도하고,
-        // 실패 시 walking 프로필로 폴백합니다.
-        const profiles = modeRaw === "driving" ? ["driving"] : ["foot", "walking"];
 
-        // OSRM 라우팅 호출 (여러 프로필 순차 시도)
-        let lastErrorText: string | null = null;
-        for (const profile of profiles) {
-            const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${encodeURIComponent(
-                pairs.join(";")
-            )}?overview=full&geometries=geojson`;
-            const res = await fetch(osrmUrl, { cache: "no-store" });
-            if (!res.ok) {
-                lastErrorText = await res.text();
-                continue;
-            }
-            const data = await res.json();
-            const route = data?.routes?.[0];
-            const coordinates = route?.geometry?.coordinates;
-            if (Array.isArray(coordinates)) {
-                return NextResponse.json({ success: true, coordinates, profile });
-            }
+        const clientId = process.env.NAVER_MAP_API_KEY_ID;
+        const clientSecret = process.env.NAVER_MAP_API_KEY;
+        if (!clientId || !clientSecret) {
+            return NextResponse.json({ error: "Missing NAVER API credentials" }, { status: 500 });
         }
-        return NextResponse.json(
-            { success: false, error: "No route found", details: lastErrorText?.slice(0, 500) || null },
-            { status: 404 }
-        );
+
+        const [start, goal] = coords.split(";");
+        if (!start || !goal) {
+            return NextResponse.json({ error: "coords must include start and goal" }, { status: 400 });
+        }
+
+        const endpoint =
+            mode === "walking"
+                ? "https://naveropenapi.apigw.ntruss.com/map-direction/v1/walking"
+                : "https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving";
+
+        const url = `${endpoint}?start=${start}&goal=${goal}&option=traoptimal`;
+
+        const response = await fetch(url, {
+            headers: {
+                "X-NCP-APIGW-API-KEY-ID": clientId,
+                "X-NCP-APIGW-API-KEY": clientSecret,
+            },
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            return NextResponse.json({ error: errorText }, { status: response.status });
+        }
+
+        const data = await response.json();
+        return NextResponse.json(data);
     } catch (error: any) {
-        return NextResponse.json(
-            { success: false, error: error?.message || "Unknown error in directions" },
-            { status: 500 }
-        );
+        console.error("Directions API error:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

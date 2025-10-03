@@ -23,7 +23,7 @@ interface Place {
     reservation_required: boolean;
     latitude: number;
     longitude: number;
-    image_url?: string;
+    imageUrl?: string; // ✅ snake_case 로 수정
 }
 
 interface CoursePlace {
@@ -43,7 +43,7 @@ interface Course {
     description: string;
     duration: string;
     price?: string;
-    imageUrl: string;
+    imageUrl: string; // ✅ snake_case 로 수정
     concept: string;
     rating: number;
     isPopular: boolean;
@@ -142,7 +142,6 @@ export default function CourseDetailPage() {
     const params = useParams();
     const router = useRouter();
 
-    // courseId가 유효하지 않으면 페이지를 렌더링하지 않고 조기 반환
     if (!params || !params.id) {
         return (
             <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -161,12 +160,10 @@ export default function CourseDetailPage() {
     const courseId = params.id as string;
 
     // --- 상태 관리 ---
-    // 데이터 상태
     const [courseData, setCourseData] = useState<CourseData | null>(null);
     const [reviews, setReviews] = useState<Review[]>([]);
     const [isSaved, setIsSaved] = useState(false);
 
-    // UI 및 로딩 상태
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -174,11 +171,10 @@ export default function CourseDetailPage() {
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [showPlaceModal, setShowPlaceModal] = useState(false);
 
-    // 지도 관련 상태
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
 
-    // --- 메모이제이션 (성능 최적화) ---
+    // --- 메모이제이션 ---
     const sortedCoursePlaces = useMemo(() => {
         if (!courseData?.coursePlaces) return [];
         return [...courseData.coursePlaces].sort((a, b) => a.order_index - b.order_index);
@@ -186,13 +182,13 @@ export default function CourseDetailPage() {
 
     const heroImageUrl = useMemo(() => {
         if (courseData?.imageUrl) return courseData.imageUrl;
-        if (sortedCoursePlaces.length > 0) return sortedCoursePlaces[0].place.image_url || "";
-        return "/images/placeholder.png"; // Fallback Image
+        if (sortedCoursePlaces.length > 0) return sortedCoursePlaces[0].place.imageUrl || undefined;
+        return "/images/placeholder.png";
     }, [courseData?.imageUrl, sortedCoursePlaces]);
 
     const totalCost = useMemo(() => courseData?.price || "", [courseData]);
 
-    // --- 함수 및 핸들러 ---
+    // --- (이하 fetch, useEffect, 이벤트 핸들러 부분 이어집니다)
     const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
         setToast({ message, type });
     }, []);
@@ -200,7 +196,7 @@ export default function CourseDetailPage() {
     // 길찾기 핸들러
     const createNavigationHandler = useCallback(
         (name: string, lat: number, lng: number) => (e: React.MouseEvent) => {
-            e.stopPropagation(); // 이벤트 버블링 방지
+            e.stopPropagation();
             const url = `https://map.naver.com/v5/search/${encodeURIComponent(name)}?c=${lng},${lat},15,0,0,0,dh`;
             window.open(url, "_blank");
         },
@@ -215,7 +211,7 @@ export default function CourseDetailPage() {
             latitude: coursePlace.place.latitude,
             longitude: coursePlace.place.longitude,
             address: coursePlace.place.address,
-            imageUrl: coursePlace.place.image_url,
+            imageUrl: coursePlace.place.imageUrl, // ✅ snake_case
             description: coursePlace.place.description,
         });
         setShowPlaceModal(true);
@@ -319,7 +315,7 @@ export default function CourseDetailPage() {
                 Kakao.init(jsKey);
             }
 
-            const shareImage = heroImageUrl || courseData?.imageUrl || "/images/placeholder-location.jpg";
+            const shareImage = heroImageUrl || courseData?.imageUrl || "/images/placeholder-location.jpg"; // ✅ snake_case
             const title = courseData?.title || "StyleMap 코스";
             const desc = courseData?.description || "StyleMap에서 코스를 확인해 보세요";
 
@@ -382,15 +378,12 @@ export default function CourseDetailPage() {
     };
 
     // --- useEffect 훅 ---
-
-    // 초기 데이터 로딩 (코스 정보, 후기, 찜 상태)
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
                 setLoading(true);
                 setError(null);
 
-                // 코스 정보와 후기 목록을 병렬로 요청
                 const [courseRes, reviewsRes] = await Promise.all([
                     fetch(`/api/courses/${courseId}`, { cache: "no-store" }),
                     fetch(`/api/reviews?courseId=${courseId}`),
@@ -419,7 +412,6 @@ export default function CourseDetailPage() {
                     console.warn("후기 목록을 가져오지 못했습니다.");
                 }
 
-                // 로그인 상태라면 찜 여부 확인 (페이지 로딩을 막지 않음)
                 const token = localStorage.getItem("authToken");
                 if (token) {
                     fetch("/api/users/favorites", { headers: { Authorization: `Bearer ${token}` } })
@@ -439,7 +431,6 @@ export default function CourseDetailPage() {
         fetchInitialData();
     }, [courseId]);
 
-    // 조회수 증가 로직 (30분 쿨다운, 비로그인 포함)
     useEffect(() => {
         const key = `course_view_${courseId}`;
         const now = Date.now();
@@ -452,7 +443,6 @@ export default function CourseDetailPage() {
                 .catch((err) => console.error("조회수 증가 API 호출 실패:", err));
         }
     }, [courseId]);
-
     // 사용자 현재 위치 가져오기
     useEffect(() => {
         if (!navigator.geolocation) return;
@@ -476,7 +466,7 @@ export default function CourseDetailPage() {
                 latitude: first.place.latitude,
                 longitude: first.place.longitude,
                 address: first.place.address,
-                imageUrl: first.place.image_url,
+                imageUrl: first.place.imageUrl, // ✅ snake_case 유지
                 description: first.place.description,
             });
         }
@@ -631,7 +621,7 @@ export default function CourseDetailPage() {
                                                         latitude: cp.place.latitude,
                                                         longitude: cp.place.longitude,
                                                         address: cp.place.address,
-                                                        imageUrl: cp.place.image_url,
+                                                        imageUrl: cp.place.imageUrl, // ✅ snake_case
                                                         description: cp.place.description,
                                                     }))}
                                                     userLocation={userLocation}
@@ -652,7 +642,6 @@ export default function CourseDetailPage() {
                                             )}
                                         </div>
                                     </div>
-
                                     {/* 타임라인 */}
                                     <div className="relative pl-6" style={{ willChange: "transform" }}>
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
@@ -677,9 +666,9 @@ export default function CourseDetailPage() {
                                                                     <span className="absolute top-1 right-1 z-10 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                                                                         {coursePlace.place.category || "기타"}
                                                                     </span>
-                                                                    {coursePlace.place.image_url ? (
+                                                                    {coursePlace.place.imageUrl ? (
                                                                         <img
-                                                                            src={coursePlace.place.image_url}
+                                                                            src={coursePlace.place.imageUrl}
                                                                             alt={coursePlace.place.name}
                                                                             className="object-cover w-full h-full"
                                                                             loading={idx === 0 ? "eager" : "lazy"}
@@ -1020,9 +1009,8 @@ export default function CourseDetailPage() {
                                     decoding="async"
                                 />
                             </div>
-                        ) : (
-                            <div className="w-full h-32 md:h-48 bg-gray-100" />
-                        )}
+                        ) : // <div className="w-full h-32 md:h-48 bg-gray-100" />＼
+                        null}
                         <div className="p-4">
                             <p className="text-gray-700 text-sm whitespace-pre-line">
                                 {selectedPlace.description || "설명이 없습니다."}

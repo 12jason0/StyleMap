@@ -1,3 +1,5 @@
+// src/app/api/courses/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
@@ -6,16 +8,28 @@ import { getUserIdFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
     try {
+        console.log(">>> API 함수 진입");
+        console.log("--- [START] /api/courses GET 요청 수신 ---");
+
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
         const regionQuery = searchParams.get("region");
         const limitParam = searchParams.get("limit");
         const offsetParam = searchParams.get("offset");
         const noCache = searchParams.get("nocache");
-        const imagePolicy = searchParams.get("imagePolicy") as ImagePolicy;
+        const imagePolicyParam = searchParams.get("imagePolicy");
+
+        // --- imagePolicy 안전하게 처리 ---
+        const allowedPolicies: ImagePolicy[] = ["any", "all", "none", "all-or-one-missing", "none-or-all"];
+
+        const imagePolicy: ImagePolicy = allowedPolicies.includes(imagePolicyParam as ImagePolicy)
+            ? (imagePolicyParam as ImagePolicy)
+            : "any"; // 기본값 "any"
+
         const parsedLimit = Number(limitParam ?? 100);
         const effectiveLimit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 100, 1), 200);
         const parsedOffset = Number(offsetParam ?? 0);
@@ -65,7 +79,10 @@ export async function GET(request: NextRequest) {
             },
         };
 
+        console.log("[LOG] Prisma 쿼리 실행 직전...");
         const results = await prisma.course.findMany(prismaQuery);
+        console.log(`[LOG] Prisma 쿼리 성공. ${results.length}개 데이터 수신.`);
+
         const imagePolicyApplied = filterCoursesByImagePolicy(results as CourseWithPlaces[], imagePolicy);
 
         const formattedCourses = imagePolicyApplied.map((course: any) => {
@@ -90,6 +107,8 @@ export async function GET(request: NextRequest) {
             };
         });
 
+        console.log("--- [SUCCESS] /api/courses 요청 처리 완료 ---");
+
         return NextResponse.json(formattedCourses, {
             status: 200,
             headers: {
@@ -98,54 +117,15 @@ export async function GET(request: NextRequest) {
             },
         });
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("API: /api/courses failed, returning empty list:", { message: errorMessage });
-        return NextResponse.json([], { status: 200 });
-    }
-}
+        console.error("--- [ERROR] /api/courses GET 요청 처리 중 심각한 오류 발생 ---");
+        console.error("Full error:", error);
 
-export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const { title, description, duration, location, imageUrl, concept } = body;
-        if (!title) return NextResponse.json({ error: "제목은 필수입니다" }, { status: 400 });
-
-        const userId = getUserIdFromRequest(request);
-        if (!userId) return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
-        const numericUserId = Number(userId);
-        if (!Number.isFinite(numericUserId))
-            return NextResponse.json({ error: "유효하지 않은 사용자 ID입니다." }, { status: 401 });
-
-        const created = await prisma.course.create({
-            data: {
-                title,
-                description: description || null,
-                duration: duration || null,
-                region: location || null,
-                imageUrl: imageUrl || null,
-                concept: concept || null,
-                userId: numericUserId,
-            } as any,
-        });
-
-        return NextResponse.json(
-            {
-                id: String(created.id),
-                title: created.title,
-                description: created.description || "",
-                duration: created.duration || "",
-                location: created.region || "",
-                imageUrl: created.imageUrl || "",
-                concept: created.concept || "",
-                rating: 0,
-                reviewCount: 0,
-                participants: 0,
-            },
-            { status: 201 }
+        return new NextResponse(
+            JSON.stringify({
+                message: "Internal Server Error",
+                error: error instanceof Error ? error.message : String(error),
+            }),
+            { status: 500 }
         );
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("코스 생성 오류:", error);
-        return NextResponse.json({ error: "코스 생성 실패", details: errorMessage }, { status: 500 });
     }
 }

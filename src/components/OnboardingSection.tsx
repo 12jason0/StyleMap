@@ -34,3 +34,5 @@ export default function OnboardingSection({ onStart }: Props) {
     );
 }
 
+
+
