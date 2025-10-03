@@ -59,6 +59,10 @@ const Signup = () => {
             const data = await response.json();
 
             if (response.ok) {
+                try {
+                    localStorage.setItem("userCoupons", "10");
+                    localStorage.setItem("userCoins", "10");
+                } catch {}
                 router.push("/login?message=회원가입이 완료되었습니다. 로그인해주세요.");
             } else {
                 setError(data.error || "회원가입에 실패했습니다.");
@@ -160,6 +164,14 @@ const Signup = () => {
                             localStorage.setItem("authToken", data.token);
                             localStorage.setItem("user", JSON.stringify(data.user));
                             localStorage.setItem("loginTime", Date.now().toString());
+                            try {
+                                // 카카오 신규가입 시 백엔드에서 내려준 지급 수 반영 (기본 10)
+                                const award = Number(data.couponsAwarded);
+                                if (data.newUser && Number.isFinite(award) && award > 0) {
+                                    localStorage.setItem("userCoupons", String(award));
+                                    localStorage.setItem("userCoins", "10");
+                                }
+                            } catch {}
                             window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token: data.token } }));
                         }
 

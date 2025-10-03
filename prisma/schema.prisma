@@ -29,9 +29,49 @@ model User {
   userFavorites      UserFavorite[]
   userPreference     UserPreference?
   userStoryProgress  UserStoryProgress[]
+    coinBalance        Int                 @default(0)
+  couponCount        Int                 @default(0)
+    rewards            UserReward[]
+  checkins           UserCheckin[]
 
   @@index([provider, socialId])
   @@map("users")
+}
+
+model UserReward {
+  id        Int        @id @default(autoincrement())
+  user      User       @relation(fields: [userId], references: [id])
+  userId    Int
+  type      RewardType
+  amount    Int
+  unit      RewardUnit
+  createdAt DateTime   @default(now())
+
+  @@map("user_rewards")
+}
+
+model UserCheckin {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  date      DateTime
+  rewarded  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("user_checkins")
+}
+
+enum RewardType {
+  signup
+  checkin
+  ad_watch
+  purchase
+  event
+}
+
+enum RewardUnit {
+  coin
+  coupon
 }
 
 model UserPreference {
@@ -58,7 +98,7 @@ model Course {
   rating               Float             @default(0.0)
   current_participants Int               @default(0)
   max_participants     Int               @default(0)
-  view_count           Int               @default(0)
+  view_count           Int               @default(0)  
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
   completedCourses     CompletedCourse[]

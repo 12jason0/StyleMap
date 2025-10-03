@@ -62,6 +62,21 @@ interface UserBadgeItem {
     awarded_at: string;
 }
 
+interface UserRewardRow {
+    id: number;
+    type: string;
+    amount: number;
+    unit: string;
+    createdAt: string;
+}
+
+interface UserCheckinRow {
+    id: number;
+    date: string;
+    rewarded: boolean;
+    createdAt: string;
+}
+
 declare global {
     interface Window {
         Kakao?: any;
@@ -129,6 +144,9 @@ const MyPage = () => {
     const [selectedCaseTitle, setSelectedCaseTitle] = useState("");
     const [casePhotoUrls, setCasePhotoUrls] = useState<string[]>([]);
     const [casePhotoLoading, setCasePhotoLoading] = useState(false);
+    const [rewards, setRewards] = useState<UserRewardRow[]>([]);
+    const [checkins, setCheckins] = useState<UserCheckinRow[]>([]);
+    const [showCheckinModal, setShowCheckinModal] = useState(false);
 
     useEffect(() => {
         fetchUserInfo();
@@ -137,6 +155,15 @@ const MyPage = () => {
         fetchBadges();
         fetchCompleted();
         fetchCasefiles();
+        fetchRewards();
+        fetchCheckins();
+
+        // 로그인 시 오늘 출석 여부 확인 → 모달
+        try {
+            const last = localStorage.getItem("attendanceLastDate") || "";
+            const today = new Date().toISOString().slice(0, 10);
+            if (last !== today) setShowCheckinModal(true);
+        } catch {}
 
         try {
             const url = new URL(window.location.href);
@@ -370,6 +397,48 @@ const MyPage = () => {
         }
     };
 
+    const fetchRewards = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            const res = await fetch("/api/users/rewards", { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            if (res.ok && data?.success) setRewards(data.rewards || []);
+        } catch {}
+    };
+
+    const fetchCheckins = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            const res = await fetch("/api/users/checkins", { headers: { Authorization: `Bearer ${token}` } });
+            const data = await res.json();
+            if (res.ok && data?.success) setCheckins(data.checkins || []);
+        } catch {}
+    };
+
+    const doCheckin = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            const res = await fetch("/api/users/checkins", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json();
+            if (res.ok && data?.success) {
+                localStorage.setItem("attendanceLastDate", new Date().toISOString().slice(0, 10));
+                setShowCheckinModal(false);
+                fetchCheckins();
+                if (data.awarded) {
+                    alert("출석 7회 달성! 쿠폰 7개가 지급되었습니다.");
+                } else {
+                    alert("출석 체크 완료!");
+                }
+            }
+        } catch {}
+    };
+
     const removeFavorite = async (courseId: number) => {
         try {
             const token = localStorage.getItem("authToken");
@@ -539,6 +608,13 @@ const MyPage = () => {
                         수정하기
                     </button>
                 </div>
+                {userInfo?.mbti && (
+                    <div className="mb-4">
+                        <span className="px-2.5 md:px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs md:text-sm font-semibold">
+                            MBTI: {userInfo.mbti}
+                        </span>
+                    </div>
+                )}
                 {userPreferences ? (
                     <div className="space-y-6">
                         {userPreferences.travelStyle && userPreferences.travelStyle.length > 0 && (
@@ -806,6 +882,70 @@ const MyPage = () => {
         </div>
     );
 
+    function renderRewardsTab() {
+        return (
+            <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                    <div className="flex items-center justify-between mb-4 md:mb-6">
+                        <h3 className="text-xl md:text-2xl font-bold text-gray-900">보상 지급 내역</h3>
+                    </div>
+                    {rewards.length > 0 ? (
+                        <div className="divide-y">
+                            {rewards.map((r) => (
+                                <div key={r.id} className="py-3 flex items-center justify-between">
+                                    <div className="text-gray-800">
+                                        <div className="font-semibold">{r.type}</div>
+                                        <div className="text-xs text-gray-500">
+                                            {new Date(r.createdAt).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-bold">
+                                            +{r.amount} {r.unit}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-gray-600 py-10">보상 내역이 없습니다.</div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    function renderCheckinsTab() {
+        return (
+            <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
+                    <div className="flex items-center justify-between mb-4 md:mb-6">
+                        <h3 className="text-xl md:text-2xl font-bold text-gray-900">출석 기록</h3>
+                    </div>
+                    {checkins.length > 0 ? (
+                        <div className="divide-y">
+                            {checkins.map((c) => (
+                                <div key={c.id} className="py-3 flex items-center justify-between">
+                                    <div className="text-gray-800">
+                                        <div className="font-semibold">{new Date(c.date).toLocaleDateString()}</div>
+                                        <div className="text-xs text-gray-500">
+                                            기록: {new Date(c.createdAt).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div className={c.rewarded ? "text-green-600 font-bold" : "text-gray-500"}>
+                                        {c.rewarded ? "보상 지급됨" : "미지급"}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-gray-600 py-10">출석 기록이 없습니다.</div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -840,6 +980,8 @@ const MyPage = () => {
                                 { id: "completed", label: "완료", icon: "✅" },
                                 { id: "casefiles", label: "사건 파일", icon: "🗂️" },
                                 { id: "badges", label: "뱃지", icon: "🏅" },
+                                { id: "rewards", label: "보상 내역", icon: "🎁" },
+                                { id: "checkins", label: "출석 기록", icon: "📅" },
                             ].map((tab) => (
                                 <button
                                     key={tab.id}
@@ -988,6 +1130,8 @@ const MyPage = () => {
                         </div>
                     </div>
                 )}
+                {activeTab === "rewards" && renderRewardsTab()}
+                {activeTab === "checkins" && renderCheckinsTab()}
                 {selectedCaseStoryId !== null && (
                     <div
                         className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
@@ -1150,6 +1294,26 @@ const MyPage = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {showCheckinModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">출석 체크</h3>
+                        <p className="text-gray-600 mb-4">하루 한 번 출석 체크! 7회마다 쿠폰 7개 지급</p>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                onClick={() => setShowCheckinModal(false)}
+                                className="px-4 py-2 border rounded-lg text-gray-700"
+                            >
+                                나중에
+                            </button>
+                            <button onClick={doCheckin} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                                출석 체크 하기
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

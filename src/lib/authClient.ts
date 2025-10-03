@@ -1,4 +1,4 @@
-export type AuthUser = { id: number; email: string; name: string } | null;
+export type AuthUser = { id: number; email: string; name: string; nickname?: string } | null;
 
 // 서버 쿠키 기반으로 변경: 클라이언트 저장소 사용 안 함
 export async function fetchSession(): Promise<{ authenticated: boolean; user: AuthUser }> {

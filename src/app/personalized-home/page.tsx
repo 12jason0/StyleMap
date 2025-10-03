@@ -120,9 +120,13 @@ const questionFlow: Question[] = [
 const AIRecommender = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
+    const [nickname, setNickname] = useState("");
     const [coupons, setCoupons] = useState(0);
+    const [coins, setCoins] = useState(0);
     const [showLogin, setShowLogin] = useState(false);
     const [showPaywall, setShowPaywall] = useState(false);
+    const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
+    const [attendanceCount, setAttendanceCount] = useState(0);
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [currentQuestion, setCurrentQuestion] = useState<Question>(questionFlow[0]);
@@ -131,6 +135,8 @@ const AIRecommender = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [showRecommendations, setShowRecommendations] = useState(false);
     const [conversationStarted, setConversationStarted] = useState(false);
+    const [progress, setProgress] = useState(0); // 0~100 진행도
+    const [showUpsell, setShowUpsell] = useState(false); // 최종 전 업셀 표시
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -152,23 +158,66 @@ const AIRecommender = () => {
                 try {
                     const userData = JSON.parse(user);
                     setIsLoggedIn(true);
-                    setUserName(userData.name || userData.email || "사용자");
+                    // 닉네임 우선, 없으면 name, 둘 다 없으면 email의 로컬파트 또는 '사용자'
+                    const emailLocal = typeof userData.email === "string" ? userData.email.split("@")[0] : "";
+                    let nick = userData.nickname || userData.name || emailLocal || "사용자";
+                    try {
+                        if (!userData.nickname && nick) {
+                            const patched = { ...userData, nickname: nick };
+                            localStorage.setItem("user", JSON.stringify(patched));
+                        }
+                    } catch {}
+                    setUserName(nick);
+                    setNickname(nick);
                     setCoupons(parseInt(localStorage.getItem("userCoupons") || "1"));
+                    setCoins(parseInt(localStorage.getItem("userCoins") || "0"));
+                    // 출석 카운트 초기화
+                    try {
+                        const c = parseInt(localStorage.getItem("attendanceCount") || "0");
+                        setAttendanceCount(Number.isFinite(c) ? c : 0);
+                    } catch {}
                 } catch (error) {
                     console.error("사용자 데이터 파싱 오류:", error);
                     setIsLoggedIn(false);
                     setUserName("");
+                    setNickname("");
                     setCoupons(0);
                 }
             } else {
                 setIsLoggedIn(false);
                 setUserName("");
+                setNickname("");
                 setCoupons(0);
+                setCoins(0);
             }
         };
 
         // 초기 로그인 상태 확인
         checkLoginStatus();
+        // 세션에서 닉네임 최신화(로컬 user에 nickname이 없을 수 있음)
+        (async () => {
+            try {
+                const res = await fetch("/api/auth/session", { cache: "no-store" });
+                if (res.ok) {
+                    const data = await res.json();
+                    const sessNick = data?.user?.nickname || data?.user?.name || "";
+                    if (sessNick) {
+                        setNickname(sessNick);
+                        setUserName(sessNick);
+                        // 로컬 user 동기화
+                        try {
+                            const userStr = localStorage.getItem("user");
+                            if (userStr) {
+                                const parsed = JSON.parse(userStr);
+                                if (!parsed.nickname || parsed.nickname !== sessNick) {
+                                    localStorage.setItem("user", JSON.stringify({ ...parsed, nickname: sessNick }));
+                                }
+                            }
+                        } catch {}
+                    }
+                }
+            } catch {}
+        })();
 
         // localStorage 변경 감지를 위한 이벤트 리스너
         const handleStorageChange = (e: StorageEvent) => {
@@ -191,11 +240,49 @@ const AIRecommender = () => {
         };
     }, []);
 
+    // 로그인 시, 오늘 출석 여부 확인하여 모달 띄우기
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        try {
+            const last = localStorage.getItem("attendanceLastDate") || "";
+            const today = new Date().toISOString().slice(0, 10);
+            if (last !== today) setAttendanceModalOpen(true);
+        } catch {}
+    }, [isLoggedIn]);
+
+    const handleAttendanceCheck = () => {
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const last = localStorage.getItem("attendanceLastDate") || "";
+            if (last === today) {
+                setAttendanceModalOpen(false);
+                return;
+            }
+            const next = attendanceCount + 1;
+            setAttendanceCount(next);
+            localStorage.setItem("attendanceCount", String(next));
+            localStorage.setItem("attendanceLastDate", today);
+            setAttendanceModalOpen(false);
+            if (next % 7 === 0) {
+                const nc = coupons + 7;
+                setCoupons(nc);
+                localStorage.setItem("userCoupons", String(nc));
+                alert("출석 7회 달성! 쿠폰 7개가 지급되었어요.");
+            } else {
+                const remain = 7 - (next % 7);
+                alert(`출석 완료! 남은 횟수 ${remain}회 (7회마다 쿠폰 7개 지급)`);
+            }
+        } catch {
+            setAttendanceModalOpen(false);
+        }
+    };
+
     const handleLogin = (name: string) => {
         // 임시 로그인 처리 (실제로는 이미 카카오톡 로그인이 되어있어야 함)
         localStorage.setItem("userCoupons", "1");
         setIsLoggedIn(true);
         setUserName(name);
+        setNickname(name);
         setCoupons(1);
         setShowLogin(false);
 
@@ -207,9 +294,11 @@ const AIRecommender = () => {
         localStorage.removeItem("authToken");
         localStorage.removeItem("user");
         localStorage.removeItem("userCoupons");
+        localStorage.removeItem("userCoins");
         setIsLoggedIn(false);
         setUserName("");
         setCoupons(0);
+        setCoins(0);
         resetConversation();
         setConversationStarted(false);
 
@@ -258,6 +347,16 @@ const AIRecommender = () => {
 
         setTimeout(() => {
             setIsTyping(false);
+
+            // 진행도 업데이트 (질문 수 기준 5단계: greeting, preview, mood, activity, location, budget, complete 중 사용자 응답 단계만)
+            try {
+                const answered = Object.keys(newAnswers).length;
+                const totalSteps = 4; // mood, activity, location, budget
+                const pct = Math.min(100, Math.round((answered / totalSteps) * 100));
+                setProgress(pct);
+                // 마지막 전 단계에서 업셀 배너 노출 (80% 이상)
+                setShowUpsell(pct >= 75 && pct < 100);
+            } catch {}
 
             if (option.next === "complete") {
                 generateRecommendations(newAnswers);
@@ -341,7 +440,7 @@ const AIRecommender = () => {
                 type: "ai",
                 text:
                     list.length > 0
-                        ? `완벽해요! 🎉 ${userName}님의 취향을 분석해 현재 데이터로 최적의 코스를 찾았어요!`
+                        ? `완벽해요! 🎉 ${nickname}님의 취향을 분석해 현재 데이터로 최적의 코스를 찾았어요!`
                         : `조건에 맞는 코스를 찾지 못했어요. 사용하신 쿠폰은 바로 복구해드렸습니다. 다른 조건으로 다시 시도해볼까요?`,
             },
         ]);
@@ -358,11 +457,66 @@ const AIRecommender = () => {
         resetConversation();
     };
 
-    const purchaseTicket = (type: string) => {
-        const newCoupons = type === "basic" ? coupons + 5 : type === "premium" ? coupons + 20 : coupons + 50;
-        setCoupons(newCoupons);
-        localStorage.setItem("userCoupons", newCoupons.toString());
-        setShowPaywall(false);
+    // 출석 체크: 주 1회 7코인 지급 (월요일~일요일 주간 단위)
+    const checkInWeekly = () => {
+        const now = new Date();
+        const weekKey = `${now.getFullYear()}-W${Math.ceil(
+            ((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000 +
+                new Date(now.getFullYear(), 0, 1).getDay() +
+                1) /
+                7
+        )}`;
+        const last = localStorage.getItem("attendanceWeek");
+        if (last === weekKey) return false;
+        const nextCoins = coins + 7;
+        setCoins(nextCoins);
+        localStorage.setItem("userCoins", String(nextCoins));
+        localStorage.setItem("attendanceWeek", weekKey);
+        return true;
+    };
+
+    // 광고 시청: 2회당 쿠폰 1개
+    const rewardAd = () => {
+        const count = parseInt(localStorage.getItem("adWatchCount") || "0") + 1;
+        localStorage.setItem("adWatchCount", String(count));
+        if (count % 2 === 0) {
+            const next = coupons + 1;
+            setCoupons(next);
+            localStorage.setItem("userCoupons", String(next));
+            return "쿠폰 1개가 지급되었어요!";
+        }
+        return "광고 1회 시청 완료! 한 번 더 보면 쿠폰 1개 지급";
+    };
+
+    const beginPurchase = async (plan: "basic" | "premium" | "vip") => {
+        // Toss Payments 결제창으로 이동 (redirect 방식)
+        // orderId는 간단히 timestamp 기반으로 생성
+        const orderId = `order_${plan}_${Date.now()}`;
+        const amount = plan === "basic" ? 4900 : plan === "premium" ? 14900 : 29900;
+        const successUrl = `${window.location.origin}/personalized-home/pay/success?orderId=${encodeURIComponent(
+            orderId
+        )}&amount=${amount}&plan=${plan}`;
+        const failUrl = `${window.location.origin}/personalized-home/pay/fail?orderId=${encodeURIComponent(
+            orderId
+        )}&amount=${amount}&plan=${plan}`;
+
+        // Toss 결제 페이지로 리다이렉트 (테스트용 간소화: 카드 간편결제)
+        // 실제로는 결제수단 선택 UX를 추가하거나 Checkout SDK를 붙일 수 있습니다.
+        const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
+        if (!clientKey) {
+            alert("결제 설정이 완료되지 않았습니다. (NEXT_PUBLIC_TOSS_CLIENT_KEY)");
+            return;
+        }
+        const params = new URLSearchParams({
+            clientKey,
+            amount: String(amount),
+            orderId,
+            orderName:
+                plan === "basic" ? "AI 추천 쿠폰 5개" : plan === "premium" ? "AI 추천 쿠폰 20개" : "AI 추천 쿠폰 50개",
+            successUrl,
+            failUrl,
+        }).toString();
+        window.location.href = `https://tosspayments.com/payments/checkout?${params}`;
     };
 
     const LoginModal = () => (
@@ -384,26 +538,16 @@ const AIRecommender = () => {
                 </div>
 
                 <div className="space-y-4">
-                    <input
-                        type="text"
-                        placeholder="닉네임을 입력하세요"
-                        className="text-gray-600 w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        onKeyPress={(e) => {
-                            if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
-                                handleLogin((e.target as HTMLInputElement).value.trim());
-                            }
-                        }}
-                    />
                     <button
-                        onClick={(e) => {
-                            const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                            if (input && input.value.trim()) {
-                                handleLogin(input.value.trim());
-                            }
+                        onClick={() => {
+                            try {
+                                setShowLogin(false);
+                            } catch {}
+                            window.location.href = "/login";
                         }}
                         className="hover:cursor-pointer w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all active:scale-95"
                     >
-                        로그인하고 쿠폰받기
+                        로그인 하러 가기
                     </button>
                 </div>
 
@@ -471,7 +615,7 @@ const AIRecommender = () => {
                                 </li>
                             </ul>
                             <button
-                                onClick={() => purchaseTicket("basic")}
+                                onClick={() => beginPurchase("basic")}
                                 className="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-semibold transition-all active:scale-95"
                             >
                                 구매하기
@@ -510,7 +654,7 @@ const AIRecommender = () => {
                                 </li>
                             </ul>
                             <button
-                                onClick={() => purchaseTicket("premium")}
+                                onClick={() => beginPurchase("premium")}
                                 className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold hover:shadow-lg transition-all active:scale-95"
                             >
                                 인기 플랜 선택
@@ -542,7 +686,7 @@ const AIRecommender = () => {
                                 </li>
                             </ul>
                             <button
-                                onClick={() => purchaseTicket("vip")}
+                                onClick={() => beginPurchase("vip")}
                                 className="w-full py-3 bg-black text-white rounded-xl font-semibold hover:bg-gray-800 transition-all active:scale-95"
                             >
                                 VIP 되기
@@ -616,6 +760,7 @@ const AIRecommender = () => {
             <div className="flex flex-col items-center justify-center p-4 ">
                 {showLogin && <LoginModal />}
                 {showPaywall && <TicketPlans />}
+                {/* 출석 모달은 마이페이지로 이동했습니다. */}
 
                 <div className="w-full max-w-4xl flex flex-col">
                     {/* AI 추천 헤더 */}
@@ -632,7 +777,7 @@ const AIRecommender = () => {
                                 </div>
                                 <div className="text-white">
                                     <h1 className="text-2xl sm:text-3xl font-bold cursor-pointer">AI 여행 코스 추천</h1>
-                                    <p className="text-white/90 text-sm">98.7% 만족도 · 132명이 이용 중</p>
+                                    <p className="text-white/90 text-sm">98.7% 만족도 · 32명이 이용 중</p>
                                 </div>
                             </div>
 
@@ -640,11 +785,14 @@ const AIRecommender = () => {
                                 {isLoggedIn ? (
                                     <div className="flex items-center space-x-4 bg-white/10 p-2 rounded-xl">
                                         <div className="text-left">
-                                            <p className="text-sm opacity-90">안녕하세요, {userName}님</p>
+                                            <p className="text-sm opacity-90">
+                                                안녕하세요, {nickname && nickname.trim() ? nickname : "사용자"}님
+                                            </p>
                                             <div className="flex items-center space-x-2">
                                                 <Ticket className="w-5 h-5" />
                                                 <span className="text-xl font-bold">{coupons}개</span>
                                             </div>
+                                            {/* 출석 표시/버튼은 마이페이지에서 확인 및 수행하세요. */}
                                         </div>
                                         <button
                                             onClick={handleLogout}
@@ -667,6 +815,28 @@ const AIRecommender = () => {
 
                     {/* 채팅 및 추천 결과가 표시되는 메인 영역 */}
                     <main className="flex-1 overflow-y-auto rounded-3xl">
+                        {/* 진행 상태 표시: 모바일 상단 고정 바 + 도트 */}
+                        {conversationStarted && !showRecommendations && (
+                            <div className="sticky top-0 z-10 p-3">
+                                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                                        style={{ width: `${progress}%` }}
+                                    />
+                                </div>
+                                <div className="mt-2 flex items-center justify-center gap-2 text-xs text-gray-600">
+                                    {[0, 25, 50, 75, 100].map((v) => (
+                                        <span
+                                            key={v}
+                                            className={`inline-block w-2 h-2 rounded-full ${
+                                                progress >= v ? "bg-purple-600" : "bg-gray-300"
+                                            }`}
+                                        />
+                                    ))}
+                                    <span className="ml-2">{progress}%</span>
+                                </div>
+                            </div>
+                        )}
                         {/* 채팅 시작 버튼 */}
                         {!conversationStarted && (
                             <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-white/10 rounded-3xl border border-white/10">
@@ -677,13 +847,38 @@ const AIRecommender = () => {
                                     <MessageCircle className="w-6 h-6 mr-3" />
                                     AI 추천 시작하기
                                 </button>
-                                <p className="text-gray-600 mt-4">몇 가지 질문에 답하면 완벽한 코스를 찾아드려요!</p>
+                                <p className="text-gray-600 mt-4">몇 가지 질문에 답하면 </p>
+                                <p className="text-gray-600">완벽한 코스를 찾아드려요!</p>
+                                {/* 미리보기 힌트 */}
+                                <div className="mt-6 text-sm text-gray-700 bg-gray-50 rounded-xl p-4">
+                                    <p>
+                                        시작하면 <strong>기분/활동/지역/예산</strong>을 바탕으로
+                                        <strong> 3시간짜리 맞춤 데이트 코스</strong>를 만드는 중이에요 🎉
+                                    </p>
+                                </div>
                             </div>
                         )}
 
                         {/* 채팅 및 추천 영역 */}
                         {conversationStarted && (
                             <div className="bg-white/95 rounded-3xl shadow-xl p-4 sm:p-6 h-full flex flex-col max-h-[600px]">
+                                {/* 업셀 배너 (마지막 전 단계에 노출) */}
+                                {showUpsell && !showRecommendations && (
+                                    <div className="mb-3 p-3 rounded-xl bg-gradient-to-r from-amber-50 to-pink-50 border border-amber-200 text-[13px] text-gray-800">
+                                        <div className="font-semibold mb-1">
+                                            🔑 무료 체험 {coupons <= 1 ? "1회 남음" : `${coupons}개 남음`}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span>프리미엄으로 업그레이드하면 무제한 추천!</span>
+                                            <button
+                                                onClick={() => setShowPaywall(true)}
+                                                className="px-2 py-1 rounded-lg bg-black text-white text-xs cursor-pointer"
+                                            >
+                                                업그레이드
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 {/* 채팅 메시지 영역 */}
                                 <div className="flex-grow overflow-y-auto pr-2 space-y-6">
                                     {messages.map((message, index) => (

@@ -102,7 +102,10 @@ const Header = () => {
             const rightOffset = Math.max(0, window.innerWidth - rect.right);
             setPanelRight(rightOffset);
             setPanelWidth(rect.width);
-            setDrawerWidth(Math.min(333, rect.width));
+            const isMobile = window.innerWidth < 768;
+            const mobileWidth = Math.round(rect.width * 0.5); // 모바일에서는 화면의 절반만
+            const desktopWidth = Math.min(333, rect.width);
+            setDrawerWidth(isMobile ? mobileWidth : desktopWidth);
         } catch {}
     };
 
@@ -286,7 +289,7 @@ const Header = () => {
                     }`}
                     ref={drawerRef}
                     onClick={(e) => e.stopPropagation()}
-                    style={{ right: panelRight, width: Math.max(240, drawerWidth) }}
+                    style={{ right: panelRight, width: drawerWidth }}
                 >
                     <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-2">
                         <Link
