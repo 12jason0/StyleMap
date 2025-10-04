@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useEffectOnce } from "react-use";
 import Image from "next/image";
 
 import ReviewModal from "@/components/ReviewModal";
@@ -173,6 +174,21 @@ export default function CourseDetailPage() {
 
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+    // 상세 진입 즉시 view 상호작용 기록
+    useEffect(() => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            fetch("/api/users/interactions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ courseId: Number(courseId), action: "view" }),
+            }).catch(() => {});
+        } catch {}
+    }, [courseId]);
 
     // --- 메모이제이션 ---
     const sortedCoursePlaces = useMemo(() => {

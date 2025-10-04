@@ -14,6 +14,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
         }
 
+        // 환불은 비즈니스 룰상 중복 환불을 방지해야 함
+        // 옵션: idempotency-key 헤더가 있으면 최근 5분 내 동일 키 중복 환불 차단 (확장 포인트)
+        // 여기서는 단순히 증가만 수행하되, 필요 시 환불 히스토리 테이블 추가 권장
+
         const updated = await prisma.user.update({
             where: { id: Number(userId) },
             data: { couponCount: { increment: 1 } },

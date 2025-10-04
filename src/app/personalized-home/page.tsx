@@ -138,6 +138,7 @@ const AIRecommender = () => {
     const [conversationStarted, setConversationStarted] = useState(false);
     const [progress, setProgress] = useState(0);
     const [showUpsell, setShowUpsell] = useState(false);
+    const [netError, setNetError] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -354,12 +355,14 @@ const AIRecommender = () => {
                     setShowPaywall(true);
                 } else {
                     alert(errorData.message || "쿠폰 사용 오류");
+                    setNetError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
                 }
                 return false;
             }
         } catch (error) {
             console.error("쿠폰 사용 API 오류:", error);
             alert("네트워크 오류");
+            setNetError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
             return false;
         }
     };
@@ -378,9 +381,12 @@ const AIRecommender = () => {
             if (response.ok) {
                 const data = await response.json();
                 setCoupons(data.ticketsRemaining);
+            } else {
+                setNetError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
             }
         } catch (error) {
             console.error("쿠폰 환불 API 오류:", error);
+            setNetError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
         }
     };
 
@@ -437,6 +443,7 @@ const AIRecommender = () => {
 
     // 추천 생성
     const generateRecommendations = async (answers: Record<string, string>) => {
+        let hadNetworkError = false;
         const buildList = (rows: any[]): Course[] =>
             (rows || []).map((c: any) => ({
                 id: String(c.id),
@@ -457,10 +464,18 @@ const AIRecommender = () => {
             try {
                 const params = new URLSearchParams({ limit: "100", imagePolicy: "any", ...query }).toString();
                 const res = await fetch(`/api/courses?${params}`, { cache: "no-store" });
-                const data = await res.json();
-                if (!res.ok || !Array.isArray(data)) return [] as Course[];
+                if (!res.ok) {
+                    hadNetworkError = true;
+                    return [] as Course[];
+                }
+                const data = await res.json().catch(() => {
+                    hadNetworkError = true;
+                    return [];
+                });
+                if (!Array.isArray(data)) return [] as Course[];
                 return buildList(data);
             } catch {
+                hadNetworkError = true;
                 return [] as Course[];
             }
         };
@@ -492,8 +507,11 @@ const AIRecommender = () => {
 
         list = list.slice(0, 3);
 
-        // 결과 없을 시 환불
+        // 결과 없거나 네트워크 오류 시 환불 및 오류 표시
         if (list.length === 0) {
+            if (hadNetworkError) {
+                setNetError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+            }
             await refundCoupon();
         }
 
@@ -507,6 +525,8 @@ const AIRecommender = () => {
                 text:
                     list.length > 0
                         ? `완벽해요! 🎉 ${nickname}님의 취향을 분석해 현재 데이터로 최적의 코스를 찾았어요!`
+                        : hadNetworkError
+                        ? `네트워크 오류로 추천을 가져오지 못했어요. 쿠폰은 복구해드렸습니다. 잠시 후 다시 시도해 주세요.`
                         : `조건에 맞는 코스를 찾지 못했어요. 사용하신 쿠폰은 바로 복구해드렸습니다. 다른 조건으로 다시 시도해볼까요?`,
             },
         ]);

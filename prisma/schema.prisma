@@ -33,6 +33,12 @@ model User {
   couponCount        Int                 @default(0)
     rewards            UserReward[]
   checkins           UserCheckin[]
+  gender             String?             @db.VarChar(10)      // ✅ 성별
+  location           String?             @db.VarChar(100)     // ✅ 거주지/선호지역
+  preferredTags      String[]            @db.Text             // ✅ 빠른 태그 캐싱
+  lastActiveAt       DateTime?                               // ✅ 마지막 접속일
+  level              Int                 @default(1)          // ✅ 유저 레벨 (등급)
+  interactions       UserInteraction[]   // ✅ 추가
 
   @@index([provider, socialId])
   @@map("users")
@@ -60,6 +66,20 @@ model UserCheckin {
 
   @@map("user_checkins")
 }
+
+model UserInteraction {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  courseId  Int
+  action    String   // "view" | "click" | "like" | "share"
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("user_interactions")
+}
+
 
 enum RewardType {
   signup
@@ -111,6 +131,7 @@ model Course {
   reviews              Review[]
   userFavorites        UserFavorite[]
   course_tags          CourseTag[]       @relation("CourseTagToCourses")
+   interactions         UserInteraction[] // ✅ 추가
 
   @@map("courses")
 }

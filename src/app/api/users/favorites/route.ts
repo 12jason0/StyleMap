@@ -56,6 +56,13 @@ export async function POST(request: NextRequest) {
             },
         });
 
+        // 상호작용 로그: like 기록
+        try {
+            await (prisma as any).userInteraction.create({
+                data: { userId, courseId, action: "like" },
+            });
+        } catch {}
+
         return NextResponse.json({ success: true });
     } catch (error: any) {
         return NextResponse.json({ error: error?.message || "create error" }, { status: 500 });

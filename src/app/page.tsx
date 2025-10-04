@@ -63,7 +63,12 @@ export default function Home() {
                     cache: "force-cache",
                     next: { revalidate: 300 },
                 });
-                const data = await response.json();
+                if (!response.ok) {
+                    setErrorMessage("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+                    setCourses([]);
+                    return;
+                }
+                const data = await response.json().catch(() => null);
                 if (Array.isArray(data)) {
                     setCourses(data);
                 } else if (data.error) {

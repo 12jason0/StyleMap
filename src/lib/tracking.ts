@@ -19,12 +19,12 @@ export class UserTracker {
             const json = JSON.stringify(payload);
             if (navigator.sendBeacon) {
                 const blob = new Blob([json], { type: "application/json" });
-                navigator.sendBeacon("/api/analytics/time-spent", blob);
+                navigator.sendBeacon("/api/users/interactions", blob);
             } else {
-                fetch("/api/analytics/time-spent", {
+                fetch("/api/users/interactions", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: json,
+                    body: JSON.stringify({ courseId, action: "time_spent", milliseconds }),
                     keepalive: true,
                 }).catch(() => {});
             }
