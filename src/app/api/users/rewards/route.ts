@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
     try {
-        const userIdStr = getUserIdFromRequest(request);
-        if (!userIdStr) return NextResponse.json({ success: false, error: "UNAUTHORIZED" }, { status: 401 });
-        const userId = Number(userIdStr);
+        const userId = resolveUserId(request);
+        if (!userId) return NextResponse.json({ success: false, error: "UNAUTHORIZED" }, { status: 401 });
         if (!Number.isFinite(userId)) return NextResponse.json({ success: false, error: "BAD_USER" }, { status: 400 });
 
         const rewards = await prisma.userReward.findMany({

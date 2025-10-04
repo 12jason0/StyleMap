@@ -1,23 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserIdFromRequest, getJwtSecret } from "@/lib/auth";
-import jwt from "jsonwebtoken";
+import { resolveUserId } from "@/lib/auth";
 export const dynamic = "force-dynamic";
 
 // Bearer 토큰 또는 'auth' 쿠키에서 사용자 ID를 가져오는 헬퍼 함수
-function resolveUserId(request: NextRequest): number | null {
-    const fromHeader = getUserIdFromRequest(request);
-    if (fromHeader && Number.isFinite(Number(fromHeader))) {
-        return Number(fromHeader);
-    }
-    const token = request.cookies.get("auth")?.value;
-    if (!token) return null;
-    try {
-        const payload = jwt.verify(token, getJwtSecret()) as { userId?: number | string };
-        if (payload?.userId) return Number(payload.userId);
-    } catch {}
-    return null;
-}
+// 통합 인증 사용
 
 // 로그인한 사용자의 모든 배지를 가져오는 GET 엔드포인트
 export async function GET(request: NextRequest) {

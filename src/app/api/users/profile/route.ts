@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
     try {
-        const userIdStr = getUserIdFromRequest(request);
-        if (!userIdStr) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-        const userId = Number(userIdStr);
+        const userId = resolveUserId(request);
+        if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
@@ -40,9 +39,8 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
     try {
-        const userIdStr = getUserIdFromRequest(request);
-        if (!userIdStr) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-        const userId = Number(userIdStr);
+        const userId = resolveUserId(request);
+        if (!userId) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
         const body = await request.json().catch(() => null);
         if (!body) return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });

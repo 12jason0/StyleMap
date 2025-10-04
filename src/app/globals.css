@@ -27,6 +27,22 @@ body {
         sans-serif;
 }
 
+/* 브랜드용 라운디드 한글 폰트 (GmarketSans) */
+@font-face {
+    font-family: "GmarketSans";
+    src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GmarketSansMedium.woff") format("woff");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+@font-face {
+    font-family: "GmarketSans";
+    src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2108@1.1/GmarketSansBold.woff") format("woff");
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* 전역 버튼 기본값 통일 */
 @layer base {
     button {
@@ -118,6 +134,14 @@ body {
 
     .card {
         @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+    }
+
+    /* 제목/브랜드 영역에 사용하는 폰트 유틸 */
+    .font-brand {
+        font-family: "GmarketSans", "SUIT Variable", "SUIT", "Pretendard Variable", Pretendard, -apple-system,
+            BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Noto Sans KR",
+            "Malgun Gothic", "맑은 고딕", Dotum, "돋움", sans-serif;
+        letter-spacing: -0.02em;
     }
 }
 

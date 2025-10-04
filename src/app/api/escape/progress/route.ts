@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
     try {
-        const userIdStr = getUserIdFromRequest(request);
+        const userIdStr = resolveUserId(request);
         // 로그인하지 않은 사용자는 서버 저장을 건너뜀
         if (!userIdStr) {
             return NextResponse.json({ ok: true, skipped: true });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
-        const userId = getUserIdFromRequest(request);
+        const userId = resolveUserId(request);
         if (!userId) {
             return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
         }

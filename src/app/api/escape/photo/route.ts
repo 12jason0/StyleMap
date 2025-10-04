@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserIdFromRequest } from "@/lib/auth";
+import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // - 추후 S3 등으로 확장 가능하도록 메타데이터를 함께 받아 둡니다.
 export async function POST(request: NextRequest) {
     try {
-        const userIdStr = getUserIdFromRequest(request);
+        const userIdStr = resolveUserId(request);
         const form = await request.formData();
 
         const file = form.get("photo");
@@ -47,5 +47,3 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "사진 업로드 실패" }, { status: 500 });
     }
 }
-
-

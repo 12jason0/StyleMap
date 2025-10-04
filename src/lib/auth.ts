@@ -46,6 +46,24 @@ export function getUserIdFromRequest(request: NextRequest): string | null {
     }
 }
 
+// 통합 인증 헬퍼: 우선순위 1) Authorization: Bearer 토큰, 2) 'auth' 쿠키(JWT)
+export function resolveUserId(request: NextRequest): number | null {
+    // 1) Authorization 헤더 우선
+    const fromHeader = getUserIdFromRequest(request);
+    if (fromHeader && Number.isFinite(Number(fromHeader))) {
+        return Number(fromHeader);
+    }
+
+    // 2) auth 쿠키(JWT) 디코드
+    const token = request.cookies.get("auth")?.value;
+    if (!token) return null;
+    try {
+        const payload = jwt.verify(token, getJwtSecret()) as { userId?: number | string };
+        if (payload?.userId) return Number(payload.userId);
+    } catch {}
+    return null;
+}
+
 // --- 데이터 보안 처리 관련 함수 ---
 
 /**

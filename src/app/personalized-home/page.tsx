@@ -18,7 +18,7 @@ import {
     RefreshCw,
 } from "lucide-react";
 
-// 타입 정의 (기존과 동일)
+// 타입 정의
 interface QuestionOption {
     text: string;
     value: string;
@@ -52,7 +52,7 @@ interface Course {
     score?: number;
 }
 
-// 질문 시나리오 (기존과 동일)
+// 질문 시나리오
 const questionFlow: Question[] = [
     {
         id: "greeting",
@@ -118,10 +118,11 @@ const questionFlow: Question[] = [
 ];
 
 const AIRecommender = () => {
+    // 상태 관리
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
     const [nickname, setNickname] = useState("");
-    const [coupons, setCoupons] = useState(0); // DB에서 가져온 실제 쿠폰 수
+    const [coupons, setCoupons] = useState(0);
     const [showLogin, setShowLogin] = useState(false);
     const [showPaywall, setShowPaywall] = useState(false);
     const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
@@ -148,7 +149,7 @@ const AIRecommender = () => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    // ✅ [수정] 서버에서 실제 사용자 정보와 쿠폰 개수를 가져오는 함수
+    // 유저 정보 가져오기
     const fetchUserData = async () => {
         const token = localStorage.getItem("authToken");
         if (!token) {
@@ -171,13 +172,9 @@ const AIRecommender = () => {
                 const nick = userData.nickname || userData.name || userData.email?.split("@")[0] || "사용자";
                 setUserName(nick);
                 setNickname(nick);
-                // DB에서 직접 가져온 쿠폰 수로 상태 업데이트
                 setCoupons(userData.couponCount || 0);
-
-                // 로컬 user 정보도 동기화
                 localStorage.setItem("user", JSON.stringify(userData));
             } else {
-                // 토큰이 유효하지 않은 경우 로그아웃 처리
                 handleLogout();
             }
         } catch (error) {
@@ -186,12 +183,12 @@ const AIRecommender = () => {
         }
     };
 
-    // 로그인 상태 확인 및 사용자 데이터 동기화
+    // 로그인 상태 확인
     useEffect(() => {
         const checkLoginStatus = () => {
             const token = localStorage.getItem("authToken");
             if (token) {
-                fetchUserData(); // 토큰이 있으면 서버에서 최신 정보 가져오기
+                fetchUserData();
             } else {
                 setIsLoggedIn(false);
                 setUserName("");
@@ -221,7 +218,7 @@ const AIRecommender = () => {
         };
     }, []);
 
-    // 로그인 상태일 때 주간 출석 정보 불러오기
+    // 출석 정보 가져오기
     useEffect(() => {
         if (!isLoggedIn) return;
         const fetchCheckins = async () => {
@@ -270,7 +267,7 @@ const AIRecommender = () => {
         fetchCheckins();
     }, [isLoggedIn]);
 
-    // 출석 체크 로직 (서버 연동)
+    // 출석 체크
     const doHomeCheckin = async () => {
         try {
             const token = localStorage.getItem("authToken");
@@ -281,9 +278,7 @@ const AIRecommender = () => {
             });
             const data = await res.json();
             if (res.ok && data?.success) {
-                // 출석 성공 후 최신 유저 정보(쿠폰 포함) 다시 불러오기
                 await fetchUserData();
-
                 const now = new Date();
                 const day = now.getDay();
                 const idx = (day + 6) % 7;
@@ -304,6 +299,7 @@ const AIRecommender = () => {
         }
     };
 
+    // 로그아웃
     const handleLogout = () => {
         localStorage.removeItem("authToken");
         localStorage.removeItem("user");
@@ -334,7 +330,7 @@ const AIRecommender = () => {
         }
     };
 
-    // ✅ [수정] 서버 API를 호출하여 쿠폰을 사용하는 함수
+    // 쿠폰 사용 API
     const useCoupon = async (): Promise<boolean> => {
         const token = localStorage.getItem("authToken");
         if (!token) {
@@ -350,52 +346,45 @@ const AIRecommender = () => {
 
             if (response.ok) {
                 const data = await response.json();
-                // 성공 시 서버에서 받은 최신 쿠폰 개수로 상태 업데이트
-                setCoupons(data.updatedUser.couponCount);
+                setCoupons(data.ticketsRemaining);
                 return true;
             } else {
                 const errorData = await response.json();
-                // 쿠폰 부족 등 서버에서 거절한 경우
-                if (response.status === 400 && errorData.message === "쿠폰이 부족합니다.") {
+                if (response.status === 400) {
                     setShowPaywall(true);
                 } else {
-                    alert(errorData.message || "쿠폰 사용 중 오류가 발생했습니다.");
+                    alert(errorData.message || "쿠폰 사용 오류");
                 }
                 return false;
             }
         } catch (error) {
             console.error("쿠폰 사용 API 오류:", error);
-            alert("쿠폰 사용 중 네트워크 오류가 발생했습니다.");
+            alert("네트워크 오류");
             return false;
         }
     };
 
-    // ✅ [수정] 서버 API를 호출하여 쿠폰을 환불하는 함수
+    // 쿠폰 환불 API
     const refundCoupon = async (): Promise<void> => {
         const token = localStorage.getItem("authToken");
         if (!token) return;
 
         try {
-            // 이 로직은 /api/users/checkins POST 요청의 보상 로직을 참고하여
-            // /api/users/coupons/refund 와 같은 API를 만든 후 호출해야 합니다.
-            // 여기서는 임시로 +1 하는 API가 있다고 가정하고 작성합니다.
-            const response = await fetch("/api/users/coupons/increment", {
-                // 가상의 환불 API
+            const response = await fetch("/api/ai-recommendation/refund", {
                 method: "POST",
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: 1 }),
+                headers: { Authorization: `Bearer ${token}` },
             });
 
             if (response.ok) {
                 const data = await response.json();
-                // 성공 시 서버에서 받은 최신 쿠폰 개수로 상태 업데이트
-                setCoupons(data.couponCount);
+                setCoupons(data.ticketsRemaining);
             }
         } catch (error) {
             console.error("쿠폰 환불 API 오류:", error);
         }
     };
 
+    // 답변 처리
     const handleAnswer = async (option: QuestionOption) => {
         const isFirstAnswer = Object.keys(userAnswers).length === 0;
 
@@ -408,10 +397,8 @@ const AIRecommender = () => {
                 setShowPaywall(true);
                 return;
             }
-            // ✅ [수정] 첫 답변 시, localStorage 대신 서버 API로 쿠폰 차감
             const couponUsed = await useCoupon();
             if (!couponUsed) {
-                // 쿠폰 사용 실패 시 (로그인 필요, 개수 부족 등) 대화 진행 중단
                 return;
             }
         }
@@ -448,8 +435,8 @@ const AIRecommender = () => {
         }, 600);
     };
 
+    // 추천 생성
     const generateRecommendations = async (answers: Record<string, string>) => {
-        // ... (generateRecommendations 내부 로직은 기존과 거의 동일)
         const buildList = (rows: any[]): Course[] =>
             (rows || []).map((c: any) => ({
                 id: String(c.id),
@@ -505,9 +492,9 @@ const AIRecommender = () => {
 
         list = list.slice(0, 3);
 
-        // ✅ [수정] 결과 없을 시, 서버에 쿠폰 환불 요청
+        // 결과 없을 시 환불
         if (list.length === 0) {
-            await refundCoupon(); // 서버에 환불 요청
+            await refundCoupon();
         }
 
         setRecommendedCourses(list);
@@ -525,12 +512,12 @@ const AIRecommender = () => {
         ]);
     };
 
+    // 다른 추천
     const handleResetAndRecommend = async () => {
         if (coupons < 1) {
             setShowPaywall(true);
             return;
         }
-        // ✅ [수정] '다른 추천 받기' 시에도 서버 API로 쿠폰 사용
         const couponUsed = await useCoupon();
         if (couponUsed) {
             resetConversation();
@@ -846,7 +833,7 @@ const AIRecommender = () => {
                 <div className="w-full max-w-4xl flex flex-col">
                     {/* AI 추천 헤더 */}
                     <header className="bg-[#1E2A44] rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 flex-shrink-0 border border-white/10">
-                        <div className="flex flex-col sm:flex-row items-center justify-between">
+                        <div className="flex flex-col justify-between gap-4">
                             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
                                 <div className="relative">
                                     <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
@@ -857,26 +844,28 @@ const AIRecommender = () => {
                                     </div>
                                 </div>
                                 <div className="text-white">
-                                    <h1 className="text-2xl sm:text-3xl font-bold cursor-pointer">AI 여행 코스 추천</h1>
-                                    <p className="text-white/90 text-sm">98.7% 만족도 · 32명이 이용 중</p>
+                                    <h1 className="font-brand text-2xl sm:text-3xl font-bold cursor-pointer">
+                                        AI 여행 코스 추천
+                                    </h1>
+                                    <p className="text-white/90 text-sm font-brand">98.7% 만족도 · 32명이 이용 중</p>
                                 </div>
                             </div>
 
-                            <div className="text-white text-right">
+                            <div className="text-white w-full flex justify-end items-end">
                                 {isLoggedIn ? (
-                                    <div className="flex items-center space-x-4 bg-white/10 p-2 rounded-xl">
-                                        <div className="text-left">
-                                            <p className="text-sm opacity-90">
+                                    <div className="flex items-center gap-4 bg-white/10 p-3 rounded-xl backdrop-blur-sm w-full lg:w-auto justify-between lg:justify-start">
+                                        <div className="text-left min-w-0">
+                                            <p className="text-sm opacity-90 whitespace-nowrap truncate">
                                                 안녕하세요, {nickname && nickname.trim() ? nickname : "사용자"}님
                                             </p>
-                                            <div className="flex items-center space-x-2">
+                                            <div className="flex items-center space-x-2 whitespace-nowrap">
                                                 <Ticket className="w-5 h-5" />
                                                 <span className="text-xl font-bold">{coupons}개</span>
                                             </div>
                                         </div>
                                         <button
                                             onClick={handleLogout}
-                                            className="p-3 bg-white/20 rounded-lg hover:bg-white/30 transition-all active:scale-95 cursor-pointer"
+                                            className="p-2.5 bg-white/20 rounded-lg hover:bg-white/30 transition-all active:scale-95 cursor-pointer"
                                         >
                                             <LogOut className="w-5 h-5" />
                                         </button>
@@ -884,7 +873,7 @@ const AIRecommender = () => {
                                 ) : (
                                     <button
                                         onClick={() => setShowLogin(true)}
-                                        className="hover:cursor-pointer px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/25 transition-all active:scale-95"
+                                        className="hover:cursor-pointer px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/25 transition-all active:scale-95 w-full lg:w-auto"
                                     >
                                         로그인하기
                                     </button>

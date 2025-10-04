@@ -14,29 +14,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "유효하지 않은 토큰입니다." }, { status: 401 });
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: Number(userId) },
-            select: { couponCount: true },
-        });
-
-        if (!user) return NextResponse.json({ error: "유저를 찾을 수 없습니다." }, { status: 404 });
-        if (user.couponCount <= 0) {
-            return NextResponse.json({ error: "사용 가능한 쿠폰이 없습니다." }, { status: 400 });
-        }
-
         const updated = await prisma.user.update({
             where: { id: Number(userId) },
-            data: { couponCount: { decrement: 1 } },
+            data: { couponCount: { increment: 1 } },
             select: { couponCount: true },
         });
 
         return NextResponse.json({
             success: true,
-            message: "쿠폰이 사용되었습니다.",
+            message: "쿠폰이 환불되었습니다.",
             ticketsRemaining: updated.couponCount,
         });
     } catch (err) {
-        console.error("쿠폰 사용 오류", err);
-        return NextResponse.json({ error: "쿠폰 사용 중 오류" }, { status: 500 });
+        console.error("쿠폰 환불 오류", err);
+        return NextResponse.json({ error: "쿠폰 환불 중 오류" }, { status: 500 });
     }
 }

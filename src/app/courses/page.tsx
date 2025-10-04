@@ -140,9 +140,6 @@ function CoursesPageInner() {
                                 {concept ? `${concept} 관련 코스를 찾아보세요` : "다양한 코스를 둘러보세요"}
                             </p>
                         </div>
-                        <Link href="/" className="btn-primary rounded-full">
-                            ← 홈으로
-                        </Link>
                     </div>
                 </div>
             </div>
