@@ -625,39 +625,108 @@ function MapPageInner() {
                 </div>
 
                 {/* 콘텐츠 목록 */}
-                <div className="flex-1 overflow-y-auto p-2">
+                <div className={`flex-1 p-2 ${selectedPlace ? "overflow-hidden" : "overflow-y-auto"}`}>
                     {loading ? (
                         <LoadingSpinner />
                     ) : error ? (
                         <div className="text-red-500 p-4 text-center">{error}</div>
                     ) : activeTab === "places" ? (
                         selectedPlace ? (
-                            // 장소 상세 정보
-                            <div className="p-4">
-                                <h3 className="text-xl font-bold text-black">{selectedPlace.name}</h3>
-                                <p className="text-gray-600 mt-2">{selectedPlace.address}</p>
-                                <p className="text-gray-500 text-sm mt-1">{selectedPlace.category}</p>
-                                {selectedPlace.phone && <p className="text-gray-700 mt-2">📞 {selectedPlace.phone}</p>}
-                                <div className="mt-4 flex gap-4">
-                                    <button
-                                        onClick={() =>
-                                            window.open(
-                                                `https://map.naver.com/v5/search/${encodeURIComponent(
-                                                    selectedPlace.name
-                                                )}`,
-                                                "_blank"
-                                            )
-                                        }
-                                        className="text-black font-semibold hover:underline hover:cursor-pointer"
-                                    >
-                                        네이버 지도에서 보기
-                                    </button>
-                                    <button
-                                        onClick={() => resetPanelState()}
-                                        className="text-gray-500 hover:underline hover:cursor-pointer"
-                                    >
-                                        목록으로
-                                    </button>
+                            // 장소 상세 정보 - StyleMap 톤(그린 계열) 적용 카드 스타일
+                            <div className="p-2">
+                                <div className="bg-white rounded-md shadow-sm border border-gray-200 p-3">
+                                    <h3 className="text-base font-semibold text-gray-900 mb-1 leading-snug">
+                                        {selectedPlace.name}
+                                    </h3>
+                                    <div className="flex items-center gap-1 text-gray-700 mb-1">
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                            className="w-3 h-3 text-blue-700"
+                                        >
+                                            <path d="M9.813 15.904C7.024 14.946 5 12.248 5 9a7 7 0 1 1 14 0c0 3.248-2.024 5.946-4.813 6.904l-.4 1.6a2 2 0 0 1-1.94 1.496h-1.694a2 2 0 0 1-1.94-1.496l-.4-1.6z" />
+                                        </svg>
+                                        <span className="font-medium">{selectedPlace.category || "장소"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-gray-700 mb-1">
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            viewBox="0 0 24 24"
+                                            fill="currentColor"
+                                            className="w-3 h-3 text-blue-700"
+                                        >
+                                            <path
+                                                fillRule="evenodd"
+                                                d="M12 2.25c-4.28 0-7.75 3.47-7.75 7.75 0 5.813 6.514 11.258 7.18 11.815a1 1 0 0 0 1.14 0c.666-.557 7.18-6.002 7.18-11.815 0-4.28-3.47-7.75-7.75-7.75Zm0 10.25a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"
+                                                clipRule="evenodd"
+                                            />
+                                        </svg>
+                                        <span className="text-gray-700">{selectedPlace.address}</span>
+                                    </div>
+                                    {selectedPlace.phone && (
+                                        <div className="flex items-center gap-1 text-gray-700 mb-2">
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 24 24"
+                                                fill="currentColor"
+                                                className="w-3 h-3 text-blue-700"
+                                            >
+                                                <path d="M2.25 5.25A2.25 2.25 0 0 1 4.5 3h2.708a2.25 2.25 0 0 1 2.132 1.552l.762 2.287a2.25 2.25 0 0 1-.54 2.316l-1.2 1.2a14.25 14.25 0 0 0 5.484 5.484l1.2-1.2a2.25 2.25 0 0 1 2.316-.54l2.287.762A2.25 2.25 0 0 1 21 16.792V19.5a2.25 2.25 0 0 1-2.25 2.25h-.75C9.716 21.75 2.25 14.284 2.25 5.25v0Z" />
+                                            </svg>
+                                            <span className="tracking-wide font-medium">{selectedPlace.phone}</span>
+                                        </div>
+                                    )}
+                                    <div className="mt-2 flex gap-3">
+                                        <button
+                                            onClick={() =>
+                                                window.open(
+                                                    `https://map.naver.com/v5/search/${encodeURIComponent(
+                                                        selectedPlace.name
+                                                    )}`,
+                                                    "_blank"
+                                                )
+                                            }
+                                            className="px-3 py-1.5 rounded-full border border-blue-500 text-blue-700 bg-white font-semibold text-sm hover:bg-blue-50 transition-colors hover:cursor-pointer flex items-center gap-1 shadow-sm"
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 24 24"
+                                                fill="currentColor"
+                                                className="w-3 h-3"
+                                            >
+                                                <path
+                                                    fillRule="evenodd"
+                                                    d="M12 2.25c-4.28 0-7.75 3.47-7.75 7.75 0 5.813 6.514 11.258 7.18 11.815a1 1 0 0 0 1.14 0c.666-.557 7.18-6.002 7.18-11.815 0-4.28-3.47-7.75-7.75-7.75Zm0 10.25a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5Z"
+                                                    clipRule="evenodd"
+                                                />
+                                            </svg>
+                                            지도 보기
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                selectedPlace.phone
+                                                    ? (window.location.href = `tel:${selectedPlace.phone}`)
+                                                    : undefined
+                                            }
+                                            disabled={!selectedPlace.phone}
+                                            className={`px-3 py-1.5 rounded-full font-semibold text-white text-sm flex items-center gap-1 hover:cursor-pointer transition-colors shadow-sm ${
+                                                selectedPlace.phone
+                                                    ? "bg-blue-600 hover:bg-blue-700"
+                                                    : "bg-gray-300 cursor-not-allowed"
+                                            }`}
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 24 24"
+                                                fill="currentColor"
+                                                className="w-3 h-3"
+                                            >
+                                                <path d="M2.25 5.25A2.25 2.25 0 0 1 4.5 3h2.708a2.25 2.25 0 0 1 2.132 1.552l.762 2.287a2.25 2.25 0 0 1-.54 2.316l-1.2 1.2a14.25 14.25 0 0 0 5.484 5.484l1.2-1.2a2.25 2.25 0 0 1 2.316-.54l2.287.762A2.25 2.25 0 0 1 21 16.792V19.5a2.25 2.25 0 0 1-2.25 2.25h-.75C9.716 21.75 2.25 14.284 2.25 5.25v0Z" />
+                                            </svg>
+                                            전화하기
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ) : // 장소 목록

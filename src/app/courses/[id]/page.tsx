@@ -530,7 +530,7 @@ export default function CourseDetailPage() {
                     </div>
 
                     <div className="relative h-full max-w-[500px] mx-auto px-4 flex items-center">
-                        <div className="max-w-[85%]">
+                        <div className="max-w-[80%]">
                             <div className="mb-4 flex items-center gap-3 flex-wrap">
                                 {courseData.isPopular && (
                                     <span className="px-4 py-1.5 bg-red-500 text-white text-sm font-bold rounded-full animate-pulse">
@@ -547,7 +547,7 @@ export default function CourseDetailPage() {
 
                             <h1 className="text-2xl font-bold text-white mb-4">{courseData.title}</h1>
                             <p
-                                className="text-base text-white/90 mb-6"
+                                className="text-base text-white/90 mb-2"
                                 style={{
                                     display: "-webkit-box",
                                     WebkitLineClamp: 2,
@@ -624,7 +624,7 @@ export default function CourseDetailPage() {
                                                         imageUrl: cp.place.imageUrl, // ✅ snake_case
                                                         description: cp.place.description,
                                                     }))}
-                                                    userLocation={userLocation}
+                                                    userLocation={null}
                                                     selectedPlace={selectedPlace}
                                                     onPlaceClick={setSelectedPlace}
                                                     drawPath={true}
@@ -913,7 +913,7 @@ export default function CourseDetailPage() {
 
             {/* 공유 모달 */}
             {showShareModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[3000] p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-bold text-gray-800">공유하기</h3>
@@ -988,7 +988,7 @@ export default function CourseDetailPage() {
             {/* 장소 상세 모달 */}
             {showPlaceModal && selectedPlace && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-[3000] p-4"
                     onClick={() => setShowPlaceModal(false)}
                 >
                     <div

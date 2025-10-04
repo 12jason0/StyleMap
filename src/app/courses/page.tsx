@@ -1,5 +1,5 @@
 "use client";
-import { useSearchParams, useRouter } from "next/navigation"; // useRouter 추가
+import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -24,8 +24,9 @@ interface Course {
 
 function CoursesPageInner() {
     const searchParams = useSearchParams();
-    const router = useRouter(); // useRouter 훅 사용
+    const router = useRouter();
     const concept = searchParams.get("concept");
+
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -50,10 +51,9 @@ function CoursesPageInner() {
                 const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
                 const now = Date.now();
 
-                // 3분 이내 캐시된 데이터가 있으면 사용
                 if (cachedData && cacheTime && now - parseInt(cacheTime) < 1 * 60 * 1000) {
                     const data = JSON.parse(cachedData);
-                    setCourses(data);
+                    setCourses(Array.isArray(data) ? data : []);
                     setError(null);
                     setLoading(false);
                     return;
@@ -61,7 +61,7 @@ function CoursesPageInner() {
 
                 const response = await fetch(url, {
                     cache: "force-cache",
-                    next: { revalidate: 180 }, // 3분 캐시
+                    next: { revalidate: 180 },
                 });
 
                 if (!response.ok) {
@@ -69,17 +69,14 @@ function CoursesPageInner() {
                 }
 
                 const data = await response.json();
-                if (data && Array.isArray(data.courses)) {
-                    setCourses(data.courses);
-                } else {
-                    // 혹시 모를 다른 형식의 응답에 대비
-                    setCourses(data);
-                }
+
+                // ✅ API 응답이 배열임 (data.courses 아님)
+                const normalized = Array.isArray(data) ? data : data.courses || [];
+                setCourses(normalized);
 
                 setError(null);
 
-                // 데이터를 캐시에 저장
-                sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                sessionStorage.setItem(cacheKey, JSON.stringify(normalized));
                 sessionStorage.setItem(`${cacheKey}_time`, now.toString());
             } catch (err) {
                 console.error("Error fetching courses:", err);
@@ -92,11 +89,10 @@ function CoursesPageInner() {
         fetchCourses();
     }, [concept]);
 
-    // ✅ "코스 시작하기" 버튼을 위한 새로운 핸들러
+    // ✅ "코스 시작하기" 버튼 핸들러
     const handleStartCourse = (e: React.MouseEvent, courseId: string) => {
-        e.stopPropagation(); // Link의 기본 동작을 막기 위해 이벤트 전파 중단
+        e.stopPropagation();
 
-        // 로그인 여부 확인
         const token = localStorage.getItem("authToken");
         if (!token) {
             alert("로그인이 필요합니다.");
@@ -104,7 +100,6 @@ function CoursesPageInner() {
             return;
         }
 
-        // 새로운 가이드 페이지로 이동
         router.push(`/courses/${courseId}/start`);
     };
 
@@ -161,17 +156,15 @@ function CoursesPageInner() {
                             className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer block"
                             onClick={async () => {
                                 try {
-                                    // 조회수 증가 비동기 전송 (내비게이션 비차단)
                                     fetch(`/api/courses/${course.id}/view`, { method: "POST", keepalive: true }).catch(
                                         () => {}
                                     );
                                 } catch {}
-                                // 코스 상세 페이지로 즉시 이동
                                 window.location.href = `/courses/${course.id}`;
                             }}
                         >
                             {/* 이미지 */}
-                            <div className="relative h-40 rounded-t-2xl overflow-hidden">
+                            <div className="relative h-32 rounded-t-2xl overflow-hidden">
                                 {course.imageUrl ? (
                                     <Image
                                         src={course.imageUrl}
@@ -190,27 +183,27 @@ function CoursesPageInner() {
                             </div>
 
                             {/* 내용 */}
-                            <div className="p-6">
+                            <div className="p-4">
                                 <div className="flex items-start justify-between mb-3">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-2">{course.title}</h3>
-                                    <div className="flex items-center text-sm text-gray-600">
-                                        <span className="text-yellow-500">★</span>
-                                        <span className="ml-1">{course.rating}</span>
-                                        <span className="ml-1">({course.reviewCount})</span>
-                                    </div>
+                                    <h3 className="text-lg font-bold text-gray-900 ">{course.title}</h3>
+                                </div>
+                                <div className="flex items-center text-sm text-gray-600 mb-2">
+                                    <span className="text-yellow-500">★</span>
+                                    <span className="ml-1">{course.rating}</span>
+                                    <span className="ml-1">({course.reviewCount})</span>
                                 </div>
 
-                                {/* 조회수 표시 */}
-                                <div className="flex items-center text-sm text-gray-500 mb-3">
-                                    <span className="mr-2">👁️</span>
+                                {/* 조회수 */}
+                                <div className="flex items-center text-sm text-gray-500 mb-2">
+                                    <span>👁️</span>
                                     <span>{(course.viewCount || 0).toLocaleString()}회 조회</span>
                                 </div>
 
                                 <p
-                                    className="text-gray-600 mb-4"
+                                    className="text-gray-600 mb-3"
                                     style={{
                                         display: "-webkit-box",
-                                        WebkitLineClamp: 2,
+                                        WebkitLineClamp: 1,
                                         WebkitBoxOrient: "vertical",
                                         overflow: "hidden",
                                     }}
@@ -219,11 +212,11 @@ function CoursesPageInner() {
                                 </p>
 
                                 {/* 정보 태그 */}
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
                                         ⏱ {course.duration}
                                     </span>
-                                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
+                                    <span className="px-2.5 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
                                         📍 {course.location}
                                     </span>
                                 </div>
@@ -233,10 +226,9 @@ function CoursesPageInner() {
                                     <span className="text-sm text-blue-600 font-medium">
                                         👥 지금 {course.participants}명 진행중
                                     </span>
-                                    {/* ✅ 버튼 onClick 이벤트 수정 */}
                                     <button
                                         onClick={(e) => handleStartCourse(e, course.id)}
-                                        className="btn-primary rounded-full text-sm active:scale-95"
+                                        className="btn-primary rounded-full text-xs px-3 py-1.5 active:scale-95"
                                     >
                                         코스 시작하기
                                     </button>
@@ -246,6 +238,7 @@ function CoursesPageInner() {
                     ))}
                 </div>
 
+                {/* 코스 없을 때 */}
                 {courses.length === 0 && concept && (
                     <div className="text-center py-16">
                         <div className="text-6xl mb-4">🚧</div>
@@ -281,7 +274,6 @@ function CoursesPageInner() {
                     </div>
                 )}
             </div>
-            {/* 모바일 하단 네비게이션을 위한 여백 */}
             <div className="md:hidden h-20"></div>
         </div>
     );

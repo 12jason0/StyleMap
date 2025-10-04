@@ -208,7 +208,12 @@ const Header = () => {
         alert("로그아웃되었습니다.");
     };
 
-    const openLogoutConfirm = () => setShowLogoutConfirm(true);
+    const openLogoutConfirm = () => {
+        try {
+            setIsMenuOpen(false);
+        } catch {}
+        setShowLogoutConfirm(true);
+    };
     const closeLogoutConfirm = () => setShowLogoutConfirm(false);
 
     return (
@@ -346,7 +351,7 @@ const Header = () => {
                                     </Link>
                                     <button
                                         onClick={openLogoutConfirm}
-                                        className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        className="cursor-pointer block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50"
                                     >
                                         로그아웃
                                     </button>
@@ -443,14 +448,14 @@ const Header = () => {
 
             {/* 로그아웃 확인 모달 */}
             {showLogoutConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
                     <div className="bg-white rounded-2xl shadow-xl p-6 w-80">
                         <h3 className="text-lg font-bold text-gray-900 mb-2">로그아웃</h3>
                         <p className="text-gray-600 mb-6">로그아웃 하시겠습니까?</p>
                         <div className="flex gap-3">
                             <button
                                 onClick={closeLogoutConfirm}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 cursor-pointer"
                             >
                                 취소
                             </button>
@@ -459,7 +464,7 @@ const Header = () => {
                                     closeLogoutConfirm();
                                     handleLogout();
                                 }}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
+                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 cursor-pointer "
                             >
                                 로그아웃
                             </button>

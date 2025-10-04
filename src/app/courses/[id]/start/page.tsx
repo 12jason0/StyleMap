@@ -197,21 +197,22 @@ function GuidePageInner() {
                     selectedPlace={null}
                     onPlaceClick={() => {}}
                     className="w-full h-full"
-                    drawPath={!!userLocation}
-                    routeMode="walking"
+                    drawPath={Boolean(userLocation && (mapPlaces as any)?.length > 0)}
+                    routeMode="driving"
                 />
 
-                {/* 패널 토글 버튼 */}
+                {/* 패널 토글 버튼 - 헤더 아래 여백 확보 */}
                 <button
                     onClick={() => setShowPanel((v) => !v)}
-                    className="absolute top-4 left-4 z-20 px-3 py-2 rounded-lg bg-black/60 text-white backdrop-blur hover:bg-black/70 hover:cursor-pointer"
+                    className="absolute left-4 z-20 px-3 py-2 rounded-lg bg-black/60 text-white backdrop-blur hover:bg-black/70 hover:cursor-pointer"
+                    style={{ top: 72 }}
                 >
                     {showPanel ? "숨기기" : "보이기"}
                 </button>
 
                 {/* 지도 위 하단 모달 패널 */}
                 {showPanel && (
-                    <div className="absolute inset-x-0 bottom-30 md:top-auto md:bottom-6 z-10 px-4 pt-[env(safe-area-inset-bottom)] md:pt-0 md:pb-[env(safe-area-inset-bottom)]">
+                    <div className="absolute inset-x-0 bottom-10 md:10 md:bottom-6 z-10 px-4 pt-[env(safe-area-inset-bottom)] ">
                         <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-xl border p-4">
                             <div className="mb-3">
                                 <h2 className="text-xl font-bold">{currentPlace.name}</h2>

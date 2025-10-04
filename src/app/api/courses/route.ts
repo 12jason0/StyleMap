@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
                 rating: true,
                 current_participants: true,
                 view_count: true,
+                createdAt: true,
                 coursePlaces: {
                     orderBy: { order_index: "asc" },
                     select: {
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest) {
                 participants: course.current_participants || 0,
                 view_count: course.view_count || 0,
                 viewCount: course.view_count || 0,
+                createdAt: course.createdAt,
             };
         });
 

@@ -33,7 +33,7 @@ const regions = ["강남", "성수", "홍대", "종로", "연남", "한남", "�
 export default function NearbyPage() {
     const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
     const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
-    const [budget, setBudget] = useState<number>(10);
+    // 예산 기능 제거
     const [courses, setCourses] = useState<Course[]>([]);
     // 되돌림: 페이징 상태 제거
     const [loading, setLoading] = useState(false);
@@ -69,12 +69,6 @@ export default function NearbyPage() {
     // 되돌림: 필터 변경에 따른 페이징 초기화 제거
 
     const filtered = useMemo(() => {
-        const maxWon = budget * 10000;
-        const toWon = (price?: string) => {
-            if (!price) return null;
-            const d = price.replace(/[^0-9]/g, "");
-            return d ? Number(d) : null;
-        };
         return courses.filter((c) => {
             if (selectedActivities.length > 0 && !selectedActivities.some((a) => (c.concept || "").includes(a))) {
                 return false;
@@ -83,11 +77,9 @@ export default function NearbyPage() {
                 const loc = (c.location || c.region || "").toLowerCase();
                 if (!selectedRegions.some((r) => loc.includes(r.toLowerCase()))) return false;
             }
-            const won = toWon(c.price);
-            if (won !== null && won > maxWon) return false;
             return true;
         });
-    }, [courses, selectedActivities, selectedRegions, budget]);
+    }, [courses, selectedActivities, selectedRegions]);
 
     const toggle = (arr: string[], v: string, set: (n: string[]) => void) => {
         if (arr.includes(v)) set(arr.filter((x) => x !== v));
@@ -150,22 +142,7 @@ export default function NearbyPage() {
                             </div>
                         </div>
 
-                        {/* 예산 */}
-                        <div className="mb-2">
-                            <h3 className="text-sm font-semibold text-gray-700 mb-2">예산 (최대)</h3>
-                            <div className="flex items-center gap-3">
-                                <input
-                                    type="range"
-                                    min={3}
-                                    max={30}
-                                    step={1}
-                                    value={budget}
-                                    onChange={(e) => setBudget(Number(e.target.value))}
-                                    className="w-full hover:cursor-pointer"
-                                />
-                                <span className="text-sm text-gray-700 whitespace-nowrap ">{budget}만원</span>
-                            </div>
-                        </div>
+                        {/* 예산 기능 제거 */}
                     </aside>
 
                     {/* Right: Results */}
@@ -176,7 +153,6 @@ export default function NearbyPage() {
                                 onClick={() => {
                                     setSelectedActivities([]);
                                     setSelectedRegions([]);
-                                    setBudget(10);
                                 }}
                                 className="text-sm text-gray-600 hover:text-gray-800 border px-3 py-1.5 rounded-lg hover:cursor-pointer "
                             >

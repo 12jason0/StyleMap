@@ -1,5 +1,4 @@
 // src/app/api/courses/[id]/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 
@@ -7,20 +6,19 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
     request: NextRequest,
-    context: { params: Promise<{ id: string }> } // ✅ Promise 타입으로 선언
+    { params }: { params: { id: string } } // ✅ Promise 제거
 ) {
     try {
-        const { id: courseId } = await context.params;
+        const courseId = Number(params.id);
 
-        // id가 숫자가 아닌 경우 방어 코드
-        if (isNaN(Number(courseId))) {
+        if (!courseId || isNaN(courseId)) {
             return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });
         }
 
-        // 조회수 1 증가 (에러는 무시)
+        // 조회수 증가 (실패해도 무시)
         try {
             await prisma.course.update({
-                where: { id: Number(courseId) },
+                where: { id: courseId },
                 data: { view_count: { increment: 1 } },
             });
         } catch (e) {
@@ -28,7 +26,7 @@ export async function GET(
         }
 
         const course = await prisma.course.findUnique({
-            where: { id: Number(courseId) },
+            where: { id: courseId },
             include: {
                 highlights: true,
                 benefits: true,
@@ -47,12 +45,12 @@ export async function GET(
 
         // 기본 course 정보
         const formattedCourse = {
-            id: course.id.toString(),
+            id: String(course.id),
             title: course.title || "",
             description: course.description || "",
             duration: course.duration || "",
             location: course.region || "",
-            imageUrl: course.imageUrl || "/images/maker.png", // ✅ 기본 이미지 fallback
+            imageUrl: course.imageUrl || "/images/maker.png",
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
             view_count: course.view_count || 0,
@@ -66,12 +64,12 @@ export async function GET(
             transportation: "대중교통",
             parking: "주차 가능",
             reservationRequired: false,
-            placeCount: (course as any)._count?.coursePlaces ?? (course.coursePlaces?.length || 0),
+            placeCount: course._count?.coursePlaces ?? (course.coursePlaces?.length || 0),
             createdAt: course.createdAt,
             updatedAt: course.updatedAt,
         };
 
-        // 코스 장소들 가공
+        // 코스 장소 가공
         const coursePlaces = course.coursePlaces.map((cp) => ({
             id: cp.id,
             course_id: cp.course_id,
@@ -94,11 +92,7 @@ export async function GET(
                       reservation_required: !!cp.place.reservation_required,
                       latitude: cp.place.latitude ? Number(cp.place.latitude) : null,
                       longitude: cp.place.longitude ? Number(cp.place.longitude) : null,
-                      // ✅ DB 값 있으면 그대로, 없으면 fallback
-                      imageUrl:
-                          cp.place.imageUrl && cp.place.imageUrl.trim() !== ""
-                              ? cp.place.imageUrl
-                              : "/images/maker.png",
+                      imageUrl: cp.place.imageUrl?.trim() ? cp.place.imageUrl : "/images/maker.png",
                   }
                 : null,
         }));

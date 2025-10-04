@@ -1173,7 +1173,7 @@ function CourseDetailPage() {
 
             {/* 공유 모달 */}
             {showShareModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[3000] p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-xl font-bold text-gray-800">공유하기</h3>
@@ -1274,7 +1274,7 @@ function CourseDetailPage() {
             {/* 장소 상세 모달 */}
             {showPlaceModal && selectedPlace && (
                 <div
-                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/50 flex items-center justify-center z-[3000] p-4"
                     onClick={() => setShowPlaceModal(false)}
                 >
                     <div

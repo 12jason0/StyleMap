@@ -146,7 +146,7 @@ const MyPage = () => {
     const [casePhotoLoading, setCasePhotoLoading] = useState(false);
     const [rewards, setRewards] = useState<UserRewardRow[]>([]);
     const [checkins, setCheckins] = useState<UserCheckinRow[]>([]);
-    const [showCheckinModal, setShowCheckinModal] = useState(false);
+    // Removed: showCheckinModal state for MyPage attendance modal
 
     useEffect(() => {
         fetchUserInfo();
@@ -158,12 +158,7 @@ const MyPage = () => {
         fetchRewards();
         fetchCheckins();
 
-        // 로그인 시 오늘 출석 여부 확인 → 모달
-        try {
-            const last = localStorage.getItem("attendanceLastDate") || "";
-            const today = new Date().toISOString().slice(0, 10);
-            if (last !== today) setShowCheckinModal(true);
-        } catch {}
+        // Removed: MyPage auto-open attendance modal
 
         try {
             const url = new URL(window.location.href);
@@ -417,27 +412,7 @@ const MyPage = () => {
         } catch {}
     };
 
-    const doCheckin = async () => {
-        try {
-            const token = localStorage.getItem("authToken");
-            if (!token) return;
-            const res = await fetch("/api/users/checkins", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (res.ok && data?.success) {
-                localStorage.setItem("attendanceLastDate", new Date().toISOString().slice(0, 10));
-                setShowCheckinModal(false);
-                fetchCheckins();
-                if (data.awarded) {
-                    alert("출석 7회 달성! 쿠폰 7개가 지급되었습니다.");
-                } else {
-                    alert("출석 체크 완료!");
-                }
-            }
-        } catch {}
-    };
+    // Removed: doCheckin function and modal-specific logic
 
     const removeFavorite = async (courseId: number) => {
         try {
@@ -547,7 +522,8 @@ const MyPage = () => {
                             <p className="text-gray-600 mb-1 text-sm md:text-base">{userInfo.email}</p>
                             <div className="flex items-center space-x-3 md:space-x-4 text-xs md:text-sm text-gray-500">
                                 <span>가입일: {userInfo.joinDate}</span>
-                                {userInfo.mbti && <span>MBTI: {userInfo.mbti}</span>}
+                            </div>
+                            <div className="flex items-center space-x-3 md:space-x-4 text-xs md:text-sm text-gray-500">
                                 {userInfo.age && <span>나이: {userInfo.age}세</span>}
                             </div>
                         </div>
@@ -1294,26 +1270,6 @@ const MyPage = () => {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            )}
-
-            {showCheckinModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">출석 체크</h3>
-                        <p className="text-gray-600 mb-4">하루 한 번 출석 체크! 7회마다 쿠폰 7개 지급</p>
-                        <div className="flex gap-3 justify-center">
-                            <button
-                                onClick={() => setShowCheckinModal(false)}
-                                className="px-4 py-2 border rounded-lg text-gray-700"
-                            >
-                                나중에
-                            </button>
-                            <button onClick={doCheckin} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
-                                출석 체크 하기
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}

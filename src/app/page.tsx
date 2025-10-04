@@ -29,7 +29,8 @@ type Course = {
 
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
-    const [searchRegion, setSearchRegion] = useState("");
+    const [searchRegion, setSearchRegion] = useState(""); // 입력값
+    const [submittedRegion, setSubmittedRegion] = useState(""); // 실제 검색어
     const [currentSlide] = useState(0);
     const [, setLoading] = useState(true);
     const [showWelcome, setShowWelcome] = useState(false);
@@ -38,6 +39,15 @@ export default function Home() {
     const [isSignup, setIsSignup] = useState(false);
     const [showAiAdModal, setShowAiAdModal] = useState(false);
     const [showLoginRequiredModal, setShowLoginRequiredModal] = useState(false);
+    // 출석 체크 모달 상태 및 애니메이션 상태
+    const [showCheckinModal, setShowCheckinModal] = useState(false);
+    const [weekStamps, setWeekStamps] = useState<boolean[]>([false, false, false, false, false, false, false]);
+    const [animStamps, setAnimStamps] = useState<boolean[] | null>(null);
+    const [isStamping, setIsStamping] = useState(false);
+    const [stampCompleted, setStampCompleted] = useState(false);
+    const [alreadyToday, setAlreadyToday] = useState(false);
+    const [cycleProgress, setCycleProgress] = useState(0); // total%7
+    const [todayIndex, setTodayIndex] = useState(0);
     const router = useRouter();
 
     useEffect(() => {
@@ -47,8 +57,8 @@ export default function Home() {
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const qs = new URLSearchParams({ limit: "12", imagePolicy: "all-or-one-missing", lean: "1" });
-                if (searchRegion.trim()) qs.set("region", searchRegion.trim());
+                const qs = new URLSearchParams({ limit: "100", imagePolicy: "any", lean: "1" });
+                if (submittedRegion.trim()) qs.set("region", submittedRegion.trim());
                 const response = await fetch(`/api/courses?${qs.toString()}` as any, {
                     cache: "force-cache",
                     next: { revalidate: 300 },
@@ -73,7 +83,7 @@ export default function Home() {
             }
         };
         fetchCourses();
-    }, [searchRegion]);
+    }, [submittedRegion]);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -90,6 +100,8 @@ export default function Home() {
 
         if (loginSuccess === "true") {
             setShowLoginModal(true);
+            // 홈 진입 즉시 출석 모달 표시 (로그인 성공으로 들어온 경우)
+            maybeOpenCheckinModal();
             const token = localStorage.getItem("authToken");
             if (token) {
                 window.dispatchEvent(new CustomEvent("authTokenChange", { detail: { token } }));
@@ -104,6 +116,8 @@ export default function Home() {
             setShowLoginModal(true);
             setIsSignup(true);
             localStorage.setItem("loginTime", Date.now().toString());
+            // 홈 진입 즉시 출석 모달 표시 (회원가입 직후)
+            maybeOpenCheckinModal();
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
         }
@@ -119,19 +133,77 @@ export default function Home() {
                 if (!hideUntil || now > parseInt(hideUntil)) {
                     setShowAiAdModal(true);
                 }
+                // 로그인 직후 출석 모달 오픈 (하루 1회)
+                maybeOpenCheckinModal();
             }
         };
         window.addEventListener("authTokenChange", handleAuthChange as EventListener);
         return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
     }, []);
 
+    // 주차 계산 및 출석 데이터 조회 (7칸 사이클 표현으로 단순화)
+    const fetchAndSetWeekStamps = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return null as boolean[] | null;
+            const res = await fetch("/api/users/checkins", {
+                cache: "no-store",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) return null as boolean[] | null;
+            const data = await res.json();
+            const list: { date: string }[] = data?.checkins || [];
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const already = list.some((c: any) => (c.date || c.createdAt || "").slice(0, 10) === todayStr);
+            const total = list.length || 0;
+            const remainder = total % 7;
+            const stamps = new Array(7).fill(false).map((_, i) => i < remainder);
+            setWeekStamps(stamps);
+            setCycleProgress(remainder);
+            setAlreadyToday(already);
+            return stamps;
+        } catch {
+            return null as boolean[] | null;
+        }
+    };
+
+    const maybeOpenCheckinModal = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            await fetchAndSetWeekStamps();
+            setAnimStamps(null);
+            setStampCompleted(alreadyToday);
+            setShowCheckinModal(true);
+        } catch {}
+    };
+
+    // 첫 방문 시(메인 진입 때마다) 로그인 되어있으면 출석 모달 표시
+    useEffect(() => {
+        const token = localStorage.getItem("authToken");
+        if (token) {
+            maybeOpenCheckinModal();
+        }
+    }, []);
+
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const topCourses = courses.slice(0, 5);
     const hotCourses = courses
-        .filter((c) => c.participants > 10 || c.rating >= 4.5)
-        .sort((a, b) => b.participants - a.participants || b.rating - a.rating)
-        .slice(0, 6);
-    const newCourses = courses.slice(-3);
+        .slice()
+        .sort(
+            (a, b) =>
+                ((b.view_count ?? (b as any).viewCount ?? 0) as number) -
+                ((a.view_count ?? (a as any).viewCount ?? 0) as number)
+        )
+        .slice(0, 8);
+    const newCourses = courses
+        .slice()
+        .sort((a, b) => {
+            const ad = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
+            const bd = (b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0;
+            return bd - ad;
+        })
+        .slice(0, 8);
 
     const handleStartOnboarding = () => {
         if (!localStorage.getItem("authToken")) {
@@ -208,6 +280,8 @@ export default function Home() {
                                         setShowAiAdModal(true);
                                     }
                                 }
+                                // 로그인 확인 후 출석 모달도 체크
+                                maybeOpenCheckinModal();
                             }}
                             className="mt-6 btn-primary hover:cursor-pointer"
                         >
@@ -340,6 +414,115 @@ export default function Home() {
                     </div>
                 </div>
             )}
+            {/* 출석 체크 모달 */}
+            {showCheckinModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">출석 체크</h3>
+                        <p className="text-gray-600 mb-1">이번 주 출석 현황</p>
+                        {alreadyToday && <p className="text-sm text-green-600 mb-3">오늘 이미 출석했습니다</p>}
+                        <div className="grid grid-cols-7 gap-2 mb-4">
+                            {new Array(7).fill(0).map((_, i) => {
+                                const stamped = (weekStamps[i] || (!!animStamps && !!animStamps[i])) as boolean;
+                                const pulse = !!animStamps && !!animStamps[i];
+                                return (
+                                    <div key={i} className="flex flex-col items-center gap-1">
+                                        <span
+                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-transform duration-150 ${
+                                                stamped ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
+                                            } ${pulse ? "scale-110" : ""}`}
+                                        >
+                                            {stamped ? "✔" : String(i + 1)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="flex gap-3 justify-center">
+                            {!stampCompleted && !alreadyToday ? (
+                                <>
+                                    <button
+                                        onClick={() => setShowCheckinModal(false)}
+                                        className="px-4 py-2 border rounded-lg text-gray-700"
+                                    >
+                                        나중에
+                                    </button>
+                                    <button
+                                        onClick={async () => {
+                                            if (isStamping) return;
+                                            setIsStamping(true);
+                                            try {
+                                                const token = localStorage.getItem("authToken");
+                                                const res = await fetch("/api/users/checkins", {
+                                                    method: "POST",
+                                                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                                                });
+                                                const data = await res.json();
+                                                if (res.ok) {
+                                                    // 기존 도장은 유지하고, 새로 찍는 칸만 강조 애니메이션 처리
+                                                    const prevProgress = cycleProgress || 0; // 0~6
+                                                    const targetIdx = prevProgress === 6 ? 6 : prevProgress; // 오늘 새로 찍을 인덱스
+
+                                                    // 애니 시작: 강조 대상만 pulse
+                                                    setAnimStamps([false, false, false, false, false, false, false]);
+                                                    setTimeout(() => {
+                                                        setAnimStamps((_) => {
+                                                            const next = [
+                                                                false,
+                                                                false,
+                                                                false,
+                                                                false,
+                                                                false,
+                                                                false,
+                                                                false,
+                                                            ];
+                                                            next[targetIdx] = true; // pulse 대상
+                                                            return next;
+                                                        });
+                                                        setTimeout(() => {
+                                                            // 최종 반영: weekStamps에 새 도장 고정, animStamps 해제
+                                                            setWeekStamps((prev) => {
+                                                                const next = [...prev];
+                                                                next[targetIdx] = true;
+                                                                return next;
+                                                            });
+                                                            setCycleProgress(((prevProgress + 1) % 7) as number);
+                                                            setAnimStamps(null);
+                                                            setIsStamping(false);
+                                                            setStampCompleted(true);
+                                                        }, 300);
+                                                    }, 120);
+                                                } else {
+                                                    setIsStamping(false);
+                                                }
+                                            } catch {
+                                                setIsStamping(false);
+                                            }
+                                        }}
+                                        className={`px-4 py-2 rounded-lg text-white ${
+                                            isStamping ? "bg-gray-400" : "bg-purple-600"
+                                        }`}
+                                    >
+                                        {isStamping ? "도장 찍는 중..." : "출석 체크 하기"}
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setShowCheckinModal(false);
+                                        setAnimStamps(null);
+                                        setStampCompleted(false);
+                                        setAlreadyToday(false);
+                                    }}
+                                    className="hover:cursor-pointer px-6 py-2 rounded-lg bg-blue-600 text-white"
+                                >
+                                    확인
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* [수정] 기존의 main, aside, grid 레이아웃을 모두 제거하고 콘텐츠만 남깁니다.
               - pt-20, pb-20과 같은 상/하단 여백도 제거하여 LayoutContent와 중복되지 않도록 합니다.
@@ -353,17 +536,21 @@ export default function Home() {
                             value={searchRegion}
                             onChange={(e) => setSearchRegion(e.target.value)}
                             placeholder="지역으로 검색"
-                            className="w-full border border-gray-300 rounded-xl py-3 pl-11 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                            className="w-full border border-gray-300 rounded-xl py-3 pl-3 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") setSubmittedRegion(searchRegion.trim());
+                            }}
                         />
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔎</span>
                         <button
-                            onClick={() => setSearchRegion(searchRegion.trim())}
+                            onClick={() => setSubmittedRegion(searchRegion.trim())}
                             className="hover:cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
                         >
                             검색
                         </button>
                     </div>
-                    {searchRegion && <div className="mt-2 text-sm text-gray-600">지역: "{searchRegion}" 추천 결과</div>}
+                    {submittedRegion && (
+                        <div className="mt-2 text-sm text-gray-600">지역: "{submittedRegion}" 추천 결과</div>
+                    )}
                 </div>
                 {/* Hero Section - 대형 슬라이드 (카드형) */}
                 <HeroSlider
@@ -527,7 +714,7 @@ function TabbedConcepts({
                                 onClick={() => router.push(`/courses?concept=${encodeURIComponent(item.name)}`)}
                                 className={`${cardBase} cursor-pointer`}
                             >
-                                <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border">
+                                <div className="w-20 h-20 rounded-full overflow-hidden mb-4 ">
                                     {item.imageUrl ? (
                                         <Image
                                             src={item.imageUrl}
@@ -555,9 +742,9 @@ function TabbedConcepts({
                         onMouseUp={handleMouseUp}
                         onMouseMove={handleMouseMove}
                     >
-                        {hotCourses.slice(0, 10).map((c) => (
+                        {hotCourses.map((c) => (
                             <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
-                                <div className="w-20 h-20  rounded-full overflow-hidden mb-4 border">
+                                <div className="w-20 h-20  rounded-full overflow-hidden mb-4">
                                     {c.imageUrl ? (
                                         <Image
                                             src={c.imageUrl}
@@ -571,7 +758,13 @@ function TabbedConcepts({
                                     )}
                                 </div>
                                 <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
-                                <div className="text-blue-600 font-semibold">{c.view_count} 조회</div>
+                                <div className="text-blue-600 font-semibold">
+                                    {(typeof c.view_count === "number" && Number.isFinite(c.view_count)
+                                        ? c.view_count
+                                        : (c as any).viewCount ?? 0
+                                    ).toLocaleString()}{" "}
+                                    조회
+                                </div>
                             </Link>
                         ))}
                     </div>
@@ -585,28 +778,25 @@ function TabbedConcepts({
                         onMouseUp={handleMouseUp}
                         onMouseMove={handleMouseMove}
                     >
-                        {newCourses
-                            .slice()
-                            .reverse()
-                            .map((c) => (
-                                <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
-                                    <div className="w-20 h-20  rounded-full overflow-hidden mb-4 border">
-                                        {c.imageUrl ? (
-                                            <Image
-                                                src={c.imageUrl}
-                                                alt={c.title}
-                                                width={144}
-                                                height={144}
-                                                className="object-cover w-full h-full"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-gray-200" />
-                                        )}
-                                    </div>
-                                    <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
-                                    <div className="text-blue-600 font-semibold">NEW</div>
-                                </Link>
-                            ))}
+                        {newCourses.map((c) => (
+                            <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
+                                <div className="w-20 h-20  rounded-full overflow-hidden mb-4">
+                                    {c.imageUrl ? (
+                                        <Image
+                                            src={c.imageUrl}
+                                            alt={c.title}
+                                            width={144}
+                                            height={144}
+                                            className="object-cover w-full h-full"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full bg-gray-200" />
+                                    )}
+                                </div>
+                                <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
+                                <div className="text-blue-600 font-semibold">NEW</div>
+                            </Link>
+                        ))}
                     </div>
                 )}
             </div>
