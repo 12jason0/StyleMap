@@ -19,6 +19,13 @@ model User {
   updatedAt          DateTime            @updatedAt
   mbti               String?             @db.VarChar(20)
   age                Int?
+  coinBalance        Int                 @default(0)
+  couponCount        Int                 @default(0)
+  gender             String?             @db.VarChar(10)
+  lastActiveAt       DateTime?
+  level              Int                 @default(1)
+  location           String?             @db.VarChar(100)
+  preferredTags      String[]
   completedCourses   CompletedCourse[]
   completedEscapes   CompletedEscape[]
   bookings           Booking[]
@@ -26,19 +33,12 @@ model User {
   missionSubmissions MissionSubmission[]
   reviews            Review[]
   userBadges         UserBadge[]
-  userFavorites      UserFavorite[]
-  userPreference     UserPreference?
-  userStoryProgress  UserStoryProgress[]
-    coinBalance        Int                 @default(0)
-  couponCount        Int                 @default(0)
-    rewards            UserReward[]
   checkins           UserCheckin[]
-  gender             String?             @db.VarChar(10)      // ✅ 성별
-  location           String?             @db.VarChar(100)     // ✅ 거주지/선호지역
-  preferredTags      String[]            @db.Text             // ✅ 빠른 태그 캐싱
-  lastActiveAt       DateTime?                               // ✅ 마지막 접속일
-  level              Int                 @default(1)          // ✅ 유저 레벨 (등급)
-  interactions       UserInteraction[]   // ✅ 추가
+  userFavorites      UserFavorite[]
+  interactions       UserInteraction[]
+  userPreference     UserPreference?
+  rewards            UserReward[]
+  userStoryProgress  UserStoryProgress[]
 
   @@index([provider, socialId])
   @@map("users")
@@ -46,23 +46,23 @@ model User {
 
 model UserReward {
   id        Int        @id @default(autoincrement())
-  user      User       @relation(fields: [userId], references: [id])
+  amount    Int
+  createdAt DateTime   @default(now())
   userId    Int
   type      RewardType
-  amount    Int
   unit      RewardUnit
-  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id])
 
   @@map("user_rewards")
 }
 
 model UserCheckin {
   id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    Int
   date      DateTime
   rewarded  Boolean  @default(false)
   createdAt DateTime @default(now())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
 
   @@map("user_checkins")
 }
@@ -71,27 +71,12 @@ model UserInteraction {
   id        Int      @id @default(autoincrement())
   userId    Int
   courseId  Int
-  action    String   // "view" | "click" | "like" | "share"
+  action    String
   createdAt DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_interactions")
-}
-
-
-enum RewardType {
-  signup
-  checkin
-  ad_watch
-  purchase
-  event
-}
-
-enum RewardUnit {
-  coin
-  coupon
 }
 
 model UserPreference {
@@ -106,32 +91,32 @@ model UserPreference {
 }
 
 model Course {
-  id                   Int               @id @default(autoincrement())
+  id                   Int                  @id @default(autoincrement())
   userId               Int?
-  title                String            @db.VarChar(100)
+  title                String               @db.VarChar(100)
   description          String?
-  imageUrl             String?           @db.VarChar(255)
-  region               String?           @db.VarChar(50)
-  duration             String?           @db.VarChar(45)
-  concept              String?           @db.VarChar(45)
-  isPopular            Boolean           @default(false)
-  rating               Float             @default(0.0)
-  current_participants Int               @default(0)
-  max_participants     Int               @default(0)
-  view_count           Int               @default(0)  
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  imageUrl             String?              @db.VarChar(255)
+  region               String?              @db.VarChar(50)
+  duration             String?              @db.VarChar(45)
+  concept              String?              @db.VarChar(45)
+  isPopular            Boolean              @default(false)
+  rating               Float                @default(0.0)
+  current_participants Int                  @default(0)
+  max_participants     Int                  @default(0)
+  view_count           Int                  @default(0)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
   completedCourses     CompletedCourse[]
+  CourseTagToCourses   CourseTagToCourses[]
   benefits             Benefit[]
   bookings             Booking[]
   courseNotices        CourseNotice[]
   coursePlaces         CoursePlace[]
-  user                 User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
   highlights           Highlight[]
   reviews              Review[]
   userFavorites        UserFavorite[]
-  course_tags          CourseTag[]       @relation("CourseTagToCourses")
-   interactions         UserInteraction[] // ✅ 추가
+  interactions         UserInteraction[]
 
   @@map("courses")
 }
@@ -160,10 +145,10 @@ model Place {
 }
 
 model CourseTag {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique @db.VarChar(100)
-  createdAt DateTime @default(now())
-  courses   Course[] @relation("CourseTagToCourses")
+  id                 Int                  @id @default(autoincrement())
+  name               String               @unique @db.VarChar(100)
+  createdAt          DateTime             @default(now())
+  CourseTagToCourses CourseTagToCourses[]
 
   @@map("course_tags")
 }
@@ -182,6 +167,9 @@ model Story {
   imageUrl               String?
   level                  Int?                @default(1)
   epilogue_text          String?
+  stationName            String?             @db.VarChar(100)
+  stationLat             Float?
+  stationLng             Float?
   completedEscapes       CompletedEscape[]
   reward_badge           Badge?              @relation(fields: [reward_badge_id], references: [id])
   storychapters          StoryChapter[]
@@ -200,14 +188,35 @@ model StoryChapter {
   latitude           Float?
   longitude          Float?
   story_text         String?
-  mission_type       String?             @db.VarChar(50)
-  mission_payload    Json?
-  puzzle_text        String?
+  placeOptions       PlaceOption[]
   missionSubmissions MissionSubmission[]
   story              Story               @relation(fields: [story_id], references: [id])
 
   @@unique([story_id, chapter_number])
   @@map("storychapters")
+}
+
+model PlaceOption {
+  id          Int            @id @default(autoincrement())
+  chapterId   Int
+  name        String
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  description String?
+  imageUrl    String?
+  missions    PlaceMission[]
+  chapter     StoryChapter   @relation(fields: [chapterId], references: [id])
+}
+
+model PlaceMission {
+  id             Int         @id @default(autoincrement())
+  placeId        Int
+  missionNumber  Int
+  missionType    String
+  missionPayload Json?
+  description    String?
+  place          PlaceOption @relation(fields: [placeId], references: [id])
 }
 
 model Badge {
@@ -378,4 +387,28 @@ model CompletedEscape {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("CompletedEscapes")
+}
+
+model CourseTagToCourses {
+  A           Int
+  B           Int
+  courses     Course    @relation(fields: [A], references: [id], onDelete: Cascade)
+  course_tags CourseTag @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_CourseTagToCourses_AB_pkey")
+  @@index([B], map: "_CourseTagToCourses_B_index")
+  @@map("_CourseTagToCourses")
+}
+
+enum RewardType {
+  signup
+  checkin
+  ad_watch
+  purchase
+  event
+}
+
+enum RewardUnit {
+  coin
+  coupon
 }

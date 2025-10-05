@@ -1,6 +1,7 @@
 // src/app/api/courses/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -115,5 +116,69 @@ export async function GET(
             },
             { status: 500 }
         );
+    }
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+    try {
+        const userIdStr = getUserIdFromRequest(request);
+        if (!userIdStr) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
+
+        const courseId = Number(params.id);
+        if (!courseId || isNaN(courseId)) {
+            return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });
+        }
+
+        const body = await request.json();
+        const { title, description, duration, location, imageUrl, concept } = body || {};
+
+        const updated = await prisma.course.update({
+            where: { id: courseId },
+            data: {
+                ...(title !== undefined ? { title } : {}),
+                ...(description !== undefined ? { description } : {}),
+                ...(duration !== undefined ? { duration } : {}),
+                ...(location !== undefined ? { region: location } : {}),
+                ...(imageUrl !== undefined ? { imageUrl } : {}),
+                ...(concept !== undefined ? { concept } : {}),
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                duration: true,
+                region: true,
+                imageUrl: true,
+                concept: true,
+                updatedAt: true,
+            },
+        });
+
+        return NextResponse.json({ success: true, course: updated });
+    } catch (error) {
+        console.error("API: 코스 수정 오류:", error);
+        return NextResponse.json({ error: "코스 수정 실패" }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    try {
+        const userIdStr = getUserIdFromRequest(request);
+        if (!userIdStr) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
+
+        const courseId = Number(params.id);
+        if (!courseId || isNaN(courseId)) {
+            return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });
+        }
+
+        await prisma.course.delete({ where: { id: courseId } });
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("API: 코스 삭제 오류:", error);
+        return NextResponse.json({ error: "코스 삭제 실패" }, { status: 500 });
     }
 }

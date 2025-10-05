@@ -115,6 +115,65 @@ function EscapeIntroPageInner() {
         );
     };
 
+    // --- 지오펜스 알림: 사용자가 챕터 위치/기지점 반경 진입 시 알림 ---
+    useEffect(() => {
+        let timer: any;
+        let lastNotifiedChapterId: number | null = null;
+        let lastNotifiedStation = false;
+
+        async function ensurePermission() {
+            try {
+                if (typeof window === "undefined" || !("Notification" in window)) return;
+                if (Notification.permission === "default") {
+                    await Notification.requestPermission();
+                }
+            } catch {}
+        }
+
+        async function poll() {
+            try {
+                if (!storyId || !userLocation) return;
+                await ensurePermission();
+                const res = await fetch("/api/escape/geofence", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ storyId, lat: userLocation.lat, lng: userLocation.lng, radius: 150 }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data?.inRange && data?.started) {
+                    const nearest = data.nearest as { type: "station" | "chapter"; id: number | null };
+                    if (nearest?.type === "station" && !lastNotifiedStation) {
+                        if (
+                            typeof window !== "undefined" &&
+                            "Notification" in window &&
+                            Notification.permission === "granted"
+                        ) {
+                            new Notification("기지점에 도착했습니다!", { body: "미션을 시작해보세요." });
+                        }
+                        setToast("기지점 반경에 도착했습니다. 미션을 시작해보세요!");
+                        lastNotifiedStation = true;
+                    } else if (nearest?.type === "chapter" && nearest?.id && lastNotifiedChapterId !== nearest.id) {
+                        if (
+                            typeof window !== "undefined" &&
+                            "Notification" in window &&
+                            Notification.permission === "granted"
+                        ) {
+                            new Notification("다음 장소에 도착!", { body: "챕터 미션을 진행하세요." });
+                        }
+                        setToast("장소 반경에 도착했습니다. 챕터 미션을 진행하세요!");
+                        lastNotifiedChapterId = nearest.id;
+                    }
+                }
+            } catch {}
+        }
+
+        // 10초마다 폴링
+        timer = setInterval(poll, 10000);
+        // 즉시 한 번 실행
+        poll();
+        return () => clearInterval(timer);
+    }, [storyId, userLocation]);
+
     // --- 지도 컴포넌트 동적 로딩 ---
     const NaverMap = useMemo(
         () =>

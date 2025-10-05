@@ -162,3 +162,49 @@ export async function GET(request: NextRequest) {
         );
     }
 }
+
+export async function POST(request: NextRequest) {
+    try {
+        const userIdStr = getUserIdFromRequest(request);
+        if (!userIdStr) {
+            return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { title, description, duration, location, price, imageUrl, concept } = body || {};
+
+        if (!title) {
+            return NextResponse.json({ error: "코스 제목은 필수입니다." }, { status: 400 });
+        }
+
+        const created = await prisma.course.create({
+            data: {
+                title,
+                description: description || null,
+                duration: duration || null,
+                region: location || null,
+                imageUrl: imageUrl || null,
+                concept: concept || null,
+                userId: Number(userIdStr),
+            },
+            select: {
+                id: true,
+                title: true,
+                description: true,
+                duration: true,
+                region: true,
+                imageUrl: true,
+                concept: true,
+                createdAt: true,
+            },
+        });
+
+        // 캐시 무효화: 간단히 전체 키 삭제
+        defaultCache.clear?.();
+
+        return NextResponse.json({ success: true, course: created }, { status: 201 });
+    } catch (error) {
+        console.error("API: 코스 생성 오류:", error);
+        return NextResponse.json({ error: "코스 생성 실패" }, { status: 500 });
+    }
+}

@@ -52,6 +52,19 @@ export default function AdminPage() {
         concept: "",
     });
 
+    // Edit course state
+    const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+    const [editCourse, setEditCourse] = useState<NewCourse>({
+        title: "",
+        description: "",
+        duration: "",
+        location: "",
+        price: "",
+        imageUrl: "",
+        concept: "",
+    });
+    const [deletingCourseId, setDeletingCourseId] = useState<string | null>(null);
+
     // Places
     const [places, setPlaces] = useState<Place[]>([]);
     const [loadingPlaces, setLoadingPlaces] = useState<boolean>(false);
@@ -65,6 +78,18 @@ export default function AdminPage() {
         imageUrl: "",
         tags: "",
     });
+    const [editingPlaceId, setEditingPlaceId] = useState<number | null>(null);
+    const [editPlace, setEditPlace] = useState<NewPlace>({
+        name: "",
+        address: "",
+        description: "",
+        category: "",
+        latitude: undefined,
+        longitude: undefined,
+        imageUrl: "",
+        tags: "",
+    });
+    const [deletingPlaceId, setDeletingPlaceId] = useState<number | null>(null);
 
     // Course-Place linking
     const [linkCourseId, setLinkCourseId] = useState<string>("");
@@ -145,6 +170,11 @@ export default function AdminPage() {
         setNewCourse((prev) => ({ ...prev, [name]: value }));
     };
 
+    const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setEditCourse((prev) => ({ ...prev, [name]: value }));
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -198,6 +228,93 @@ export default function AdminPage() {
         }));
     };
 
+    const handleEditPlaceChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setEditPlace((prev) => ({
+            ...prev,
+            [name]: name === "latitude" || name === "longitude" ? (value === "" ? undefined : Number(value)) : value,
+        }));
+    };
+
+    const handleStartEditCourse = (course: Course) => {
+        setEditingCourseId(course.id);
+        setEditCourse({
+            title: course.title || "",
+            description: course.description || "",
+            duration: course.duration || "",
+            location: course.location || "",
+            price: course.price || "",
+            imageUrl: course.imageUrl || "",
+            concept: course.concept || "",
+        });
+    };
+
+    const handleCancelEditCourse = () => {
+        setEditingCourseId(null);
+    };
+
+    const handleUpdateCourse = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!editingCourseId) return;
+        setIsSubmitting(true);
+        setError(null);
+        try {
+            const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+            if (!token) {
+                alert("로그인이 필요합니다. 먼저 로그인해주세요.");
+                setIsSubmitting(false);
+                return;
+            }
+            const res = await fetch(`/api/courses/${editingCourseId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    title: editCourse.title,
+                    description: editCourse.description,
+                    duration: editCourse.duration,
+                    location: editCourse.location,
+                    imageUrl: editCourse.imageUrl,
+                    concept: editCourse.concept,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "코스 수정에 실패했습니다.");
+            setEditingCourseId(null);
+            await fetchCourses();
+            alert("코스가 수정되었습니다.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "코스 수정 중 오류 발생");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDeleteCourse = async (courseId: string) => {
+        if (!confirm("정말 이 코스를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+        setDeletingCourseId(courseId);
+        setError(null);
+        try {
+            const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+            if (!token) {
+                alert("로그인이 필요합니다. 먼저 로그인해주세요.");
+                setDeletingCourseId(null);
+                return;
+            }
+            const res = await fetch(`/api/courses/${courseId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "코스 삭제에 실패했습니다.");
+            await fetchCourses();
+            alert("코스가 삭제되었습니다.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "코스 삭제 중 오류 발생");
+        } finally {
+            setDeletingCourseId(null);
+        }
+    };
+
     const handleCreatePlace = async (e: FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
@@ -234,6 +351,79 @@ export default function AdminPage() {
             setError(err instanceof Error ? err.message : "장소 생성 중 오류 발생");
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleStartEditPlace = (p: Place) => {
+        setEditingPlaceId(p.id);
+        setEditPlace({
+            name: p.name || "",
+            address: p.address || "",
+            description: p.description || "",
+            category: p.category || "",
+            latitude: p.latitude ?? undefined,
+            longitude: p.longitude ?? undefined,
+            imageUrl: p.imageUrl || "",
+            tags: p.tags || "",
+        });
+    };
+
+    const handleCancelEditPlace = () => {
+        setEditingPlaceId(null);
+    };
+
+    const handleUpdatePlace = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!editingPlaceId) return;
+        setIsSubmitting(true);
+        setError(null);
+        try {
+            const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+            if (!token) {
+                alert("로그인이 필요합니다. 먼저 로그인해주세요.");
+                setIsSubmitting(false);
+                return;
+            }
+            const res = await fetch(`/api/places/${editingPlaceId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify(editPlace),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "장소 수정에 실패했습니다.");
+            setEditingPlaceId(null);
+            await fetchPlaces();
+            alert("장소가 수정되었습니다.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "장소 수정 중 오류 발생");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleDeletePlace = async (placeId: number) => {
+        if (!confirm("정말 이 장소를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+        setDeletingPlaceId(placeId);
+        setError(null);
+        try {
+            const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+            if (!token) {
+                alert("로그인이 필요합니다. 먼저 로그인해주세요.");
+                setDeletingPlaceId(null);
+                return;
+            }
+            const res = await fetch(`/api/places/${placeId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "장소 삭제에 실패했습니다.");
+            await fetchPlaces();
+            alert("장소가 삭제되었습니다.");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "장소 삭제 중 오류 발생");
+        } finally {
+            setDeletingPlaceId(null);
         }
     };
 
@@ -359,9 +549,14 @@ export default function AdminPage() {
 
                         {true && (
                             <div className="bg-white p-8 rounded-2xl shadow-lg mb-12">
-                                <h2 className="text-2xl font-semibold mb-6">새 코스 추가하기</h2>
+                                <h2 className="text-2xl font-semibold mb-6">
+                                    {editingCourseId ? "코스 수정하기" : "새 코스 추가하기"}
+                                </h2>
                                 {error && <p className="text-red-500 mb-4">오류: {error}</p>}
-                                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <form
+                                    onSubmit={editingCourseId ? handleUpdateCourse : handleSubmit}
+                                    className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                                >
                                     <div className="md:col-span-2">
                                         <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
                                             코스 제목 *
@@ -369,8 +564,8 @@ export default function AdminPage() {
                                         <input
                                             type="text"
                                             name="title"
-                                            value={newCourse.title}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.title : newCourse.title}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             required
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
@@ -384,8 +579,8 @@ export default function AdminPage() {
                                         </label>
                                         <textarea
                                             name="description"
-                                            value={newCourse.description}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.description : newCourse.description}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             rows={3}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         ></textarea>
@@ -400,8 +595,8 @@ export default function AdminPage() {
                                         <input
                                             type="text"
                                             name="duration"
-                                            value={newCourse.duration}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.duration : newCourse.duration}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -415,8 +610,8 @@ export default function AdminPage() {
                                         <input
                                             type="text"
                                             name="location"
-                                            value={newCourse.location}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.location : newCourse.location}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -427,8 +622,8 @@ export default function AdminPage() {
                                         <input
                                             type="text"
                                             name="price"
-                                            value={newCourse.price}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.price : newCourse.price}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -442,8 +637,8 @@ export default function AdminPage() {
                                         <input
                                             type="text"
                                             name="concept"
-                                            value={newCourse.concept}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.concept : newCourse.concept}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -457,18 +652,31 @@ export default function AdminPage() {
                                         <input
                                             type="text"
                                             name="imageUrl"
-                                            value={newCourse.imageUrl}
-                                            onChange={handleInputChange}
+                                            value={editingCourseId ? editCourse.imageUrl : newCourse.imageUrl}
+                                            onChange={editingCourseId ? handleEditInputChange : handleInputChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
-                                    <div className="md:col-span-2 text-right">
+                                    <div className="md:col-span-2 flex justify-end gap-3">
+                                        {editingCourseId && (
+                                            <button
+                                                type="button"
+                                                onClick={handleCancelEditCourse}
+                                                className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                                            >
+                                                취소
+                                            </button>
+                                        )}
                                         <button
                                             type="submit"
                                             disabled={isSubmitting}
                                             className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
                                         >
-                                            {isSubmitting ? "저장 중..." : "코스 추가하기"}
+                                            {isSubmitting
+                                                ? "저장 중..."
+                                                : editingCourseId
+                                                ? "코스 수정하기"
+                                                : "코스 추가하기"}
                                         </button>
                                     </div>
                                 </form>
@@ -497,6 +705,9 @@ export default function AdminPage() {
                                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                                                         지역
                                                     </th>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                                        관리
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white divide-y divide-gray-200">
@@ -507,12 +718,45 @@ export default function AdminPage() {
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                             {course.title}
+                                                            {/* Mobile actions */}
+                                                            <div className="mt-2 flex gap-2 md:hidden">
+                                                                <button
+                                                                    className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                                                    onClick={() => handleStartEditCourse(course)}
+                                                                >
+                                                                    수정
+                                                                </button>
+                                                                <button
+                                                                    className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400"
+                                                                    disabled={deletingCourseId === course.id}
+                                                                    onClick={() => handleDeleteCourse(course.id)}
+                                                                >
+                                                                    {deletingCourseId === course.id
+                                                                        ? "삭제 중..."
+                                                                        : "삭제"}
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                             {course.concept}
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                             {course.location}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right hidden md:table-cell">
+                                                            <button
+                                                                className="mr-2 px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                                                onClick={() => handleStartEditCourse(course)}
+                                                            >
+                                                                수정
+                                                            </button>
+                                                            <button
+                                                                className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400"
+                                                                disabled={deletingCourseId === course.id}
+                                                                onClick={() => handleDeleteCourse(course.id)}
+                                                            >
+                                                                {deletingCourseId === course.id ? "삭제 중..." : "삭제"}
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -523,20 +767,25 @@ export default function AdminPage() {
                             </div>
                         )}
 
-                        {/* --- 새 장소 추가 폼 --- */}
+                        {/* --- 새 장소 추가/수정 폼 --- */}
                         {true && (
                             <div className="bg-white p-8 rounded-2xl shadow-lg mt-12">
-                                <h2 className="text-2xl font-semibold mb-6">새 장소 추가하기</h2>
+                                <h2 className="text-2xl font-semibold mb-6">
+                                    {editingPlaceId ? "장소 수정하기" : "새 장소 추가하기"}
+                                </h2>
                                 {error && <p className="text-red-500 mb-4">오류: {error}</p>}
-                                <form onSubmit={handleCreatePlace} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <form
+                                    onSubmit={editingPlaceId ? handleUpdatePlace : handleCreatePlace}
+                                    className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                                >
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             장소 이름 *
                                         </label>
                                         <input
                                             name="name"
-                                            value={newPlace.name}
-                                            onChange={handlePlaceChange}
+                                            value={editingPlaceId ? editPlace.name : newPlace.name}
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             required
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
@@ -545,8 +794,8 @@ export default function AdminPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">주소</label>
                                         <input
                                             name="address"
-                                            value={newPlace.address || ""}
-                                            onChange={handlePlaceChange}
+                                            value={editingPlaceId ? editPlace.address || "" : newPlace.address || ""}
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -554,8 +803,8 @@ export default function AdminPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">카테고리</label>
                                         <input
                                             name="category"
-                                            value={newPlace.category || ""}
-                                            onChange={handlePlaceChange}
+                                            value={editingPlaceId ? editPlace.category || "" : newPlace.category || ""}
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -565,8 +814,8 @@ export default function AdminPage() {
                                             name="latitude"
                                             type="number"
                                             step="any"
-                                            value={newPlace.latitude ?? ""}
-                                            onChange={handlePlaceChange}
+                                            value={editingPlaceId ? editPlace.latitude ?? "" : newPlace.latitude ?? ""}
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -576,8 +825,10 @@ export default function AdminPage() {
                                             name="longitude"
                                             type="number"
                                             step="any"
-                                            value={newPlace.longitude ?? ""}
-                                            onChange={handlePlaceChange}
+                                            value={
+                                                editingPlaceId ? editPlace.longitude ?? "" : newPlace.longitude ?? ""
+                                            }
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -585,8 +836,12 @@ export default function AdminPage() {
                                         <label className="block text-sm font-medium text-gray-700 mb-2">설명</label>
                                         <textarea
                                             name="description"
-                                            value={newPlace.description || ""}
-                                            onChange={handlePlaceChange}
+                                            value={
+                                                editingPlaceId
+                                                    ? editPlace.description || ""
+                                                    : newPlace.description || ""
+                                            }
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             rows={3}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         ></textarea>
@@ -597,8 +852,8 @@ export default function AdminPage() {
                                         </label>
                                         <input
                                             name="imageUrl"
-                                            value={newPlace.imageUrl || ""}
-                                            onChange={handlePlaceChange}
+                                            value={editingPlaceId ? editPlace.imageUrl || "" : newPlace.imageUrl || ""}
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
@@ -608,18 +863,31 @@ export default function AdminPage() {
                                         </label>
                                         <input
                                             name="tags"
-                                            value={newPlace.tags || ""}
-                                            onChange={handlePlaceChange}
+                                            value={editingPlaceId ? editPlace.tags || "" : newPlace.tags || ""}
+                                            onChange={editingPlaceId ? handleEditPlaceChange : handlePlaceChange}
                                             className="w-full px-4 py-2 border rounded-lg"
                                         />
                                     </div>
-                                    <div className="md:col-span-2 text-right">
+                                    <div className="md:col-span-2 flex justify-end gap-3">
+                                        {editingPlaceId && (
+                                            <button
+                                                type="button"
+                                                onClick={handleCancelEditPlace}
+                                                className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                                            >
+                                                취소
+                                            </button>
+                                        )}
                                         <button
                                             type="submit"
                                             disabled={isSubmitting}
                                             className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
                                         >
-                                            {isSubmitting ? "저장 중..." : "장소 추가하기"}
+                                            {isSubmitting
+                                                ? "저장 중..."
+                                                : editingPlaceId
+                                                ? "장소 수정하기"
+                                                : "장소 추가하기"}
                                         </button>
                                     </div>
                                 </form>
@@ -728,6 +996,87 @@ export default function AdminPage() {
                                         </button>
                                     </div>
                                 </form>
+                            </div>
+                        )}
+
+                        {/* --- 장소 목록 (수정/삭제) --- */}
+                        {true && (
+                            <div className="bg-white p-8 rounded-2xl shadow-lg mt-12">
+                                <h2 className="text-2xl font-semibold mb-6">장소 목록 ({places.length}개)</h2>
+                                {loadingPlaces ? (
+                                    <p>목록을 불러오는 중...</p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                                        ID
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                                        이름
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                                        카테고리
+                                                    </th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                                        주소
+                                                    </th>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                                                        관리
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {places.map((p) => (
+                                                    <tr key={p.id}>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">{p.id}</td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                            {p.name}
+                                                            {/* Mobile actions */}
+                                                            <div className="mt-2 flex gap-2 md:hidden">
+                                                                <button
+                                                                    className="px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                                                    onClick={() => handleStartEditPlace(p)}
+                                                                >
+                                                                    수정
+                                                                </button>
+                                                                <button
+                                                                    className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400"
+                                                                    disabled={deletingPlaceId === p.id}
+                                                                    onClick={() => handleDeletePlace(p.id)}
+                                                                >
+                                                                    {deletingPlaceId === p.id ? "삭제 중..." : "삭제"}
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                            {p.category}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                            {p.address}
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right hidden md:table-cell">
+                                                            <button
+                                                                className="mr-2 px-3 py-1 rounded border border-gray-300 hover:bg-gray-50"
+                                                                onClick={() => handleStartEditPlace(p)}
+                                                            >
+                                                                수정
+                                                            </button>
+                                                            <button
+                                                                className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400"
+                                                                disabled={deletingPlaceId === p.id}
+                                                                onClick={() => handleDeletePlace(p.id)}
+                                                            >
+                                                                {deletingPlaceId === p.id ? "삭제 중..." : "삭제"}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
