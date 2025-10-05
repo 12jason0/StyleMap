@@ -210,6 +210,22 @@ export default function Home() {
         })
         .slice(0, 8);
 
+    // --- 추천 코스 (간단 버전) ---
+    const [recs, setRecs] = useState<any[]>([]);
+    useEffect(() => {
+        (async () => {
+            try {
+                const token = localStorage.getItem("authToken");
+                const res = await fetch("/api/recommendations", {
+                    cache: "no-store",
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                const data = await res.json().catch(() => ({}));
+                if (Array.isArray(data?.recommendations)) setRecs(data.recommendations);
+            } catch {}
+        })();
+    }, []);
+
     const handleStartOnboarding = () => {
         if (!localStorage.getItem("authToken")) {
             setShowLoginRequiredModal(true);
@@ -529,9 +545,6 @@ export default function Home() {
                 </div>
             )}
 
-            {/* [수정] 기존의 main, aside, grid 레이아웃을 모두 제거하고 콘텐츠만 남깁니다.
-              - pt-20, pb-20과 같은 상/하단 여백도 제거하여 LayoutContent와 중복되지 않도록 합니다.
-            */}
             <>
                 {/* 지역 검색 바 */}
                 <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
@@ -569,6 +582,48 @@ export default function Home() {
                 />
                 {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
                 <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
+                {/* ✨ 개인화 추천 섹션 */}
+                {recs.length > 0 && (
+                    <section className="py-10">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-xl font-bold text-black ">✨ 당신을 위한 추천</h2>
+                                <Link
+                                    href="/courses"
+                                    aria-label="코스 더 보기"
+                                    className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                >
+                                    ›
+                                </Link>
+                            </div>
+                            <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar scrollbar-hide">
+                                {recs.slice(0, 6).map((c) => (
+                                    <Link
+                                        key={c.id}
+                                        href={`/courses/${c.id}`}
+                                        className="min-w-[200px] bg-white rounded-xl shadow border border-gray-200 hover:shadow-md transition"
+                                    >
+                                        <div className="relative text-black w-full h-32 overflow-hidden rounded-t-xl bg-gray-100">
+                                            <Image
+                                                src={c.imageUrl || "/images/maker.png"}
+                                                alt={c.title}
+                                                fill
+                                                sizes="(max-width: 768px) 200px, 240px"
+                                                className="object-cover"
+                                            />
+                                        </div>
+                                        <div className="p-3">
+                                            <div className="font-semibold line-clamp-1 text-black">{c.title}</div>
+                                            <div className="text-sm text-gray-500 line-clamp-1">
+                                                {(c as any).concept} · {(c as any).region}
+                                            </div>
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+                )}
                 {/* 개인화 온보딩 섹션 */}
                 <OnboardingSection onStart={handleStartOnboarding} />
             </>
@@ -627,7 +682,7 @@ function TabbedConcepts({
     const trackClasses =
         "flex gap-4 overflow-x-auto snap-x snap-mandatory pb-2 no-scrollbar scrollbar-hide cursor-grab select-none overscroll-contain touch-pan-x";
     const cardBase =
-        "snap-start w-[130px] min-w-[130px] bg-white rounded-2xl overflow-hidden border border-gray-200 text-black flex flex-col items-center py-6";
+        "snap-start w-[130px] min-w-[130px] bg-white rounded-2xl border border-gray-200 text-black flex flex-col items-center py-6";
 
     // 데스크톱에서 마우스 드래그로 가로 스크롤 지원
     const trackRef = useRef<HTMLDivElement | null>(null);
