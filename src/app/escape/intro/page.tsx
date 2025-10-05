@@ -28,6 +28,15 @@ type StoryChapter = {
     story_text?: string;
     mission_type?: string;
     mission_payload?: any;
+    placeOptions?: Array<{
+        id: number;
+        name: string;
+        address?: string;
+        latitude?: number | null;
+        longitude?: number | null;
+        description?: string;
+        imageUrl?: string;
+    }>;
 };
 
 // --- 로딩 컴포넌트 ---
@@ -274,6 +283,22 @@ function EscapeIntroPageInner() {
                   longitude: Number(currentChapter.longitude ?? 126.978),
                   address: currentChapter.address,
               },
+              // include selected placeOption marker if exists
+              ...(Number.isFinite(Number(selectedOptionIndex)) &&
+              currentChapter.placeOptions &&
+              currentChapter.placeOptions[selectedOptionIndex as number]
+                  ? [
+                        {
+                            id: currentChapter.placeOptions[selectedOptionIndex as number]!.id,
+                            name: currentChapter.placeOptions[selectedOptionIndex as number]!.name,
+                            latitude: Number(currentChapter.placeOptions[selectedOptionIndex as number]!.latitude ?? 0),
+                            longitude: Number(
+                                currentChapter.placeOptions[selectedOptionIndex as number]!.longitude ?? 0
+                            ),
+                            address: currentChapter.placeOptions[selectedOptionIndex as number]!.address,
+                        },
+                    ]
+                  : []),
           ]
         : [];
 
@@ -629,6 +654,67 @@ function EscapeIntroPageInner() {
                                         {currentChapter.address || "주소 정보 없음"}{" "}
                                     </p>{" "}
                                 </div>{" "}
+                                {/* Chapter 1: 장소 카드 그리드 */}
+                                {currentChapter.chapter_number === 1 &&
+                                    Array.isArray(currentChapter.placeOptions) &&
+                                    currentChapter.placeOptions.length > 0 && (
+                                        <div className="mt-4">
+                                            <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
+                                                🗂️ 선택 가능한 장소
+                                            </h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                {currentChapter.placeOptions.map((p) => (
+                                                    <div key={p.id} className="card overflow-hidden">
+                                                        {p.imageUrl ? (
+                                                            <img
+                                                                src={p.imageUrl}
+                                                                alt={p.name}
+                                                                className="w-full h-40 object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-40 bg-gray-200 flex items-center justify-center text-gray-500">
+                                                                이미지 없음
+                                                            </div>
+                                                        )}
+                                                        <div className="p-4">
+                                                            <div className="font-semibold text-gray-900 truncate">
+                                                                {p.name}
+                                                            </div>
+                                                            {p.address && (
+                                                                <div className="text-xs text-gray-500 mt-1 truncate">
+                                                                    {p.address}
+                                                                </div>
+                                                            )}
+                                                            {p.description && (
+                                                                <div className="text-sm text-gray-700 mt-2 line-clamp-2">
+                                                                    {p.description}
+                                                                </div>
+                                                            )}
+                                                            <div className="mt-3 flex justify-end">
+                                                                <button
+                                                                    className="btn-secondary text-sm"
+                                                                    onClick={() => {
+                                                                        if (p.latitude != null && p.longitude != null) {
+                                                                            setUserLocation(
+                                                                                (prev) =>
+                                                                                    prev || {
+                                                                                        lat: p.latitude as number,
+                                                                                        lng: p.longitude as number,
+                                                                                    }
+                                                                            );
+                                                                        }
+                                                                        setShowMapModal(true);
+                                                                    }}
+                                                                >
+                                                                    지도 보기
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 {currentChapterIdx > 0 && (
                                     <button
                                         onClick={goToPrevChapter}
@@ -777,7 +863,6 @@ function EscapeIntroPageInner() {
                                             </div>
                                         ) : currentChapter.mission_payload?.options ? (
                                             <div className="space-y-2">
-                                                {" "}
                                                 {currentChapter.mission_payload.options.map(
                                                     (option: string, index: number) => (
                                                         <div
@@ -795,14 +880,12 @@ function EscapeIntroPageInner() {
                                                                     : "border-blue-300 hover:bg-blue-100"
                                                             }`}
                                                         >
-                                                            {" "}
                                                             <span className="font-medium text-blue-800">
-                                                                {" "}
-                                                                {index + 1}. {option}{" "}
-                                                            </span>{" "}
+                                                                {index + 1}. {option}
+                                                            </span>
                                                         </div>
                                                     )
-                                                )}{" "}
+                                                )}
                                             </div>
                                         ) : null}{" "}
                                     </div>{" "}

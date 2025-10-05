@@ -15,6 +15,19 @@ export async function GET(request: NextRequest) {
         const chapters = await prisma.storyChapter.findMany({
             where: { story_id: storyId },
             orderBy: [{ chapter_number: "asc" }],
+            include: {
+                placeOptions: {
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true,
+                        latitude: true,
+                        longitude: true,
+                        description: true,
+                        imageUrl: true,
+                    },
+                },
+            },
         });
 
         const normalized = chapters.map((c) => ({
@@ -30,6 +43,17 @@ export async function GET(request: NextRequest) {
             mission_type: (c.mission_type as any) ?? undefined,
             mission_payload: c.mission_payload ?? undefined,
             puzzle_text: c.puzzle_text ?? undefined,
+            placeOptions: Array.isArray(c.placeOptions)
+                ? c.placeOptions.map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      address: p.address ?? undefined,
+                      latitude: p.latitude != null ? Number(p.latitude) : null,
+                      longitude: p.longitude != null ? Number(p.longitude) : null,
+                      description: p.description ?? undefined,
+                      imageUrl: p.imageUrl ?? undefined,
+                  }))
+                : [],
         }));
 
         return NextResponse.json(normalized, {

@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
         const storyId = Number(body?.storyId);
         const lat = Number(body?.lat);
         const lng = Number(body?.lng);
+        const placeOptionId = body?.placeOptionId ? Number(body.placeOptionId) : null;
         const RADIUS = Number.isFinite(Number(body?.radius)) ? Number(body.radius) : 150; // meters
 
         if (!Number.isFinite(storyId) || !Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -39,6 +40,25 @@ export async function POST(request: NextRequest) {
         const hasStarted = !!progress && progress.status !== "not_started";
         if (!hasStarted) {
             return NextResponse.json({ inRange: false, started: false });
+        }
+
+        // If a specific place option is provided, check only that
+        if (placeOptionId && Number.isFinite(placeOptionId)) {
+            const opt = await (prisma as any).placeOption.findUnique({ where: { id: placeOptionId } });
+            if (opt?.latitude != null && opt?.longitude != null) {
+                const d = haversineMeters(lat, lng, Number(opt.latitude), Number(opt.longitude));
+                const inRange = d <= RADIUS;
+                return NextResponse.json({
+                    inRange,
+                    started: true,
+                    nearest: { type: "placeOption", id: placeOptionId, distance: d },
+                });
+            }
+            return NextResponse.json({
+                inRange: false,
+                started: true,
+                nearest: { type: "placeOption", id: placeOptionId, distance: Infinity },
+            });
         }
 
         // Fetch story station and chapters

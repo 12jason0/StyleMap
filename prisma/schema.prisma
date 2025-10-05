@@ -183,11 +183,8 @@ model StoryChapter {
   story_id           Int
   chapter_number     Int
   title              String              @db.VarChar(255)
-  location_name      String?             @db.VarChar(255)
-  address            String?
-  latitude           Float?
-  longitude          Float?
-  story_text         String?
+  description        String?
+  type               ChapterType
   placeOptions       PlaceOption[]
   missionSubmissions MissionSubmission[]
   story              Story               @relation(fields: [story_id], references: [id])
@@ -207,16 +204,31 @@ model PlaceOption {
   imageUrl    String?
   missions    PlaceMission[]
   chapter     StoryChapter   @relation(fields: [chapterId], references: [id])
+  stories     PlaceStory[]
 }
 
 model PlaceMission {
   id             Int         @id @default(autoincrement())
   placeId        Int
   missionNumber  Int
-  missionType    String
   missionPayload Json?
   description    String?
+  answer         String?
+  hint           String?
+  question       String?
+  missionType    MissionType
   place          PlaceOption @relation(fields: [placeId], references: [id])
+}
+
+model PlaceStory {
+  id          Int         @id @default(autoincrement())
+  placeId     Int
+  order       Int
+  speaker     String?
+  dialogue    String?
+  narration   String?
+  nextTrigger String?
+  place       PlaceOption @relation(fields: [placeId], references: [id])
 }
 
 model Badge {
@@ -398,6 +410,22 @@ model CourseTagToCourses {
   @@id([A, B], map: "_CourseTagToCourses_AB_pkey")
   @@index([B], map: "_CourseTagToCourses_B_index")
   @@map("_CourseTagToCourses")
+}
+
+enum ChapterType {
+  intro
+  restaurant
+  cafe
+  spot
+  final_spot
+  ending
+}
+
+enum MissionType {
+  quiz
+  photo
+  gps
+  puzzle
 }
 
 enum RewardType {
