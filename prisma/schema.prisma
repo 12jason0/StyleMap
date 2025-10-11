@@ -170,40 +170,26 @@ model Story {
   stationName            String?             @db.VarChar(100)
   stationLat             Float?
   stationLng             Float?
+  scenario               String?
   completedEscapes       CompletedEscape[]
   reward_badge           Badge?              @relation(fields: [reward_badge_id], references: [id])
-  storychapters          StoryChapter[]
   userstoryprogress      UserStoryProgress[]
 
   @@map("stories")
 }
 
-model StoryChapter {
-  id                 Int                 @id @default(autoincrement())
-  story_id           Int
-  chapter_number     Int
-  title              String              @db.VarChar(255)
-  description        String?
-  type               ChapterType
-  placeOptions       PlaceOption[]
-  missionSubmissions MissionSubmission[]
-  story              Story               @relation(fields: [story_id], references: [id])
-
-  @@unique([story_id, chapter_number])
-  @@map("storychapters")
-}
-
 model PlaceOption {
   id          Int            @id @default(autoincrement())
-  chapterId   Int
+  storyId     Int
   name        String
   address     String?
   latitude    Float?
   longitude   Float?
   description String?
   imageUrl    String?
+  category    String
+  signature   String?
   missions    PlaceMission[]
-  chapter     StoryChapter   @relation(fields: [chapterId], references: [id])
   stories     PlaceStory[]
 }
 
@@ -365,15 +351,14 @@ model UserStoryProgress {
 }
 
 model MissionSubmission {
-  id         Int          @id @default(autoincrement())
-  userId     Int          @map("user_id")
-  chapterId  Int          @map("chapter_id")
-  photoUrl   String?      @map("photo_url")
-  textAnswer String?      @map("text_answer")
-  isCorrect  Boolean      @default(false) @map("is_correct")
-  createdAt  DateTime     @default(now()) @map("created_at")
-  chapter    StoryChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  chapterId  Int      @map("chapter_id")
+  photoUrl   String?  @map("photo_url")
+  textAnswer String?  @map("text_answer")
+  isCorrect  Boolean  @default(false) @map("is_correct")
+  createdAt  DateTime @default(now()) @map("created_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("mission_submissions")
 }
