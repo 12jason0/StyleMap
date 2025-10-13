@@ -4,6 +4,34 @@ import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+function startOfDay(date: Date): Date {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function computeConsecutiveStreak(sortedDescCheckins: { date: Date }[], now: Date): number {
+    if (sortedDescCheckins.length === 0) return 0;
+    let streak = 0;
+    let expected = startOfDay(now);
+    for (const c of sortedDescCheckins) {
+        const day = startOfDay(new Date(c.date));
+        if (isSameDay(day, expected)) {
+            streak += 1;
+            expected = new Date(expected);
+            expected.setDate(expected.getDate() - 1);
+            continue;
+        }
+        // 허용되는 것은 정확히 연속된 하루씩만. 하나라도 비면 스트릭 종료
+        break;
+    }
+    return streak;
+}
+
 export async function GET(request: NextRequest) {
     try {
         const userId = resolveUserId(request);
@@ -16,7 +44,10 @@ export async function GET(request: NextRequest) {
             take: 120,
         });
 
-        return NextResponse.json({ success: true, checkins });
+        const now = new Date();
+        const streak = computeConsecutiveStreak(checkins, now);
+
+        return NextResponse.json({ success: true, checkins, streak });
     } catch (e) {
         return NextResponse.json({ success: false, error: "SERVER_ERROR" }, { status: 500 });
     }
@@ -38,15 +69,29 @@ export async function POST(request: NextRequest) {
             where: { userId, date: { gte: start, lt: end } },
         });
         if (existing) {
-            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded });
+            // 이미 오늘 체크한 경우에도 최신 스트릭을 계산하여 반환
+            const recent = await (prisma as any).userCheckin.findMany({
+                where: { userId },
+                orderBy: { date: "desc" },
+                take: 120,
+            });
+            const streak = computeConsecutiveStreak(recent, now);
+            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak });
         }
 
         const created = await (prisma as any).userCheckin.create({ data: { userId, date: now, rewarded: false } });
 
-        const total = await (prisma as any).userCheckin.count({ where: { userId } });
+        // 연속 출석 스트릭 계산 (오늘 방금 체크 포함)
+        const recent = await (prisma as any).userCheckin.findMany({
+            where: { userId },
+            orderBy: { date: "desc" },
+            take: 120,
+        });
+        const streak = computeConsecutiveStreak(recent, now);
+
         let awarded = false;
-        if (total % 7 === 0) {
-            // 7회 달성 → 쿠폰 7개 지급
+        // 7일 연속 달성 시 보상 지급, 하루라도 빠지면 streak가 1부터 다시 시작
+        if (streak > 0 && streak % 7 === 0) {
             await (prisma as any).$transaction([
                 (prisma as any).userReward.create({
                     data: { userId, type: "checkin", amount: 7, unit: "coupon" as any },
@@ -57,7 +102,7 @@ export async function POST(request: NextRequest) {
             awarded = true;
         }
 
-        return NextResponse.json({ success: true, alreadyChecked: false, awarded });
+        return NextResponse.json({ success: true, alreadyChecked: false, awarded, streak });
     } catch (e) {
         return NextResponse.json({ success: false, error: "SERVER_ERROR" }, { status: 500 });
     }

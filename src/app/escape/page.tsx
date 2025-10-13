@@ -320,15 +320,12 @@ const DetailsModal = ({
 
     return (
         <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="absolute inset-x-0 bottom-0">
+            <div className="absolute inset-x-0 bottom-15">
                 <div
-                    className="mx-auto max-w-[500px] bg-white rounded-t-2xl shadow-2xl overflow-hidden"
+                    className="mx-auto max-w-[500px] bg-white rounded-2xl shadow-2xl overflow-hidden"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="w-full h-6 flex items-center justify-center">
-                        <div className="mt-2 h-1.5 w-12 rounded-full bg-gray-300" />
-                    </div>
-                    <div className="p-6 max-h-[70vh] overflow-y-auto">
+                    <div className="p-6 max-h-[70vh] overflow-auto">
                         {story.imageUrl && (
                             <div className="relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100">
                                 <Image

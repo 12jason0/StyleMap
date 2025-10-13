@@ -436,10 +436,10 @@ const AIOnboarding = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
-            <div className="max-w-4xl mx-auto px-4">
+        <div className="h-[100dvh] min-h-[100dvh] bg-gradient-to-br from-blue-50 via-white to-purple-50 py-4 md:py-8 flex flex-col">
+            <div className="max-w-4xl mx-auto px-4 w-full flex flex-col flex-1 min-h-0">
                 {/* 진행률 바 */}
-                <div className="mb-12">
+                <div className="mb-4 md:mb-8 flex-shrink-0">
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-2xl font-bold text-gray-900">AI 개인화 설정</h1>
                         <span className="text-sm text-gray-500">
@@ -455,16 +455,16 @@ const AIOnboarding = () => {
                 </div>
 
                 {/* 단계별 컨텐츠 */}
-                <div className="bg-white rounded-2xl shadow-xl p-4  mb-8">
-                    <div className="md:hidden grid gap-3" style={{ gridTemplateColumns: "1fr" }}>
+                <div className="bg-white rounded-2xl shadow-xl p-3 md:p-4 mb-4 md:mb-8 flex-1 min-h-0 overflow-y-auto md:overflow-visible no-scrollbar scrollbar-hide overscroll-contain">
+                    <div className="md:hidden grid gap-2" style={{ gridTemplateColumns: "1fr" }}>
                         {/* 모바일: 스크롤 없이 한 화면에 담기도록 요소 간격과 폰트 사이즈 축소 */}
-                        <div className="text-center space-y-2 text-sm">{renderStep()}</div>
+                        <div className="text-center space-y-2 text-sm leading-relaxed">{renderStep()}</div>
                     </div>
                     <div className="hidden md:block">{renderStep()}</div>
                 </div>
 
                 {/* 네비게이션 버튼 */}
-                <div className="flex justify-between md:justify-between px-4 md:px-0">
+                <div className="flex justify-between md:justify-between px-2 md:px-0 flex-shrink-0">
                     <button
                         onClick={prevStep}
                         disabled={currentStep === 1}
@@ -483,7 +483,7 @@ const AIOnboarding = () => {
                 </div>
 
                 {/* 건너뛰기 옵션 */}
-                <div className="text-center mt-6 mb-20 ">
+                <div className="text-center mt-3 md:mt-6 mb-2 md:mb-6 flex-shrink-0">
                     <button
                         onClick={() => router.push("/")}
                         className="text-gray-500 hover:text-gray-700 text-sm underline cursor-pointer"

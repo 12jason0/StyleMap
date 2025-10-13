@@ -24,7 +24,7 @@ export default function HeroSlider({ items }: HeroSliderProps) {
     return (
         <section className="relative px-4">
             <div
-                className="relative h-[200px] overflow-hidden shadow-xl mr-8 cursor-grab select-none"
+                className="relative h-[200px] overflow-hidden shadow-xl cursor-grab select-none"
                 style={{
                     transform: `translateX(${touchDeltaX * 0.15}px)`,
                     transition: isTouching ? "none" : "transform 300ms ease",
@@ -147,28 +147,6 @@ export default function HeroSlider({ items }: HeroSliderProps) {
                     ))}
                 </div>
             </div>
-            {items.length > 1 && (
-                <div
-                    className="pointer-events-none absolute top-0 bottom-0 right-2 w-6 overflow-hidden shadow-lg border border-white/80 border-r-0 z-40"
-                    style={{
-                        transform: `translateX(${touchDeltaX * 0.15}px)`,
-                        transition: isTouching ? "none" : "transform 300ms ease",
-                    }}
-                >
-                    {items[(currentSlide + 1) % items.length]?.imageUrl ? (
-                        <Image
-                            src={items[(currentSlide + 1) % items.length]!.imageUrl as string}
-                            alt="next preview"
-                            fill
-                            sizes="200px"
-                            className="object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full bg-gray-200" />
-                    )}
-                    <div className="absolute inset-0 bg-black/20" />
-                </div>
-            )}
         </section>
     );
 }

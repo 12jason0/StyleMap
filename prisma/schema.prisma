@@ -172,6 +172,7 @@ model Story {
   stationLng             Float?
   scenario               String?
   completedEscapes       CompletedEscape[]
+  placeDialogues         PlaceDialogue[]
   reward_badge           Badge?              @relation(fields: [reward_badge_id], references: [id])
   userstoryprogress      UserStoryProgress[]
 
@@ -179,18 +180,34 @@ model Story {
 }
 
 model PlaceOption {
-  id          Int            @id @default(autoincrement())
-  storyId     Int
-  name        String
-  address     String?
-  latitude    Float?
-  longitude   Float?
-  description String?
-  imageUrl    String?
-  category    String
-  signature   String?
-  missions    PlaceMission[]
-  stories     PlaceStory[]
+  id             Int             @id @default(autoincrement())
+  storyId        Int
+  name           String
+  address        String?
+  latitude       Float?
+  longitude      Float?
+  description    String?
+  imageUrl       String?
+  category       String
+  signature      String?
+  placeDialogues PlaceDialogue[]
+  missions       PlaceMission[]
+  stories        PlaceStory[]
+}
+
+model PlaceDialogue {
+  id        Int          @id @default(autoincrement())
+  storyId   Int
+  placeId   Int?
+  order     Int          @default(1)
+  type      String       @default("main")
+  role      String       @default("npc")
+  speaker   String?
+  message   String
+  imageUrl  String?
+  createdAt DateTime     @default(now())
+  place     PlaceOption? @relation(fields: [placeId], references: [id])
+  story     Story        @relation(fields: [storyId], references: [id])
 }
 
 model PlaceMission {
@@ -411,6 +428,8 @@ enum MissionType {
   photo
   gps
   puzzle
+  text
+  choice
 }
 
 enum RewardType {
