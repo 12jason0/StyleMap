@@ -26,6 +26,7 @@ function CoursesPageInner() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const concept = searchParams.get("concept");
+    const recommended = searchParams.get("recommended");
 
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,7 +42,9 @@ function CoursesPageInner() {
             try {
                 setLoading(true);
 
-                const url = concept
+                const url = recommended
+                    ? `/api/recommendations?limit=8`
+                    : concept
                     ? `/api/courses?concept=${encodeURIComponent(concept)}&imagePolicy=all-or-one-missing&nocache=1`
                     : "/api/courses?imagePolicy=all-or-one-missing&nocache=1";
 
@@ -70,9 +73,20 @@ function CoursesPageInner() {
 
                 const data = await response.json();
 
-                // ✅ API 응답이 배열임 (data.courses 아님)
-                const normalized = Array.isArray(data) ? data : data.courses || [];
-                setCourses(normalized);
+                // 추천 모드면 recommendations 배열 사용 → 화면 공통 형태로 매핑(viewCount 채움)
+                const normalized = recommended
+                    ? Array.isArray(data?.recommendations)
+                        ? data.recommendations
+                        : []
+                    : Array.isArray(data)
+                    ? data
+                    : data.courses || [];
+
+                const unified = normalized.map((item: any) => ({
+                    ...item,
+                    viewCount: (item?.viewCount ?? item?.view_count ?? 0) as number,
+                }));
+                setCourses(unified);
 
                 setError(null);
 
@@ -134,10 +148,14 @@ function CoursesPageInner() {
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">
-                                {concept ? `${concept} 코스` : "모든 코스"}
+                                {recommended ? "추천 코스" : concept ? `${concept} 코스` : "모든 코스"}
                             </h1>
                             <p className="text-gray-600 mt-2">
-                                {concept ? `${concept} 관련 코스를 찾아보세요` : "다양한 코스를 둘러보세요"}
+                                {recommended
+                                    ? "당신을 위한 추천 코스"
+                                    : concept
+                                    ? `${concept} 관련 코스를 찾아보세요`
+                                    : "다양한 코스를 둘러보세요"}
                             </p>
                         </div>
                     </div>

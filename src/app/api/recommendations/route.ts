@@ -7,9 +7,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
     try {
         const userIdStr = getUserIdFromRequest(req);
+        const { searchParams } = new URL(req.url);
+        const limit = Math.min(Math.max(Number(searchParams.get("limit") || 6), 1), 24);
         if (!userIdStr) {
             // 비로그인: 인기 코스 반환 (섹션이 비지 않도록 폴백)
-            const popular = await prisma.course.findMany({ orderBy: { view_count: "desc" }, take: 6 });
+            const popular = await prisma.course.findMany({ orderBy: { view_count: "desc" }, take: limit });
             return NextResponse.json({ recommendations: popular });
         }
         const userId = Number(userIdStr);
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
         });
 
         if (!recent || recent.length === 0) {
-            const popular = await prisma.course.findMany({ orderBy: { view_count: "desc" }, take: 6 });
+            const popular = await prisma.course.findMany({ orderBy: { view_count: "desc" }, take: limit });
             return NextResponse.json({ recommendations: popular });
         }
 
@@ -45,7 +47,7 @@ export async function GET(req: NextRequest) {
                 OR: [...(topConcept ? [{ concept: topConcept }] : []), ...(topRegion ? [{ region: topRegion }] : [])],
             },
             orderBy: { rating: "desc" },
-            take: 6,
+            take: limit,
         });
 
         return NextResponse.json({ recommendations: recs });

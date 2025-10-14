@@ -188,7 +188,7 @@ model PlaceOption {
   longitude      Float?
   description    String?
   imageUrl       String?
-  category       String
+  category       String?
   signature      String?
   placeDialogues PlaceDialogue[]
   missions       PlaceMission[]
@@ -196,18 +196,20 @@ model PlaceOption {
 }
 
 model PlaceDialogue {
-  id        Int          @id @default(autoincrement())
-  storyId   Int
-  placeId   Int?
-  order     Int          @default(1)
-  type      String       @default("main")
-  role      String       @default("npc")
-  speaker   String?
-  message   String
-  imageUrl  String?
-  createdAt DateTime     @default(now())
-  place     PlaceOption? @relation(fields: [placeId], references: [id])
-  story     Story        @relation(fields: [storyId], references: [id])
+  id          Int          @id @default(autoincrement())
+  storyId     Int
+  placeId     Int?
+  order       Int          @default(1)
+  type        String       @default("main")
+  role        SpeakerRole  @default(npc)
+  speaker     String?
+  message     String
+  imageUrl    String?
+  isLetter    Boolean      @default(false) // ✅ 편지인지 표시
+  letterIndex Int? // ✅ 편지 번호 (1, 2, 3 …)
+  createdAt   DateTime     @default(now())
+  place       PlaceOption? @relation(fields: [placeId], references: [id])
+  story       Story        @relation(fields: [storyId], references: [id])
 }
 
 model PlaceMission {
@@ -443,4 +445,11 @@ enum RewardType {
 enum RewardUnit {
   coin
   coupon
+}
+
+// 🎙️ 대화 역할 (화자 구분)
+enum SpeakerRole {
+  user
+  npc
+  system
 }

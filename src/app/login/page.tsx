@@ -34,6 +34,83 @@ const Login = () => {
         }
     }, []);
 
+    // 로그인 페이지에서 전역 스크롤 완전 비활성화 (터치/휠 포함)
+    useEffect(() => {
+        const scrollY = window.scrollY || window.pageYOffset;
+
+        // 기존 스타일 보관
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousBodyPosition = document.body.style.position;
+        const previousBodyTop = document.body.style.top;
+        const previousBodyWidth = document.body.style.width;
+        const previousBodyOverscroll = document.body.style.getPropertyValue("overscroll-behavior");
+        const previousBodyTouchAction = document.body.style.getPropertyValue("touch-action");
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+        const previousHtmlOverscroll = document.documentElement.style.getPropertyValue("overscroll-behavior");
+
+        // 이벤트 핸들러: 휠/터치 이동 방지
+        const preventScroll = (e: Event) => {
+            e.preventDefault();
+        };
+        window.addEventListener("wheel", preventScroll, { passive: false });
+        window.addEventListener("touchmove", preventScroll, { passive: false });
+
+        // 키보드로 인한 스크롤 방지 (입력 요소 제외)
+        const keydownHandler = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (
+                target &&
+                (target.closest("input, textarea, [contenteditable='true']") || target.tagName === "SELECT")
+            ) {
+                return;
+            }
+            const blockKeys = ["Space", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"];
+            if (blockKeys.includes(e.code)) {
+                e.preventDefault();
+            }
+        };
+        window.addEventListener("keydown", keydownHandler, { passive: false });
+
+        // 실제 스크롤 락: body 고정 및 overscroll 차단
+        document.body.style.overflow = "hidden";
+        document.body.style.position = "fixed";
+        document.body.style.top = `-${scrollY}px`;
+        document.body.style.width = "100%";
+        document.body.style.setProperty("overscroll-behavior", "none");
+        document.body.style.setProperty("touch-action", "none");
+        document.documentElement.style.overflow = "hidden";
+        document.documentElement.style.setProperty("overscroll-behavior", "none");
+
+        // 해제 시 복원
+        return () => {
+            window.removeEventListener("wheel", preventScroll as EventListener, false);
+            window.removeEventListener("touchmove", preventScroll as EventListener, false);
+            window.removeEventListener("keydown", keydownHandler as EventListener, false);
+
+            document.body.style.overflow = previousBodyOverflow;
+            document.body.style.position = previousBodyPosition;
+            document.body.style.top = previousBodyTop;
+            document.body.style.width = previousBodyWidth;
+            if (previousBodyOverscroll) {
+                document.body.style.setProperty("overscroll-behavior", previousBodyOverscroll);
+            } else {
+                document.body.style.removeProperty("overscroll-behavior");
+            }
+            if (previousBodyTouchAction) {
+                document.body.style.setProperty("touch-action", previousBodyTouchAction);
+            } else {
+                document.body.style.removeProperty("touch-action");
+            }
+            document.documentElement.style.overflow = previousHtmlOverflow;
+            if (previousHtmlOverscroll) {
+                document.documentElement.style.setProperty("overscroll-behavior", previousHtmlOverscroll);
+            } else {
+                document.documentElement.style.removeProperty("overscroll-behavior");
+            }
+            window.scrollTo(0, scrollY);
+        };
+    }, []);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
             ...formData,
@@ -84,7 +161,7 @@ const Login = () => {
         }
     };
 
-    const handleSocialLogin = (provider: string) => {
+    const handleSocialLogin = async (provider: string) => {
         if (loading) return;
         setLoading(true);
         setError("");
@@ -201,7 +278,7 @@ const Login = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
             <main
-                className="max-w-md mx-auto px-4 pt-20 pb-28 flex items-center"
+                className="max-w-md mx-auto px-4 pt-9 pb-28 flex items-center"
                 style={{ minHeight: "calc(100dvh - 120px)" }}
             >
                 <div className="w-full bg-white rounded-2xl shadow-lg p-6">

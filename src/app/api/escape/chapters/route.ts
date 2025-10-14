@@ -118,6 +118,7 @@ export async function GET(request: NextRequest) {
                         longitude: p.longitude ?? undefined,
                         description: p.description ?? undefined,
                         imageUrl: p.imageUrl ?? undefined,
+                        signature: (p as any).signature ?? undefined,
                         stories: Array.isArray((p as any).stories)
                             ? (p as any).stories
                                   .slice()

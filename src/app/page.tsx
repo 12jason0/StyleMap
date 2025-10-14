@@ -157,14 +157,19 @@ export default function Home() {
             });
             if (!res.ok) return null as boolean[] | null;
             const data = await res.json();
-            const list: { date: string }[] = data?.checkins || [];
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const already = list.some((c: any) => (c.date || c.createdAt || "").slice(0, 10) === todayStr);
-            const total = list.length || 0;
-            const remainder = total % 7;
-            const stamps = new Array(7).fill(false).map((_, i) => i < remainder);
+            const stamps: boolean[] = Array.isArray(data?.weekStamps)
+                ? (data.weekStamps as boolean[])
+                : (() => {
+                      const list: { date: string }[] = data?.checkins || [];
+                      const total = list.length || 0;
+                      const remainder = total % 7;
+                      return new Array(7).fill(false).map((_, i) => i < remainder);
+                  })();
+            const already = Boolean(data?.todayChecked);
+
+            // 상태 반영
             setWeekStamps(stamps);
-            setCycleProgress(remainder);
+            setCycleProgress((stamps.filter(Boolean).length % 7) as number);
             setAlreadyToday(already);
             return stamps;
         } catch {
@@ -177,9 +182,15 @@ export default function Home() {
             const token = localStorage.getItem("authToken");
             if (!token) return;
             await fetchAndSetWeekStamps();
+            const todayKey = new Date().toISOString().slice(0, 10);
+            const dismissed = localStorage.getItem("checkinModalDismissedDate");
             setAnimStamps(null);
-            setStampCompleted(alreadyToday);
-            setShowCheckinModal(true);
+
+            // 오늘 이미 출석했으면 모달을 띄우지 않음. 아직 미출석인 경우에만 표시
+            if (!alreadyToday && dismissed !== todayKey) {
+                setStampCompleted(false);
+                setShowCheckinModal(true);
+            }
         } catch {}
     };
 
@@ -530,10 +541,12 @@ export default function Home() {
                             ) : (
                                 <button
                                     onClick={() => {
+                                        // 오늘 확인했음을 기록하여 같은 날 재등장 방지
+                                        const todayKey = new Date().toISOString().slice(0, 10);
+                                        localStorage.setItem("checkinModalDismissedDate", todayKey);
                                         setShowCheckinModal(false);
                                         setAnimStamps(null);
                                         setStampCompleted(false);
-                                        setAlreadyToday(false);
                                     }}
                                     className="hover:cursor-pointer px-6 py-2 rounded-lg bg-blue-600 text-white"
                                 >
@@ -589,7 +602,7 @@ export default function Home() {
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-bold text-black ">✨ 당신을 위한 추천</h2>
                                 <Link
-                                    href="/courses"
+                                    href="/courses?recommended=1"
                                     aria-label="코스 더 보기"
                                     className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
                                 >
@@ -597,7 +610,7 @@ export default function Home() {
                                 </Link>
                             </div>
                             <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar scrollbar-hide">
-                                {recs.slice(0, 6).map((c) => (
+                                {recs.slice(0, 3).map((c) => (
                                     <Link
                                         key={c.id}
                                         href={`/courses/${c.id}`}

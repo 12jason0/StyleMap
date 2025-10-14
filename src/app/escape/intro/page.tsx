@@ -40,6 +40,7 @@ type StoryChapter = {
         longitude?: number | null;
         description?: string;
         imageUrl?: string;
+        signature?: string;
     }>;
 };
 
@@ -111,8 +112,8 @@ const DialogueFlow = ({
 
     useEffect(() => {
         if (!showLetter) return;
-        const t1 = setTimeout(() => setArrived(true), 40);
-        const t2 = setTimeout(() => setOpened(true), 700);
+        const t1 = setTimeout(() => setArrived(true), 5);
+        const t2 = setTimeout(() => setOpened(true), 240);
         return () => {
             clearTimeout(t1);
             clearTimeout(t2);
@@ -225,8 +226,8 @@ const DialogueFlow = ({
                                     const isSystem = identity === "system";
                                     if (isSystem) {
                                         return (
-                                            <div key={i} className="flex justify-center">
-                                                <div className="px-3 py-1.5 rounded-full bg-gray-200 text-gray-800 text-sm shadow-sm">
+                                            <div key={i} className="flex justify-center animate-fade-in-up">
+                                                <div className="px-5 py-2 rounded-full bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-800 text-base shadow-sm font-medium">
                                                     {m.text}
                                                 </div>
                                             </div>
@@ -251,11 +252,14 @@ const DialogueFlow = ({
                                 <div className="mt-3 p-3 border-t bg-[#faf7f1] sticky bottom-0 text-center">
                                     <button
                                         onClick={() => {
+                                            // 닫기를 눌러야만 진행되도록: 먼저 모달 상태 정리
+                                            setShowLetter(false);
+                                            setOpened(false);
+                                            // 부모에 닫힘 통지 → 카테고리 화면으로 전환
                                             try {
                                                 if (typeof onLetterOpened === "function") onLetterOpened(false);
                                             } catch {}
-                                            // 닫기를 눌러야만 진행되도록: 모달 닫고 부모 UI 표시
-                                            setShowLetter(false);
+                                            // onComplete 콜백(있다면) 호출
                                             if (typeof onComplete === "function") onComplete();
                                         }}
                                         className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow"
@@ -277,23 +281,31 @@ const DialogueFlow = ({
             .map((s) => s.trim())
             .filter(Boolean);
         return (
-            <div className="fixed inset-0 z-[1400] bg-black/60 flex items-end justify-center p-4 animate-fade-in">
-                <div className="w-full max-w-3xl bg-white/90 backdrop-blur-md rounded-t-2xl p-4 shadow-lg border-t">
-                    <div className="max-h-[46vh] overflow-y-auto space-y-3 pr-1">
+            <div className="fixed inset-0 z-[1400] bg-gradient-to-b from-black/60 to-black/20 backdrop-blur-[2px] flex items-end justify-center p-4 animate-fade-in">
+                <div className="w-full max-w-3xl bg-[#fffef8]/95 rounded-t-2xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.15)] border-t border-amber-100 font-['Gowun_Dodum']">
+                    <div className="max-h-[46vh] overflow-y-auto space-y-4 pr-1">
                         {parts.map((t, i) => (
-                            <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                            <div
+                                key={i}
+                                className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"} animate-fade-in-up`}
+                            >
                                 <div
                                     className={`${
-                                        i % 2 === 0 ? "bg-gray-100 text-gray-900" : "bg-blue-600 text-white"
-                                    } px-4 py-2 rounded-2xl max-w-[80%] shadow`}
+                                        i % 2 === 0
+                                            ? "bg-[#fffdf7] text-gray-900 border border-amber-200 shadow-sm"
+                                            : "bg-gradient-to-b from-amber-500 to-amber-600 text-white shadow-lg"
+                                    } px-5 py-3 rounded-2xl max-w-[80%] leading-relaxed tracking-wide`}
                                 >
-                                    <p className="whitespace-pre-wrap leading-relaxed">{t}</p>
+                                    {t}
                                 </div>
                             </div>
                         ))}
                     </div>
                     <div className="text-right mt-4">
-                        <button onClick={onComplete} className="btn-vintage">
+                        <button
+                            onClick={onComplete}
+                            className="px-6 py-2.5 bg-gradient-to-b from-amber-400 to-amber-600 text-white rounded-full shadow-inner hover:brightness-105 transition-all"
+                        >
                             미션 시작하기
                         </button>
                     </div>
@@ -391,7 +403,11 @@ function EscapeIntroPageInner() {
     const [isDialogueActive, setIsDialogueActive] = useState<boolean>(false);
     // 편지 닫을 때만 UI를 보이게 하기 위해 초기값 false 유지
     const [isLetterOpened, setIsLetterOpened] = useState<boolean>(false);
+    // 비밀 편지를 이미 본 적이 있는지(스토리별) 영구 플래그
+    const [letterEverShown, setLetterEverShown] = useState<boolean>(false);
     const [dialogueStep, setDialogueStep] = useState<number>(0);
+    // 완료된 카테고리(카페 등)를 기록하여 카테고리 선택 화면에서 숨김 처리
+    const [completedCategories, setCompletedCategories] = useState<string[]>([]);
 
     // 새 흐름 상태 (책 펼침 제거 UI)
     const [flowStep, setFlowStep] = useState<
@@ -401,6 +417,33 @@ function EscapeIntroPageInner() {
     const [selectedPlaceIndex, setSelectedPlaceIndex] = useState<number | null>(null);
     const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
     const [selectedPlaceType, setSelectedPlaceType] = useState<string | null>(null);
+    const [selectedPlaceConfirm, setSelectedPlaceConfirm] = useState<number | null>(null);
+    const [missionUnlocked, setMissionUnlocked] = useState<boolean>(false);
+    const [answersByMission, setAnswersByMission] = useState<Record<number, string>>({});
+    const [selectedSolvedMissionId, setSelectedSolvedMissionId] = useState<number | null>(null);
+    const [missionModalOpen, setMissionModalOpen] = useState<boolean>(false);
+    const [activeMission, setActiveMission] = useState<any | null>(null);
+    // Modal answer/check states
+    const [modalAnswer, setModalAnswer] = useState<string>("");
+    const [modalWrongOnce, setModalWrongOnce] = useState<boolean>(false);
+    const [modalError, setModalError] = useState<string | null>(null);
+    // Post-mission story modal
+    const [showPostStory, setShowPostStory] = useState<boolean>(false);
+    const [postStoryQueue, setPostStoryQueue] = useState<string[]>([]);
+    const [postStoryIdx, setPostStoryIdx] = useState<number>(0);
+
+    const normalizeAnswer = (v: any): string =>
+        String(v ?? "")
+            .trim()
+            .toLowerCase();
+    const isCorrectForPayload = (payload: any, userInput: string): boolean => {
+        const user = normalizeAnswer(userInput);
+        const ans = (payload && (payload.answer ?? payload.correct ?? payload.answers)) as any;
+        if (Array.isArray(ans)) return ans.some((a) => normalizeAnswer(a) === user);
+        if (typeof ans === "number") return String(ans) === user;
+        if (typeof ans === "string") return normalizeAnswer(ans) === user;
+        return true;
+    };
     const [placeDialogueDone, setPlaceDialogueDone] = useState<boolean>(false);
     const [dialogueQueue, setDialogueQueue] = useState<Array<{ speaker?: string | null; text: string }>>([]);
     const [piecesCollected, setPiecesCollected] = useState<number>(0);
@@ -459,18 +502,13 @@ function EscapeIntroPageInner() {
         let lastNotifiedStation = false;
 
         async function ensurePermission() {
-            try {
-                if (typeof window === "undefined" || !("Notification" in window)) return;
-                if (Notification.permission === "default") {
-                    await Notification.requestPermission();
-                }
-            } catch {}
+            return;
         }
 
         async function poll() {
             try {
                 if (!storyId || !userLocation) return;
-                await ensurePermission();
+                // 알림 권한/알림 노출 제거
                 const res = await fetch("/api/escape/geofence", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -488,24 +526,8 @@ function EscapeIntroPageInner() {
                 } else if (res.ok && data?.inRange && data?.started) {
                     const nearest = data.nearest as { type: "station" | "chapter"; id: number | null };
                     if (nearest?.type === "station" && !lastNotifiedStation) {
-                        if (
-                            typeof window !== "undefined" &&
-                            "Notification" in window &&
-                            Notification.permission === "granted"
-                        ) {
-                            new Notification("기지점에 도착했습니다!", { body: "미션을 시작해보세요." });
-                        }
-                        setToast("기지점 반경에 도착했습니다. 미션을 시작해보세요!");
                         lastNotifiedStation = true;
                     } else if (nearest?.type === "chapter" && nearest?.id && lastNotifiedChapterId !== nearest.id) {
-                        if (
-                            typeof window !== "undefined" &&
-                            "Notification" in window &&
-                            Notification.permission === "granted"
-                        ) {
-                            new Notification("다음 장소에 도착!", { body: "챕터 미션을 진행하세요." });
-                        }
-                        setToast("장소 반경에 도착했습니다. 챕터 미션을 진행하세요!");
                         lastNotifiedChapterId = nearest.id;
                     }
                 }
@@ -514,7 +536,7 @@ function EscapeIntroPageInner() {
         timer = setInterval(poll, 10000);
         poll();
         return () => clearInterval(timer);
-    }, [storyId, userLocation]);
+    }, [storyId, userLocation, selectedPlaceId]);
 
     const NaverMap = useMemo(
         () =>
@@ -650,11 +672,17 @@ function EscapeIntroPageInner() {
         if (animationFinished && mountMapAfterOpen && currentChapter && chapters.length > 0) {
             const t = setTimeout(() => {
                 setDialogueStep(0);
-                setIsDialogueActive(true);
+                // 항상 1챕터에서 편지를 보여줍니다 (한 번만 표시 로직 제거)
+                if (currentChapter.chapter_number === 1) {
+                    setIsDialogueActive(true);
+                } else {
+                    setIsDialogueActive(false);
+                    setIsLetterOpened(true);
+                }
             }, 80);
             return () => clearTimeout(t);
         }
-    }, [animationFinished, mountMapAfterOpen, currentChapter, chapters.length]);
+    }, [animationFinished, mountMapAfterOpen, currentChapter, chapters.length, storyId]);
 
     const handleCloseBook = () => {
         setEndingStep(null);
@@ -823,6 +851,22 @@ function EscapeIntroPageInner() {
                 // 미션 완료 시: 편지 조각 효과 후 다음 카테고리로
                 setPiecesCollected((n) => n + 1);
                 setPendingNextChapterIdx(nextIdx);
+                // 현재 챕터의 카테고리를 완료 목록에 저장
+                try {
+                    const first = (currentChapter.placeOptions || [])[0] as any;
+                    const catKey = normalizeCategory(first?.category || first?.type || "");
+                    if (catKey) {
+                        setCompletedCategories((prev) => {
+                            const next = Array.from(new Set([...(prev || []), catKey]));
+                            // 로컬스토리지에도 함께 저장
+                            const raw = localStorage.getItem(STORAGE_KEY);
+                            const obj = raw ? JSON.parse(raw) : {};
+                            obj.__completedCategories = next;
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                            return next;
+                        });
+                    }
+                } catch {}
                 setFlowStep("pieceAward");
             } else {
                 if (endingFlowStarted) return;
@@ -874,7 +918,32 @@ function EscapeIntroPageInner() {
             setIsDialogueActive(true);
         }
     };
+    // 1️⃣ chapters를 useMemo로 감싸기
+    const memoChapters = useMemo(() => chapters, [chapters?.length]);
+    // 카테고리 매칭 유틸: 다양한 표기를 하나의 키로 정규화 (availableCategoryKeys에서 사용하므로 먼저 선언)
+    const normalizeCategory = (raw: unknown): string => {
+        const s = String(raw || "")
+            .toLowerCase()
+            .replace(/\s+/g, "");
+        if (["cafe", "카페", "카페투어"].includes(s)) return "cafe";
+        if (["restaurant", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s)) return "restaurant";
+        if (["date", "walk", "산책", "데이트"].includes(s)) return "date";
+        if (["dinner", "다이닝"].includes(s)) return "dinner"; // dinner 별도 취급
+        if (s === "") return "misc";
+        return s;
+    };
+    // 스토리에 실제 존재하는 카테고리만 버튼으로 노출
+    const availableCategoryKeys = useMemo(() => {
+        const s = new Set<string>();
+        (chapters || []).forEach((ch: any) => {
+            const first = (ch?.placeOptions || [])[0];
+            const k = normalizeCategory(first?.category || first?.type || "");
+            if (k) s.add(k);
+        });
+        return Array.from(s);
+    }, [chapters]);
 
+    // 2️⃣ useEffect에서 memoChapters 사용
     useEffect(() => {
         if (!currentChapter) return;
         try {
@@ -890,7 +959,7 @@ function EscapeIntroPageInner() {
             setPhotoFiles([]);
             setValidationError("");
         }
-    }, [currentChapterIdx, chapters, STORAGE_KEY]);
+    }, [currentChapterIdx, memoChapters, STORAGE_KEY]);
 
     useEffect(() => {
         const beforeUnload = () => {
@@ -928,28 +997,32 @@ function EscapeIntroPageInner() {
                 const nextChapterIndex = chapters.findIndex((c) => c.chapter_number === lastCompleted + 1);
                 if (nextChapterIndex !== -1) setCurrentChapterIdx(nextChapterIndex);
             }
+
+            // 저장된 완료 카테고리 복원 (있으면 우선 사용)
+            if (Array.isArray(obj.__completedCategories) && obj.__completedCategories.length > 0) {
+                setCompletedCategories(
+                    Array.from(new Set(obj.__completedCategories.map((s: any) => String(s || "").trim())))
+                );
+            } else if (completedNumbers.length > 0) {
+                // 완료된 챕터 번호 기반으로 카테고리 추론하여 설정
+                const cats: string[] = [];
+                completedNumbers.forEach((num) => {
+                    const ch = chapters.find((c) => c.chapter_number === num);
+                    const first = (ch?.placeOptions || [])[0] as any;
+                    const key = normalizeCategory(first?.category || first?.type || "");
+                    if (key && !cats.includes(key)) cats.push(key);
+                });
+                setCompletedCategories(cats);
+            }
         } catch {}
         setResumed(true);
     }, [chapters, STORAGE_KEY, resumed]);
-
-    // 카테고리 매칭 유틸: 다양한 표기를 하나의 키로 정규화
-    const normalizeCategory = (raw: unknown): string => {
-        const s = String(raw || "")
-            .toLowerCase()
-            .replace(/\s+/g, "");
-        if (["cafe", "카페", "카페투어"].includes(s)) return "cafe";
-        if (["restaurant", "food", "맛집", "음식점", "식사", "다이닝", "dining", "레스토랑"].includes(s))
-            return "restaurant";
-        if (["date", "walk", "산책", "데이트"].includes(s)) return "date"; // '산책'을 'date' 탭과 묶음
-        if (["dinner"].includes(s)) return "restaurant"; // 저녁/다이닝은 음식점과 동일 그룹 처리
-        return s;
-    };
 
     const matchesSelectedCategory = (place: any, sel: string | null): boolean => {
         if (!sel) return true;
         const normalizedSel = normalizeCategory(sel);
         const placeCat = normalizeCategory(place?.category || place?.type || "");
-        if (!placeCat) return true; // 분류 없음 → 모두 표시
+        if (!placeCat) return false; // 선택된 카테고리일 때는 비분류 항목 제외
         if (normalizedSel === placeCat) return true;
         // 보조 매칭: restaurant ↔ dinner/dining
         if (
@@ -958,6 +1031,26 @@ function EscapeIntroPageInner() {
         )
             return true;
         return false;
+    };
+
+    // 선택된 장소의 모든 미션을 반환 (없으면 챕터 대표 미션으로 폴백)
+    const getSelectedPlaceMissions = (): any[] => {
+        const placeList = (currentChapter as any)?.placeOptions || [];
+        const placeById = selectedPlaceId ? placeList.find((p: any) => Number(p.id) === Number(selectedPlaceId)) : null;
+        const placeByIndex = placeById || (selectedPlaceIndex != null ? placeList[selectedPlaceIndex as number] : null);
+        const missions = Array.isArray((placeByIndex as any)?.missions) ? (placeByIndex as any).missions : [];
+        if (missions.length > 0) return missions;
+        // 폴백: 기존 챕터 대표 미션을 하나의 리스트로 노출
+        if (currentChapter && (currentChapter as any).mission_type) {
+            return [
+                {
+                    id: (currentChapter as any).id,
+                    missionType: (currentChapter as any).mission_type,
+                    missionPayload: (currentChapter as any).mission_payload || {},
+                },
+            ];
+        }
+        return [];
     };
 
     if (loading) {
@@ -1035,59 +1128,127 @@ function EscapeIntroPageInner() {
                                         titlePopAnim ? "animate-[titlePop_400ms_ease-out]" : ""
                                     }`}
                                 >
-                                    {[
-                                        { key: "cafe", label: "☕ 카페" },
-                                        { key: "date", label: "🌳 산책" },
-                                        { key: "restaurant", label: "🍱 식사" },
-                                        { key: "dinner", label: "🍷 다이닝" },
-                                    ].map((cat) => (
-                                        <button
-                                            key={cat.key}
-                                            onClick={() => {
-                                                setSelectedCategory(cat.key);
-                                                setSelectedPlaceId(null);
-                                                setInSelectedRange(false);
-                                                setFlowStep("placeList");
-                                            }}
-                                            className="px-4 py-3 rounded-xl bg-white/85 hover:bg-white text-gray-900 shadow"
-                                        >
-                                            {cat.label}
-                                        </button>
-                                    ))}
+                                    {(() => {
+                                        const label = (k: string) =>
+                                            ((
+                                                {
+                                                    cafe: "☕ 카페",
+                                                    date: "🌳 산책",
+                                                    restaurant: "🍱 식사",
+                                                    dinner: "🍷 다이닝",
+                                                } as Record<string, string>
+                                            )[k] || k);
+                                        const base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
+                                        let cats = base.filter((c) => !completedCategories.includes(c.key));
+                                        // 모두 숨겨지면(=선택할 게 없으면) 필터링을 해제하여 보여줌
+                                        if (cats.length === 0) cats = base;
+                                        return cats.map((cat) => (
+                                            <button
+                                                key={cat.key}
+                                                onClick={() => {
+                                                    setSelectedCategory(cat.key);
+                                                    // 카테고리에 해당하는 챕터로 이동 (카테고리-챕터 정합성 보장)
+                                                    try {
+                                                        const targetIdx = chapters.findIndex((ch: any) => {
+                                                            const first = (ch?.placeOptions || [])[0];
+                                                            const chCat = normalizeCategory(
+                                                                first?.category || first?.type || ""
+                                                            );
+                                                            return chCat === cat.key;
+                                                        });
+                                                        if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
+                                                    } catch {}
+                                                    setSelectedPlaceId(null);
+                                                    setInSelectedRange(false);
+                                                    setMissionUnlocked(false);
+                                                    setFlowStep("placeList");
+                                                }}
+                                                className="px-4 py-3 rounded-xl bg-white/85 hover:bg-white text-gray-900 shadow"
+                                            >
+                                                {cat.label}
+                                            </button>
+                                        ));
+                                    })()}
                                 </div>
                             )}
 
                             {flowStep === "placeList" && selectedCategory && (
                                 <div className="space-y-2">
-                                    {(currentChapter.placeOptions || [])
-                                        .filter((p: any) => matchesSelectedCategory(p, selectedCategory))
-                                        .map((p: any, idx: number) => (
+                                    {(() => {
+                                        const all = ((currentChapter.placeOptions || []) as any[]).slice();
+                                        const list = all.filter((p: any) =>
+                                            matchesSelectedCategory(p, selectedCategory)
+                                        );
+                                        return list.map((p: any, idx: number) => (
                                             <div
                                                 key={p.id}
-                                                className="p-3 rounded-xl bg-white/85 hover:bg-white border shadow cursor-pointer"
+                                                className={`p-3 rounded-xl border shadow cursor-pointer ${
+                                                    selectedPlaceConfirm === p.id
+                                                        ? "bg-emerald-50 border-emerald-300"
+                                                        : "bg-white/85 hover:bg-white border-gray-200"
+                                                }`}
                                                 onClick={() => {
-                                                    const placeType = (p.type || p.category || "").toString();
-                                                    setSelectedPlaceType(placeType || null);
+                                                    // 첫 클릭: 상세(주소/시그니처)만 보여주고 선택 대기
+                                                    if (selectedPlaceConfirm !== p.id) {
+                                                        setSelectedPlaceConfirm(p.id);
+                                                        setSelectedPlaceIndex(idx);
+                                                        setSelectedPlaceId(Number(p.id) || null);
+                                                        setSelectedPlaceType(
+                                                            (p.type || p.category || "").toString() || null
+                                                        );
+                                                        setInSelectedRange(false);
+                                                        setMissionUnlocked(false);
+                                                        return;
+                                                    }
+                                                    // 두번째 클릭: 해당 장소로 확정 → 대화/미션
                                                     const lines: Array<{ speaker?: string | null; text: string }> =
                                                         Array.isArray(p.stories) && p.stories.length > 0
-                                                            ? p.stories.map((s: any) => ({
-                                                                  speaker: s.speaker,
-                                                                  text: s.dialogue || s.narration || "",
-                                                              }))
-                                                            : [{ text: `${p.name}에 도착했어요.` }];
-                                                    setSelectedPlaceIndex(idx);
-                                                    setSelectedPlaceId(Number(p.id) || null);
-                                                    setInSelectedRange(false);
+                                                            ? p.stories
+                                                                  .map((s: any) => ({
+                                                                      speaker: s.speaker,
+                                                                      text: s.dialogue || s.narration || "",
+                                                                  }))
+                                                                  .filter(
+                                                                      (d: any) => d.text && d.text.trim().length > 0
+                                                                  )
+                                                            : [];
+
+                                                    // 대사가 없으면 알림(도착 메시지) 대신 바로 미션으로 이동
+                                                    if (lines.length === 0) {
+                                                        setDialogueQueue([]);
+                                                        setMissionUnlocked(true);
+                                                        setFlowStep("mission");
+                                                        return;
+                                                    }
+
                                                     setDialogueQueue(lines);
                                                     setFlowStep("dialogue");
+                                                    setMissionUnlocked(true);
                                                 }}
                                             >
                                                 <div className="font-semibold text-gray-900">{p.name}</div>
-                                                {p.address && (
-                                                    <div className="text-xs text-gray-600 mt-0.5">{p.address}</div>
+                                                {selectedPlaceConfirm === p.id && (p.address || p.signature) ? (
+                                                    <div className="text-xs text-gray-700 mt-2 space-y-1">
+                                                        {p.address && (
+                                                            <div className="leading-relaxed">{p.address}</div>
+                                                        )}
+                                                        {p.signature && (
+                                                            <div className="inline-flex items-center px-2 py-1 rounded-md bg-amber-100 text-amber-800">
+                                                                {p.signature}
+                                                            </div>
+                                                        )}
+                                                        <div className="text-[11px] text-gray-500">
+                                                            한 번 더 클릭하면 이 장소로 진행합니다
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    p.address && (
+                                                        <div className="text-xs text-gray-600 mt-0.5">{p.address}</div>
+                                                    )
                                                 )}
                                             </div>
-                                        ))}
+                                        ));
+                                    })()}
                                 </div>
                             )}
 
@@ -1172,62 +1333,64 @@ function EscapeIntroPageInner() {
                             )}
                         </div>
 
-                        {/* 우: 미션 카드 - 선택 장소 반경 내에 도착한 경우에만 표시 */}
-                        {selectedPlaceId && inSelectedRange ? (
+                        {/* 우: 미션 카드 - 지금은 선택 확정 즉시 표시 */}
+                        {selectedPlaceId && missionUnlocked ? (
                             <div
                                 className={`rounded-2xl bg-white/85 backdrop-blur p-4 border shadow transition-opacity duration-500 ${
                                     flowStep === "walk" || letterGateActive ? "opacity-0" : "opacity-100"
                                 } ${noteOpenAnim && flowStep === "mission" ? "animate-[noteOpen_300ms_ease-out]" : ""}`}
                             >
                                 <h3 className="text-lg font-bold text-gray-800 mb-3">미션</h3>
+                                {/* 모든 미션 목록을 보여주고 사용자가 클릭하면 모달에서 풀이 */}
                                 <div className="space-y-3">
-                                    <div className="text-base text-gray-900 font-medium text-center">
-                                        {currentChapter.mission_payload?.question || "질문이 없습니다."}
-                                    </div>
-                                    {String(currentChapter.mission_type || "").toUpperCase() === "PUZZLE_ANSWER" && (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="text"
-                                                value={puzzleAnswer}
-                                                onChange={(e) => {
-                                                    setPuzzleAnswer(e.target.value);
-                                                    setAnswerChecked(false);
-                                                }}
-                                                placeholder="정답 입력"
-                                                className="flex-1 px-3 py-2 rounded border"
-                                            />
-                                            <button
-                                                onClick={handleCheckAnswer}
-                                                className={`px-3 py-2 rounded text-sm text-white ${
-                                                    answerChecked ? "bg-green-600" : "bg-blue-600"
-                                                }`}
-                                            >
-                                                {answerChecked ? "확인됨" : "확인"}
-                                            </button>
-                                        </div>
-                                    )}
-                                    {String(currentChapter.mission_type || "").toUpperCase() === "PHOTO" && (
-                                        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white cursor-pointer hover:bg-gray-50">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                multiple
-                                                className="hidden"
-                                                onChange={(e) => {
-                                                    const files = Array.from(e.target.files || []);
-                                                    if (files.length > 0) {
-                                                        setPhotoFiles(files.slice(0, 5));
-                                                        const url = URL.createObjectURL(files[0]);
-                                                        setPhotoPreviewUrl(url);
-                                                        const enough = files.length >= 2;
-                                                        setPhotoUploaded(enough);
-                                                        setValidationError(enough ? "" : "사진 2장을 업로드해 주세요.");
-                                                    }
-                                                }}
-                                            />
-                                            <span>사진 업로드 (2장)</span>
-                                        </label>
-                                    )}
+                                    {(() => {
+                                        const missions = getSelectedPlaceMissions();
+                                        return missions.length > 0 ? (
+                                            missions.map((m: any, mi: number) => {
+                                                const payload = m?.missionPayload || {};
+                                                return (
+                                                    <button
+                                                        key={mi}
+                                                        className="w-full text-left rounded-lg border p-3 bg-white/95 hover:bg-white"
+                                                        onClick={() => {
+                                                            setActiveMission(m);
+                                                            setMissionModalOpen(true);
+                                                        }}
+                                                    >
+                                                        <div className="font-semibold text-gray-800">
+                                                            {payload.question ||
+                                                                payload.description ||
+                                                                `미션 ${mi + 1}`}
+                                                        </div>
+                                                        {(() => {
+                                                            const p: any = payload || {};
+                                                            const base = p.hints ?? p.hint;
+                                                            let hints: string[] = [];
+                                                            if (Array.isArray(base)) hints = base.filter(Boolean);
+                                                            else if (typeof base === "string" && base.trim())
+                                                                hints = [base.trim()];
+                                                            else {
+                                                                Object.keys(p || {}).forEach((k) => {
+                                                                    if (/^hint[_-]?\d+$/i.test(k) && p[k])
+                                                                        hints.push(p[k]);
+                                                                });
+                                                            }
+                                                            return hints.length > 0 ? (
+                                                                <div className="text-xs text-gray-500 mt-1">
+                                                                    힌트 {hints.length}개
+                                                                </div>
+                                                            ) : null;
+                                                        })()}
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="text-base text-gray-900 font-medium text-center">
+                                                {currentChapter.mission_payload?.question ||
+                                                    "진행 가능한 미션이 없습니다."}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                                 <div className="mt-4 flex justify-center">
                                     <button
@@ -1252,6 +1415,11 @@ function EscapeIntroPageInner() {
                         onComplete={() => {
                             // 편지 닫기를 눌러야만 UI가 나타나도록 이 시점에서는 숨김 유지
                             setIsDialogueActive(false);
+                            try {
+                                const key = `escape_letter_shown_${storyId}`;
+                                localStorage.setItem(key, "1");
+                                setLetterEverShown(true);
+                            } catch {}
                         }}
                         letterMode={currentChapter?.chapter_number === 1}
                         onLetterOpened={(opened) => {
@@ -1304,625 +1472,171 @@ function EscapeIntroPageInner() {
                         </div>
                     </div>
                 )}
+
+                {/* 미션 풀이 모달 */}
+                {missionModalOpen && activeMission && (
+                    <div className="fixed inset-0 z-[1500] bg-black/50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-5 relative">
+                            <button
+                                onClick={() => setMissionModalOpen(false)}
+                                className="absolute top-3 right-3 px-3 py-1.5 text-sm rounded-lg bg-black/80 text-white"
+                            >
+                                닫기
+                            </button>
+                            {(() => {
+                                const t = String(activeMission?.missionType || "").toUpperCase();
+                                const payload = activeMission?.missionPayload || {};
+                                const p: any = payload || {};
+                                const base = p.hints ?? p.hint;
+                                let hints: string[] = [];
+                                if (Array.isArray(base)) hints = base.filter(Boolean);
+                                else if (typeof base === "string" && base.trim()) hints = [base.trim()];
+                                else {
+                                    Object.keys(p || {}).forEach((k) => {
+                                        if (/^hint[_-]?\d+$/i.test(k) && p[k]) hints.push(p[k]);
+                                    });
+                                }
+                                return (
+                                    <div className="space-y-4">
+                                        <h4 className="text-lg font-bold text-gray-800">미션</h4>
+                                        <div className="text-gray-900">
+                                            {payload.question || payload.description || "미션"}
+                                        </div>
+                                        {t === "PUZZLE_ANSWER" && (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={modalAnswer}
+                                                    onChange={(e) => {
+                                                        setModalAnswer(e.target.value);
+                                                        setModalError(null);
+                                                    }}
+                                                    placeholder="정답 입력"
+                                                    className="flex-1 px-3 py-2 rounded border text-gray-900"
+                                                />
+                                                <button
+                                                    onClick={() => {
+                                                        const ok = isCorrectForPayload(payload, modalAnswer);
+                                                        if (!ok) {
+                                                            setModalWrongOnce(true);
+                                                            setModalError("정답이 아니에요");
+                                                            return;
+                                                        }
+                                                        setModalError(null);
+                                                        setModalWrongOnce(false);
+                                                        // 정답 처리: 챕터 진행 조건 충족을 위해 상태 동기화
+                                                        setAnswerChecked(true);
+                                                        setPuzzleAnswer(modalAnswer || "");
+                                                        setMissionModalOpen(false);
+                                                        // 미션 완룔 후: 선택한 장소의 stories 우선 재생
+                                                        try {
+                                                            const place = (currentChapter?.placeOptions || []).find(
+                                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                                            );
+                                                            const placeQueue: string[] = Array.isArray(
+                                                                (place as any)?.stories
+                                                            )
+                                                                ? (place as any).stories
+                                                                      .map((s: any) =>
+                                                                          String(
+                                                                              s?.dialogue || s?.narration || s || ""
+                                                                          ).trim()
+                                                                      )
+                                                                      .filter(Boolean)
+                                                                : [];
+                                                            if (placeQueue.length > 0) {
+                                                                setPostStoryQueue(placeQueue);
+                                                                setPostStoryIdx(0);
+                                                                setShowPostStory(true);
+                                                                return;
+                                                            }
+                                                        } catch {}
+                                                        // 장소 스토리가 없으면 기존 흐름으로 바로 진행
+                                                        goToNextChapter();
+                                                    }}
+                                                    className={`px-3 py-2 rounded text-sm text-white ${
+                                                        answerChecked ? "bg-green-600" : "bg-blue-600"
+                                                    }`}
+                                                >
+                                                    {answerChecked ? "확인됨" : "제출"}
+                                                </button>
+                                            </div>
+                                        )}
+                                        {modalError && <div className="text-sm text-red-600">{modalError}</div>}
+                                        {t === "PHOTO" && (
+                                            <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white cursor-pointer hover:bg-gray-50">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                        const files = Array.from(e.target.files || []);
+                                                        if (files.length > 0) {
+                                                            setPhotoFiles(files.slice(0, 5));
+                                                            const url = URL.createObjectURL(files[0]);
+                                                            setPhotoPreviewUrl(url);
+                                                            const enough = files.length >= 2;
+                                                            setPhotoUploaded(enough);
+                                                            setValidationError(
+                                                                enough ? "" : "사진 2장을 업로드해 주세요."
+                                                            );
+                                                        }
+                                                    }}
+                                                />
+                                                <span>사진 업로드 (2장)</span>
+                                            </label>
+                                        )}
+                                        {hints.length > 0 && modalWrongOnce && (
+                                            <div className="text-sm text-gray-500 space-y-1">
+                                                {hints.map((h, i) => (
+                                                    <div key={i}>
+                                                        힌트{hints.length > 1 ? ` ${i + 1}` : ""}: {h}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                )}
+
+                {/* 미션 이후 스토리 모달 */}
+                {showPostStory && postStoryQueue.length > 0 && (
+                    <div className="fixed inset-0 z-[1550] bg-black/40 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-5">
+                            <div className="text-gray-900 whitespace-pre-wrap min-h-[4em]">
+                                {postStoryQueue[postStoryIdx]}
+                            </div>
+                            <div className="text-right mt-4">
+                                <button
+                                    onClick={() => {
+                                        if (postStoryIdx < postStoryQueue.length - 1) {
+                                            setPostStoryIdx((i) => i + 1);
+                                        } else {
+                                            setShowPostStory(false);
+                                            setPostStoryQueue([]);
+                                            setPostStoryIdx(0);
+                                            // 스토리 종료 후 조각 획득 단계로 연결
+                                            setFlowStep("pieceAward");
+                                        }
+                                    }}
+                                    className="px-4 py-2 rounded-lg bg-black text-white"
+                                >
+                                    {postStoryIdx < postStoryQueue.length - 1 ? "다음" : "닫기"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
 
-    return (
-        <div className="fixed inset-0 bg-[aliceblue] flex items-center justify-center pl-0 sm:pl-[12vw] md:pl-[24vw]">
-            <style>
-                {`
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");
-                :root { --color-cover: hsl(0, 44%, 42%); --color-cover-text: hsl(40, 64%, 80%); --duration: 5000ms; --initial-delay: 500ms; }
-                body { display: flex; height: 100vh; margin: 0; justify-content: center; align-items: center; font-family: "Cormorant Garamond", Garamond, "Times New Roman", Times, serif; font-size: 20px; background-color: aliceblue; }
-                .book { width: 88vw; max-width: 520px; aspect-ratio: 2/3; border-radius: 0 24px 24px 0; transform-style: preserve-3d; transform: scale(0.92) rotateX(10deg) rotateZ(0deg); animation: move-book var(--duration) ease-in-out forwards; animation-delay: var(--initial-delay); }
-                .book.closing { animation: close-book 1.2s ease-in-out forwards; }
-.book.animation-finished { pointer-events: none; }
-.book.animation-finished .interactive { pointer-events: auto; }
-                .page { position: absolute; width: 100%; height: 100%; background-color: white; background: linear-gradient(to right, rgba(0, 0, 0, 0.05), transparent 10%) white; border: 1px solid rgba(0, 0, 0, 0.2); border-radius: inherit; z-index: calc(var(--pages) - var(--id, 0)); transform: translateZ(calc(var(--id, 0) * -1px)); transform-origin: 0 0; animation: turn-page var(--duration) ease-in-out forwards; --increment: calc(var(--duration) / (var(--pages) * 2)); animation-delay: calc(var(--id, 0) * var(--increment) + var(--initial-delay) * 2); }
-                .page.static { animation: none !important; }
-.deco { pointer-events: none; }
-                .content-flip { transform: rotateY(180deg); backface-visibility: visible; -webkit-backface-visibility: visible; transform-style: preserve-3d; }
-                .cover { width: 100%; height: 100%; color: var(--color-cover-text); z-index: var(--pages); padding: 5%; box-sizing: border-box; font-size: clamp(12px, 2.2vh, 36px); background: var(--color-cover); }
-                .cover .cover-content { position: relative; display: grid; justify-items: center; align-items: center; grid-auto-rows: 1fr; height: 90%; width: 90%; box-sizing: border-box; margin: 5%; padding: 5%; border: 12px double var(--color-cover-text); text-align: center; overflow: hidden; }
-                .cover h1, .cover h2 { font-weight: 300; }
-                .cover h1 { text-transform: uppercase; }
-                .cover h1, .cover h2 { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; }
-                .cover img { width: 50%; filter: sepia(100%) brightness(85%) saturate(550%) hue-rotate(-10deg); }
-                .back { background: var(--color-cover); transform: translateZ(calc(var(--pages) * -1px)); animation: none; z-index: 0; }
-                @keyframes move-book { from { perspective: 1200px; transform: scale(0.86) rotateX(16deg) rotateZ(0deg); } to { perspective: 2200px; transform: scale(1) rotateX(0deg) rotateZ(0deg); } }
-                @keyframes turn-page { from { transform: translateZ(calc(var(--id, 0) * -1px)) rotateY(0); } to { transform: translateZ(calc((var(--pages) - var(--id, 0)) * -1px)) rotateY(-180deg); } }
-                @keyframes close-book { from { perspective: 5000px; transform: scale(1) rotateX(0deg) rotateZ(0deg); } to { perspective: 2000px; transform: scale(0.5) rotateX(60deg) rotateZ(30deg); } }
-                .book.closing .page { animation: turn-page-close 800ms ease-in forwards; --increment: calc(var(--duration) / (var(--pages) * 2)); animation-delay: calc((var(--pages) - var(--id, 0)) * var(--increment) / 2); }
-                .book.closing .page.static { animation: turn-page-close 800ms ease-in forwards; }
-                @keyframes turn-page-close { from { transform: translateZ(calc((var(--pages) - var(--id, 0)) * -1px)) rotateY(-180deg); } to { transform: translateZ(calc(var(--id, 0) * -1px)) rotateY(0); } }
-                .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-                @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
-.btn-vintage { background: linear-gradient(180deg, #c27a24 0%, #a55e14 100%); color: #fff; border: 1px solid rgba(60,42,25,.35); border-radius: 10px; padding: 8px 14px; box-shadow: 0 3px 0 rgba(60,42,25,.35); cursor: pointer; }
-.btn-vintage:hover { filter: brightness(1.05); }
-                `}
-            </style>
-
-            <div className="relative flex items-center justify-center">
-                <div
-                    className={`book${isClosing ? " closing" : ""} ${animationFinished ? "animation-finished" : ""}`}
-                    style={{ ["--pages" as any]: String(COUNT_PAGES) } as React.CSSProperties}
-                >
-                    {/* 표지 */}
-                    <div className="cover page">
-                        <div className="cover-content">
-                            <h1>{story?.title || "Welcome to the Story"}</h1>
-                            <img src={story?.imageUrl || " "} alt="cover" />
-                            <h2>{story?.synopsis || "An adventure awaits"}</h2>
-                        </div>
-                    </div>
-
-                    {/* 왼쪽 페이지 (지도) */}
-                    <div
-                        className="page static interactive"
-                        style={{
-                            ["--id" as any]: String(COUNT_PAGES - 2),
-                            zIndex: 12,
-                            background: "white",
-                            transform: "rotateY(180deg)",
-                            opacity: animationFinished ? 1 : 0,
-                        }}
-                    >
-                        {animationFinished && mountMapAfterOpen && currentChapter && chapters.length > 0 && (
-                            <div
-                                className="w-full h-full p-6 flex flex-col content-flip"
-                                style={{ transformOrigin: "center" }}
-                            >
-                                <div className="relative mb-4 border-b-2 pb-3">
-                                    <div className="flex items-center justify-center gap-3">
-                                        {currentChapter.chapter_number === 1 && (
-                                            <button
-                                                onClick={() => router.push("/escape")}
-                                                className="hover:cursor-pointer px-3 py-1.5 text-sm rounded bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
-                                            >
-                                                escape로 이동
-                                            </button>
-                                        )}
-                                        <h2 className="text-xl font-bold text-gray-900">
-                                            Chapter {currentChapter.chapter_number}. {currentChapter.title || "스토리"}
-                                        </h2>
-                                    </div>
-                                </div>
-                                <div className="relative flex-1 rounded-lg overflow-hidden border-2 border-gray-300 shadow-md mb-4 min-h-[260px]">
-                                    <NaverMap
-                                        places={mapPlaces as any}
-                                        userLocation={userLocation as any}
-                                        selectedPlace={null}
-                                        onPlaceClick={() => {}}
-                                        className="w-full h-full"
-                                        drawPath={mapPlaces.length >= 2}
-                                        routeMode={isMobile ? "walking" : "driving"}
-                                    />
-                                </div>
-                                <div className="bg-gray-50 p-4 rounded border">
-                                    <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
-                                        📍 위치
-                                    </h3>
-                                    <p className="text-base text-gray-900">
-                                        <strong>{currentChapter.location_name || "위치 정보"}</strong> <br />
-                                        {currentChapter.address || "주소 정보 없음"}
-                                    </p>
-                                </div>
-                                {currentChapter.chapter_number === 1 &&
-                                    Array.isArray(currentChapter.placeOptions) &&
-                                    currentChapter.placeOptions.length > 0 && (
-                                        <div className="mt-4">
-                                            <h3 className="text-lg font-bold mb-2 text-gray-800 flex items-center gap-2">
-                                                🗂️ 선택 가능한 장소
-                                            </h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                {currentChapter.placeOptions.map((p) => (
-                                                    <div key={p.id} className="card overflow-hidden">
-                                                        {p.imageUrl ? (
-                                                            <img
-                                                                src={p.imageUrl}
-                                                                alt={p.name}
-                                                                className="w-full h-40 object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-40 bg-gray-200 flex items-center justify-center text-gray-500">
-                                                                이미지 없음
-                                                            </div>
-                                                        )}
-                                                        <div className="p-4">
-                                                            <div className="font-semibold text-gray-900 truncate">
-                                                                {p.name}
-                                                            </div>
-                                                            {p.address && (
-                                                                <div className="text-xs text-gray-500 mt-1 truncate">
-                                                                    {p.address}
-                                                                </div>
-                                                            )}
-                                                            {p.description && (
-                                                                <div className="text-sm text-gray-700 mt-2 line-clamp-2">
-                                                                    {p.description}
-                                                                </div>
-                                                            )}
-                                                            <div className="mt-3 flex justify-end">
-                                                                <button
-                                                                    className="btn-secondary text-sm"
-                                                                    onClick={() => {
-                                                                        if (p.latitude != null && p.longitude != null) {
-                                                                            setUserLocation(
-                                                                                (prev) =>
-                                                                                    prev || {
-                                                                                        lat: p.latitude as number,
-                                                                                        lng: p.longitude as number,
-                                                                                    }
-                                                                            );
-                                                                        }
-                                                                        setShowMapModal(true);
-                                                                    }}
-                                                                >
-                                                                    지도 보기
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                {currentChapterIdx > 0 && (
-                                    <button
-                                        onClick={goToPrevChapter}
-                                        className="hover:cursor-pointer mt-4 self-start px-4 py-2 text-base rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow font-medium"
-                                    >
-                                        ← 이전 챕터
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 오른쪽 페이지 (미션) */}
-                    <div
-                        className="page static interactive"
-                        style={{
-                            ["--id" as any]: String(COUNT_PAGES - 1),
-                            zIndex: 13,
-                            background: "white",
-                            opacity: animationFinished ? 1 : 0,
-                        }}
-                    >
-                        {animationFinished && currentChapter && chapters.length > 0 && (
-                            <div className="w-full h-full p-6 flex flex-col overflow-hidden">
-                                <h2 className="text-xl font-bold mb-4 text-center text-gray-900 border-b-2 pb-3">
-                                    🎯 미션
-                                </h2>
-                                <div className="flex justify-end gap-2 -mt-2 mb-2">
-                                    <button
-                                        onClick={() => {
-                                            setDialogueStep(0);
-                                            setIsDialogueActive(true);
-                                        }}
-                                        className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-amber-700 text-white hover:bg-amber-800 transition-colors shadow"
-                                    >
-                                        이야기 다시 보기
-                                    </button>
-                                    {isMobile && (
-                                        <button
-                                            onClick={() => setShowMapModal(true)}
-                                            className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow"
-                                        >
-                                            지도 보기
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-h-0 flex flex-col">
-                                    <h3 className="text-lg font-bold mb-2 text-gray-800">❓ 질문</h3>
-                                    <div className="flex-1 bg-blue-50 rounded p-4 border-2 border-blue-200 overflow-auto">
-                                        <div className="text-lg font-semibold text-blue-900 mb-3 break-words">
-                                            {currentChapter.mission_payload?.question || "질문이 없습니다."}
-                                        </div>
-                                        {String(currentChapter.mission_type || "").toUpperCase() === "PUZZLE_ANSWER" ? (
-                                            <div className="space-y-3">
-                                                <input
-                                                    type="text"
-                                                    value={puzzleAnswer}
-                                                    onChange={(e) => {
-                                                        setPuzzleAnswer(e.target.value);
-                                                        setAnswerChecked(false);
-                                                    }}
-                                                    placeholder="정답을 입력하세요"
-                                                    className="w-full px-3 py-2 rounded border border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-gray-700"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    onMouseDown={(e) => e.stopPropagation()}
-                                                    onTouchStart={(e) => e.stopPropagation()}
-                                                />
-                                                <div className="flex justify-end">
-                                                    <button
-                                                        onClick={handleCheckAnswer}
-                                                        className={`px-4 py-2 rounded-lg text-sm font-medium shadow transition-colors hover:cursor-pointer ${
-                                                            answerChecked
-                                                                ? "bg-green-600 text-white hover:bg-green-700"
-                                                                : "bg-blue-600 text-white hover:bg-blue-700"
-                                                        }`}
-                                                    >
-                                                        {answerChecked ? "정답 확인됨" : "정답"}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ) : String(currentChapter.mission_type || "").toUpperCase() === "PHOTO" ? (
-                                            <div className="space-y-3">
-                                                {!photoUploaded ? (
-                                                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-blue-300 bg-white cursor-pointer hover:bg-blue-50">
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            multiple
-                                                            className="hidden"
-                                                            onChange={(e) => {
-                                                                const files = Array.from(e.target.files || []);
-                                                                if (files.length > 0) {
-                                                                    setPhotoFiles(files.slice(0, 5));
-                                                                    const url = URL.createObjectURL(files[0]);
-                                                                    setPhotoPreviewUrl(url);
-                                                                    const enough = files.length >= 2;
-                                                                    setPhotoUploaded(enough);
-                                                                    setValidationError(
-                                                                        enough ? "" : "사진 2장을 업로드해 주세요."
-                                                                    );
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span className="text-blue-800 text-sm">사진 업로드 (2장)</span>
-                                                    </label>
-                                                ) : (
-                                                    <div className="flex items-center gap-3">
-                                                        {photoPreviewUrl && (
-                                                            <img
-                                                                src={photoPreviewUrl}
-                                                                alt="preview"
-                                                                className="w-20 h-20 object-cover rounded border"
-                                                            />
-                                                        )}
-                                                        <button
-                                                            className="px-3 py-1.5 rounded-md border bg-white hover:bg-gray-50 text-sm"
-                                                            onClick={() => {
-                                                                setPhotoPreviewUrl(null);
-                                                                setPhotoUploaded(false);
-                                                                setPhotoFiles([]);
-                                                            }}
-                                                        >
-                                                            다시 선택
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                {photoFiles.length > 0 && photoFiles.length < 2 && (
-                                                    <div className="text-xs text-red-600">
-                                                        사진 2장을 업로드해 주세요.
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : currentChapter.mission_payload?.options ? (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                                                {currentChapter.mission_payload.options.map(
-                                                    (option: string, index: number) => (
-                                                        <div
-                                                            key={index}
-                                                            role="button"
-                                                            tabIndex={0}
-                                                            onClick={() => setSelectedOptionIndex(index)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter" || e.key === " ")
-                                                                    setSelectedOptionIndex(index);
-                                                            }}
-                                                            className={`p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer text-gray-800 transform hover:scale-105 ${
-                                                                selectedOptionIndex === index
-                                                                    ? "border-amber-500 bg-amber-100 shadow-lg ring-2 ring-amber-500"
-                                                                    : "border-gray-300 bg-white hover:border-amber-400 hover:bg-amber-50"
-                                                            }`}
-                                                        >
-                                                            <span className="font-semibold">{option}</span>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </div>
-                                <div className="mt-4 flex justify-between items-center">
-                                    <span className="text-sm text-red-600 h-5">{validationError}</span>
-                                    {currentChapterIdx < chapters.length - 1 ? (
-                                        <button
-                                            onClick={goToNextChapter}
-                                            className="hover:cursor-pointer px-4 py-2 text-base rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors shadow font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                            disabled={!canProceed || isSubmitting}
-                                        >
-                                            {isSubmitting ? "처리 중..." : "다음 챕터 →"}
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={goToNextChapter}
-                                            className="hover:cursor-pointer px-4 py-2 text-base rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow font-medium"
-                                            disabled={!canProceed || isSubmitting}
-                                        >
-                                            마무리
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 애니메이션용 중간 페이지들 */}
-                    {Array.from({ length: numFlipPages }, (_, i) => (
-                        <div
-                            key={`mid-${i}`}
-                            className="page deco"
-                            style={{ ["--id" as any]: String(i + 1) } as React.CSSProperties}
-                        />
-                    ))}
-
-                    {/* 뒷표지 */}
-                    <div className="back page" />
-                </div>
-
-                {/* 페이지 인디케이터 */}
-                {animationFinished && chapters.length > 0 && (
-                    <div className="absolute bottom-6 left-4 md:left-6 z-[1201] pointer-events-auto">
-                        <div className="bg-black/80 text-white px-4 py-2 rounded-full text-sm font-medium">
-                            {currentChapterIdx + 1} / {chapters.length}
-                        </div>
-                    </div>
-                )}
-
-                {/* 중복 렌더 제거: 아래 영역에서는 DialogueFlow를 렌더하지 않음 */}
-
-                {isMobile && showMapModal && (
-                    <div
-                        className="fixed inset-0 z-[1400] bg-black/50 flex items-center justify-center p-4"
-                        role="dialog"
-                        aria-modal="true"
-                    >
-                        <div className="bg-white rounded-2xl w-full max-w-md h-[78vh] overflow-hidden relative">
-                            <div className="absolute top-3 right-3 z-10">
-                                <button
-                                    onClick={() => setShowMapModal(false)}
-                                    className="hover:cursor-pointer px-3 py-1.5 text-sm rounded-lg bg-black/80 text-white"
-                                >
-                                    닫기
-                                </button>
-                            </div>
-                            <div className="w-full h-full min-h-[420px]">
-                                <NaverMap
-                                    places={mapPlaces as any}
-                                    userLocation={userLocation as any}
-                                    selectedPlace={null}
-                                    onPlaceClick={() => {}}
-                                    className="w-full h-full"
-                                    drawPath={mapPlaces.length >= 2}
-                                    routeMode={isMobile ? "walking" : "driving"}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 단계별 엔딩 오버레이 */}
-                {animationFinished && endingStep && (
-                    <div className="absolute inset-0 z-[1200] pointer-events-auto flex items-center justify-center p-4 bg-black/50 animate-fade-in">
-                        {endingStep === "finalMessage" && (
-                            <div className="bg-white/95 backdrop-blur-sm rounded-xl border shadow-lg w-full max-w-2xl h-auto max-h-[90vh] flex flex-col p-6">
-                                <h2 className="text-xl font-bold mb-4 text-gray-800">📖 마무리</h2>
-                                <div className="flex-1 overflow-y-auto mb-6">
-                                    {/* ✅ --- 오류 수정된 부분 --- */}
-                                    <p className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
-                                        {((): string => {
-                                            const finalText = chapters[chapters.length - 1]?.story_text;
-                                            if (typeof finalText === "string") return finalText;
-                                            if (Array.isArray(finalText))
-                                                return finalText.map((d) => d.text).join("\n\n");
-                                            return story?.synopsis || "여정을 함께해 주셔서 감사합니다.";
-                                        })()}
-                                    </p>
-                                    {/* ✅ --- 수정 끝 --- */}
-                                </div>
-                                <div className="flex justify-end">
-                                    <button className="btn-vintage" onClick={() => setEndingStep("epilogue")}>
-                                        에필로그 보기
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {endingStep === "epilogue" && (
-                            <div className="bg-white/95 backdrop-blur-sm rounded-xl border shadow-lg w-full max-w-2xl h-auto max-h-[90vh] flex flex-col p-6">
-                                <h2 className="text-xl font-bold mb-4 text-gray-800">🎬 에필로그</h2>
-                                <div className="flex-1 overflow-y-auto mb-6">
-                                    {(() => {
-                                        const epi = story?.epilogue_text;
-                                        if (!epi)
-                                            return <div className="text-base text-gray-700">에필로그가 없습니다.</div>;
-
-                                        const isVideoUrl = (s: string) =>
-                                            /\.(mp4|webm|ogg)(\?.*)?$/i.test(s) ||
-                                            s.includes("youtube.com") ||
-                                            s.includes("youtu.be");
-                                        const getYouTubeEmbedUrl = (url: string) => {
-                                            try {
-                                                const urlObj = new URL(url);
-                                                if (urlObj.hostname.includes("youtu.be"))
-                                                    return `https://www.youtube.com/embed/${urlObj.pathname.slice(1)}`;
-                                                if (urlObj.searchParams.has("v"))
-                                                    return `https://www.youtube.com/embed/${urlObj.searchParams.get(
-                                                        "v"
-                                                    )}`;
-                                            } catch {}
-                                            return null;
-                                        };
-
-                                        {
-                                            /* ✅ --- 오류 수정된 부분 --- */
-                                        }
-                                        const renderContent = (content: any): React.ReactNode => {
-                                            if (!content) return null;
-
-                                            if (typeof content === "string") {
-                                                const youtubeUrl = getYouTubeEmbedUrl(content);
-                                                if (youtubeUrl)
-                                                    return (
-                                                        <div className="aspect-video w-full">
-                                                            <iframe
-                                                                src={youtubeUrl}
-                                                                className="w-full h-full rounded"
-                                                                allow="autoplay; encrypted-media"
-                                                                allowFullScreen
-                                                                title="Epilogue Video"
-                                                            />
-                                                        </div>
-                                                    );
-                                                if (isVideoUrl(content))
-                                                    return <video src={content} controls className="w-full rounded" />;
-                                                return (
-                                                    <p className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
-                                                        {content}
-                                                    </p>
-                                                );
-                                            }
-
-                                            if (Array.isArray(content)) {
-                                                const textContent = content
-                                                    .map((item: any) =>
-                                                        typeof item === "object" && item.text ? item.text : String(item)
-                                                    )
-                                                    .join("\n\n");
-                                                return (
-                                                    <p className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap">
-                                                        {textContent}
-                                                    </p>
-                                                );
-                                            }
-
-                                            if (typeof content === "object") {
-                                                if (content.videoUrl) return renderContent(content.videoUrl);
-                                                if (content.text) return renderContent(content.text);
-                                            }
-                                            return <p className="text-gray-500">에필로그 내용을 표시할 수 없습니다.</p>;
-                                        };
-                                        {
-                                            /* ✅ --- 수정 끝 --- */
-                                        }
-
-                                        return renderContent(epi);
-                                    })()}
-                                </div>
-                                <div className="flex justify-end">
-                                    <button className="btn-vintage" onClick={() => setEndingStep("gallery")}>
-                                        추억 액자 보기
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {endingStep === "gallery" && (
-                            <div className="bg-white/95 backdrop-blur-sm rounded-xl border shadow-lg w-full max-w-4xl h-auto max-h-[90vh] flex flex-col p-6">
-                                <h2 className="text-xl font-bold mb-4 text-gray-800">🖼️ 추억 액자</h2>
-                                <div className="flex-1 overflow-y-auto mb-6">
-                                    {(() => {
-                                        const urls = lastUploadedUrls.length > 0 ? lastUploadedUrls : galleryUrls;
-                                        if (!urls || urls.length === 0)
-                                            return (
-                                                <div className="text-sm text-gray-600">업로드된 사진이 없습니다.</div>
-                                            );
-                                        if (urls.length === 2) {
-                                            return (
-                                                <div className="relative min-h-[520px] sm:min-h-[600px] overflow-visible">
-                                                    <div className="absolute top-2 left-2">
-                                                        <div className="bg-[#a5743a] rounded-2xl p-2 shadow-2xl transform rotate-[40deg]">
-                                                            <div className="bg-[#f8f5ef] rounded-xl p-2 border-2 border-[#704a23]">
-                                                                <img
-                                                                    src={urls[0]}
-                                                                    alt={`photo-0`}
-                                                                    className="w-[150px] h-[200px] sm:w-[300px] sm:h-[300px] object-cover rounded-lg"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="absolute bottom-2 right-2">
-                                                        <div className="bg-[#a5743a] rounded-2xl p-2 shadow-2xl transform rotate-[-10deg]">
-                                                            <div className="bg-[#f8f5ef] rounded-xl p-2 border-2 border-[#704a23]">
-                                                                <img
-                                                                    src={urls[1]}
-                                                                    alt={`photo-1`}
-                                                                    className="w-[150px] h-[200px] sm:w-[300px] sm:h-[300px] object-cover rounded-lg"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-                                        return (
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
-                                                {urls.map((u, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="bg-[#a5743a] rounded-2xl p-3 shadow-2xl transform rotate-[-4deg] hover:rotate-0 transition-transform"
-                                                    >
-                                                        <div className="bg-[#f8f5ef] rounded-xl p-3 border-4 border-[#704a23]">
-                                                            <img
-                                                                src={u}
-                                                                alt={`photo-${i}`}
-                                                                className="w-full h-full object-cover rounded aspect-square"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                                <div className="flex justify-end">
-                                    <button className="btn-vintage" onClick={() => setEndingStep("badge")}>
-                                        뱃지 보기
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {endingStep === "badge" && (
-                            <div className="bg-white/95 backdrop-blur-sm rounded-xl border shadow-lg w-full max-w-md h-auto max-h-[90vh] flex flex-col p-6 items-center">
-                                <h2 className="text-xl font-bold mb-4 text-gray-800">🏅 배지 획득</h2>
-                                {badge ? (
-                                    <>
-                                        {badge.image_url && (
-                                            <img
-                                                src={badge.image_url}
-                                                alt={badge.name || "badge"}
-                                                className="w-36 h-36 object-contain my-4"
-                                            />
-                                        )}
-                                        <p className="font-semibold text-lg text-gray-800">
-                                            {badge.name || "새로운 배지"}
-                                        </p>
-                                        {badge.description && (
-                                            <p className="text-sm text-gray-700 mt-2 text-center whitespace-pre-wrap">
-                                                {badge.description}
-                                            </p>
-                                        )}
-                                    </>
-                                ) : (
-                                    <p className="text-gray-600 my-4">획득한 배지가 없습니다.</p>
-                                )}
-                                <div className="mt-8 w-full flex justify-end">
-                                    <button className="btn-vintage" onClick={handleCloseBook}>
-                                        책 덮고 종료
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+    // ✨ 컴포넌트가 모든 경우에 값을 반환하도록 null을 추가했습니다.
+    return null;
 }
 
 export default function Page() {

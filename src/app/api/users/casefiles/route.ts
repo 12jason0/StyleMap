@@ -38,11 +38,38 @@ export async function GET(request: NextRequest) {
                 ...completedEscapes.map((r: any) => Number(r.storyId)).filter((n: number) => Number.isFinite(n)),
             ])
         );
-        const submissions = await prisma.missionSubmission.groupBy({
-            by: ["chapterId"],
-            where: { userId, photoUrl: { not: null }, chapter: { story_id: { in: storyIds } } },
-            _count: { _all: true },
-        });
+        // 1) storyIds에 속하는 장소(챕터) id 목록을 먼저 구함
+        //    스키마에 따라 storyChapter/PlaceOption 중 실제 사용하는 테이블을 선택하세요.
+        const chaptersForStories: Array<{ id: number; storyId: number }> = await (async () => {
+            try {
+                // 우선 placeOption 사용 시도
+                return await (prisma as any).placeOption.findMany({
+                    where: { storyId: { in: storyIds } },
+                    select: { id: true, storyId: true },
+                });
+            } catch {
+                // placeOption이 없으면 storyChapter 사용
+                const list = await (prisma as any).storyChapter.findMany({
+                    where: { story_id: { in: storyIds } },
+                    select: { id: true, story_id: true },
+                });
+                return (list as Array<{ id: number; story_id: number }>).map((c) => ({
+                    id: c.id,
+                    storyId: c.story_id,
+                }));
+            }
+        })();
+
+        const chapterIds = chaptersForStories.map((c) => c.id);
+
+        // 2) 그 chapterId들에 대해 groupBy 실행 (관계 경로 필터링 제거)
+        const submissions = chapterIds.length
+            ? await prisma.missionSubmission.groupBy({
+                  by: ["chapterId"],
+                  where: { userId, photoUrl: { not: null }, chapterId: { in: chapterIds } },
+                  _count: { _all: true },
+              })
+            : [];
         const chapterIdToCount = new Map<number, number>();
         for (const s of submissions) {
             chapterIdToCount.set(
@@ -54,14 +81,11 @@ export async function GET(request: NextRequest) {
         // 챕터 → 스토리 집계는 간단히 스토리 기준으로 카운트 합산
         const photoCountByStory: Record<number, number> = {};
         if (storyIds.length > 0) {
-            const chapters = await prisma.storyChapter.findMany({
-                where: { story_id: { in: storyIds } },
-                select: { id: true, story_id: true },
-            });
-            for (const ch of chapters) {
+            // storyId ↔ chapterId 매핑 재사용
+            for (const ch of chaptersForStories) {
                 const c = chapterIdToCount.get(ch.id) || 0;
-                if (!photoCountByStory[ch.story_id]) photoCountByStory[ch.story_id] = 0;
-                photoCountByStory[ch.story_id] += c;
+                if (!photoCountByStory[ch.storyId]) photoCountByStory[ch.storyId] = 0;
+                photoCountByStory[ch.storyId] += c;
             }
         }
 
