@@ -72,7 +72,7 @@ const questionFlow: Question[] = [
     {
         id: "concept",
         type: "ai",
-        text: "어떤 콘셉트를 원하시나요? 🎯 (여러 코스의 'concept' 칼럼 기준)",
+        text: "어떤 콘셉트를 원하시나요? 🎯",
         options: [
             { text: "힐링", value: "힐링", next: "region" },
             { text: "체험", value: "체험", next: "region" },
@@ -89,7 +89,7 @@ const questionFlow: Question[] = [
     {
         id: "region",
         type: "ai",
-        text: "어느 지역을 선호하시나요? 📍 (코스의 'region' 칼럼 기준)",
+        text: "어느 지역을 선호하시나요? 📍",
         options: [
             { text: "강남/서초", value: "서초", next: "duration" },
             { text: "성수/한남", value: "성수", next: "duration" },
@@ -107,7 +107,7 @@ const questionFlow: Question[] = [
     {
         id: "duration",
         type: "ai",
-        text: "예상 소요 시간은 어느 정도가 좋나요? ⏱️ (코스 'duration' 칼럼 기준)",
+        text: "예상 소요 시간은 어느 정도가 좋나요? ⏱️",
         options: [
             { text: "약 3시간", value: "3", next: "complete" },
             { text: "약 4시간", value: "4", next: "complete" },
@@ -256,10 +256,7 @@ const AIRecommender = () => {
                 }
                 setWeekStamps(stamps);
 
-                const todayStamp = stamps[(day + 6) % 7];
-                if (!todayStamp) {
-                    setAttendanceModalOpen(true);
-                }
+                // 메인 첫 진입에서만 모달을 띄우므로 여기서는 자동 오픈하지 않음
             } catch (error) {
                 console.error("출석 정보 조회 오류:", error);
             }

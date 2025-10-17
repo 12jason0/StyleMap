@@ -3,6 +3,9 @@ import prisma from "@/lib/db";
 import jwt from "jsonwebtoken";
 import { getJwtSecret } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // 요청 바디 타입 정의
 type SubmitMissionBody = {
     userId: number; // 실제 로그인 유저 ID로 대체 필요
@@ -43,7 +46,10 @@ export async function POST(request: NextRequest) {
                     photoUrl: url,
                 })),
             });
-            return NextResponse.json({ success: true, count: created.count });
+            return NextResponse.json(
+                { success: true, count: created.count },
+                { headers: { "Cache-Control": "no-store" } }
+            );
         }
 
         // 텍스트/객관식 정답 등은 textAnswer로 저장
@@ -56,8 +62,11 @@ export async function POST(request: NextRequest) {
             },
         });
 
-        return NextResponse.json({ success: true, data: created });
+        return NextResponse.json({ success: true, data: created }, { headers: { "Cache-Control": "no-store" } });
     } catch (error: any) {
-        return NextResponse.json({ message: error?.message || "저장 실패" }, { status: 500 });
+        return NextResponse.json(
+            { message: error?.message || "저장 실패" },
+            { status: 500, headers: { "Cache-Control": "no-store" } }
+        );
     }
 }

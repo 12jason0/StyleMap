@@ -49,6 +49,7 @@ export default function Home() {
     const [cycleProgress, setCycleProgress] = useState(0); // total%7
     const [todayIndex, setTodayIndex] = useState(0);
     const router = useRouter();
+    const hasShownCheckinModalRef = useRef(false);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -181,6 +182,10 @@ export default function Home() {
         try {
             const token = localStorage.getItem("authToken");
             if (!token) return;
+            const loginTime = localStorage.getItem("loginTime");
+            const shownLoginTime = localStorage.getItem("checkinModalShownLoginTime");
+            if (hasShownCheckinModalRef.current) return;
+            if (loginTime && shownLoginTime === loginTime) return;
             await fetchAndSetWeekStamps();
             const todayKey = new Date().toISOString().slice(0, 10);
             const dismissed = localStorage.getItem("checkinModalDismissedDate");
@@ -190,6 +195,8 @@ export default function Home() {
             if (!alreadyToday && dismissed !== todayKey) {
                 setStampCompleted(false);
                 setShowCheckinModal(true);
+                hasShownCheckinModalRef.current = true;
+                if (loginTime) localStorage.setItem("checkinModalShownLoginTime", loginTime);
             }
         } catch {}
     };

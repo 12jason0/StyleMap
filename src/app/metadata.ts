@@ -10,7 +10,7 @@ export const metadata: Metadata = {
         "AI가 추천하는 서울 데이트 코스, 주말 놀거리, 이색 방탈출 미션. 스타일맵에서 나만의 특별한 탈출 코스를 찾아보세요.",
     keywords: ["데이트", "코스 추천", "방탈출", "탈출", "여행", "지도", "카카오맵", "맛집", "카페", "핫플"],
     verification: {
-        other: { "naver-site-verification": "1ee13408c2d7ca40ef28f4556f288a139cac5b38" },
+        other: { "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1" },
     },
     openGraph: {
         title: "스타일맵 | 데이트 코스 추천 & 이색 방탈출 미션",

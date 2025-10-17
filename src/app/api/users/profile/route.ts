@@ -18,18 +18,32 @@ export async function GET(request: NextRequest) {
                 createdAt: true,
                 mbti: true,
                 age: true,
+                couponCount: true,
             },
         });
         if (!user) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
         return NextResponse.json({
+            // 평탄 구조(호환용)
+            id: user.id,
+            email: user.email,
+            name: user.username,
+            nickname: user.username,
+            profileImage: user.profileImageUrl,
+            createdAt: user.createdAt,
+            mbti: user.mbti,
+            age: user.age,
+            couponCount: user.couponCount ?? 0,
+            // 중첩 구조(신규)
             user: {
                 id: user.id,
                 email: user.email,
                 name: user.username,
+                nickname: user.username,
                 profileImage: user.profileImageUrl,
                 createdAt: user.createdAt,
                 mbti: user.mbti,
                 age: user.age,
+                couponCount: user.couponCount ?? 0,
             },
         });
     } catch (e) {

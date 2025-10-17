@@ -85,6 +85,7 @@ const DialogueFlow = ({
             String(s ?? "")
                 .trim()
                 .toLowerCase();
+
         if (Array.isArray(messages)) {
             const arr = (messages as DialogueMessage[])
                 .map((m) => ({
@@ -93,22 +94,43 @@ const DialogueFlow = ({
                     speaker: m?.speaker,
                 }))
                 .filter((m) => m.text.length > 0);
-            if (arr.length > 0) return arr;
-        } else if (typeof messages === "string") {
+
+            // ✅ 동일한 텍스트 중복 제거
+            const unique = arr.filter((v, i, self) => i === self.findIndex((x) => x.text === v.text));
+            return unique;
+        }
+
+        if (typeof messages === "string") {
             const arr = messages
                 .split(/\n{2,}/)
                 .map((s, i) => ({ text: s.trim(), isUser: i % 2 === 1 }))
                 .filter((m) => m.text.length > 0);
-            if (arr.length > 0) return arr;
+            return arr;
         }
-        // 최후 보정: 전달받은 fallbackParts를 채팅처럼 번갈아 배치
-        if (Array.isArray(fallbackParts) && fallbackParts.length > 0) {
-            return fallbackParts
-                .map((t, i) => ({ text: String(t || "").trim(), isUser: i % 2 === 1 }))
-                .filter((m) => m.text.length > 0);
+
+        // fallbackParts는 messages가 완전히 없을 때만 사용
+        if (!messages && Array.isArray(fallbackParts) && fallbackParts.length > 0) {
+            return fallbackParts.map((t, i) => ({
+                text: String(t || "").trim(),
+                isUser: i % 2 === 1,
+            }));
         }
+
         return [] as Array<{ text: string; isUser: boolean; speaker?: string }>;
     }, [showLetter, messages, fallbackParts]);
+
+    // 줄 단위 표시 및 수동 진행 설정
+    const autoAdvance = false;
+    const flatLetterLines = useMemo(
+        () =>
+            (letterItems || []).flatMap((m) =>
+                String(m?.text || "")
+                    .split(/\n+/)
+                    .filter(Boolean)
+                    .map((line) => ({ text: line, isUser: m.isUser, speaker: (m as any)?.speaker }))
+            ),
+        [letterItems]
+    );
 
     useEffect(() => {
         if (!showLetter) return;
@@ -122,12 +144,12 @@ const DialogueFlow = ({
 
     // 편지 열림 시에는 부모에 통지하지 않음 (닫을 때만 통지)
 
-    // 열림 이후 2초마다 한 줄씩 추가 표시 + 자동 스크롤
+    // 열림 이후 수동/자동 진행 설정 + 자동 스크롤
     useEffect(() => {
         if (!showLetter || !opened) return;
         setVisibleMessageCount(1);
-        const total = letterItems.length;
-        if (total <= 1) return;
+        const total = flatLetterLines.length;
+        if (!autoAdvance || total <= 1) return;
         const id = setInterval(() => {
             setVisibleMessageCount((n) => {
                 const next = Math.min(n + 1, total);
@@ -137,7 +159,7 @@ const DialogueFlow = ({
         }, 2000);
         return () => clearInterval(id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [opened, showLetter, letterItems.length]);
+    }, [opened, showLetter, flatLetterLines.length]);
 
     useEffect(() => {
         try {
@@ -194,7 +216,10 @@ const DialogueFlow = ({
     }
 
     if (showLetter) {
-        const items = letterItems;
+        const items = flatLetterLines;
+        const goNextLine = () => {
+            setVisibleMessageCount((n) => Math.min(n + 1, items.length));
+        };
         return (
             <div className="fixed inset-0 z-[1450] bg-transparent flex items-center justify-center p-6">
                 <div
@@ -218,7 +243,11 @@ const DialogueFlow = ({
                             style={{ maxHeight: opened ? "unset" : 0 }}
                         >
                             <h3 className="text-center text-xl font-semibold text-gray-800 mb-3">비밀 편지</h3>
-                            <div ref={messageListRef} className="max-h-[56vh] overflow-y-auto space-y-3 pr-1">
+                            <div
+                                ref={messageListRef}
+                                className="max-h-[56vh] overflow-y-auto space-y-3 pr-1 pb-3 cursor-pointer"
+                                onClick={goNextLine}
+                            >
                                 {items.slice(0, visibleMessageCount).map((m, i) => {
                                     const identity = String((m as any)?.role || (m as any)?.speaker || "")
                                         .trim()
@@ -226,23 +255,47 @@ const DialogueFlow = ({
                                     const isSystem = identity === "system";
                                     if (isSystem) {
                                         return (
-                                            <div key={i} className="flex justify-center animate-fade-in-up">
+                                            <div
+                                                key={i}
+                                                className={`flex justify-center ${
+                                                    i === visibleMessageCount - 1 ? "animate-fade-in-up" : ""
+                                                }`}
+                                                style={
+                                                    i === visibleMessageCount - 1
+                                                        ? { animationDuration: "700ms" }
+                                                        : undefined
+                                                }
+                                            >
                                                 <div className="px-5 py-2 rounded-full bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-800 text-base shadow-sm font-medium">
-                                                    {m.text}
+                                                    <span className="leading-relaxed">{m.text}</span>
                                                 </div>
                                             </div>
                                         );
                                     }
                                     return (
-                                        <div key={i} className={`flex ${m.isUser ? "justify-end" : "justify-start"}`}>
-                                            <div
-                                                className={`px-4 py-2 rounded-2xl max-w-[80%] shadow ${
-                                                    m.isUser
-                                                        ? "bg-blue-600 text-white"
-                                                        : "bg-white text-gray-900 border"
-                                                }`}
-                                            >
-                                                <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                                        <div
+                                            key={i}
+                                            className={`flex ${m.isUser ? "justify-end" : "justify-start"} ${
+                                                i === visibleMessageCount - 1 ? "animate-fade-in-up" : ""
+                                            }`}
+                                            style={
+                                                i === visibleMessageCount - 1
+                                                    ? { animationDuration: "700ms" }
+                                                    : undefined
+                                            }
+                                        >
+                                            <div className="max-w-[80%]">
+                                                <div
+                                                    className={`px-4 py-2 rounded-2xl shadow border text-left ${
+                                                        m.isUser
+                                                            ? "bg-amber-100 text-stone-900 border-amber-300"
+                                                            : "bg-amber-50 text-stone-900 border-amber-200"
+                                                    }`}
+                                                >
+                                                    <span className="leading-relaxed whitespace-pre-wrap break-words">
+                                                        {m.text}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -283,7 +336,7 @@ const DialogueFlow = ({
         return (
             <div className="fixed inset-0 z-[1400] bg-gradient-to-b from-black/60 to-black/20 backdrop-blur-[2px] flex items-end justify-center p-4 animate-fade-in">
                 <div className="w-full max-w-3xl bg-[#fffef8]/95 rounded-t-2xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.15)] border-t border-amber-100 font-['Gowun_Dodum']">
-                    <div className="max-h-[46vh] overflow-y-auto space-y-4 pr-1">
+                    <div className="max-h-[46vh] overflow-y-auto space-y-4 pr-1 pb-3">
                         {parts.map((t, i) => (
                             <div
                                 key={i}
@@ -294,7 +347,7 @@ const DialogueFlow = ({
                                         i % 2 === 0
                                             ? "bg-[#fffdf7] text-gray-900 border border-amber-200 shadow-sm"
                                             : "bg-gradient-to-b from-amber-500 to-amber-600 text-white shadow-lg"
-                                    } px-5 py-3 rounded-2xl max-w-[80%] leading-relaxed tracking-wide`}
+                                    } px-5 py-3 rounded-2xl max-w-[80%] leading-relaxed tracking-wide whitespace-pre-wrap break-words`}
                                 >
                                     {t}
                                 </div>
@@ -319,10 +372,10 @@ const DialogueFlow = ({
         return (
             <div className="fixed inset-0 z-[1400] bg-black/60 flex items-end justify-center p-4 animate-fade-in">
                 <div className="w-full max-w-3xl bg-white/90 backdrop-blur-md rounded-t-2xl p-4 shadow-lg border-t">
-                    <div className="max-h-[46vh] overflow-y-auto space-y-3 pr-1">
+                    <div className="max-h-[46vh] overflow-y-auto space-y-3 pr-1 pb-3">
                         <div className="flex justify-start">
                             <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl max-w-[80%] shadow">
-                                <p className="whitespace-pre-wrap leading-relaxed">{text}</p>
+                                <p className="whitespace-pre-wrap break-words leading-relaxed">{text}</p>
                             </div>
                         </div>
                     </div>
@@ -357,7 +410,9 @@ const DialogueFlow = ({
                         {currentMessage.speaker === "user" ? "나" : currentMessage.speaker}
                     </p>
                 )}
-                <p className="text-gray-900 text-lg whitespace-pre-wrap min-h-[4em]">{currentMessage.text}</p>
+                <p className="text-gray-900 text-lg whitespace-pre-wrap break-words min-h-[4em]">
+                    {currentMessage.text}
+                </p>
                 <div className="text-right mt-4">
                     <button onClick={handleContinue} className="btn-vintage">
                         {isLastMessage ? "미션 시작" : "계속"}
@@ -401,8 +456,15 @@ function EscapeIntroPageInner() {
     const [endingStep, setEndingStep] = useState<"finalMessage" | "epilogue" | "gallery" | "badge" | null>(null);
     // 대화형 인트로(기존 컴포넌트용) 상태
     const [isDialogueActive, setIsDialogueActive] = useState<boolean>(false);
-    // 편지 닫을 때만 UI를 보이게 하기 위해 초기값 false 유지
-    const [isLetterOpened, setIsLetterOpened] = useState<boolean>(false);
+    // 편지 닫을 때만 UI를 보이게 하기 위해, 로컬스토리지 상태를 우선 반영
+    const [isLetterOpened, setIsLetterOpened] = useState<boolean>(() => {
+        try {
+            const key = `escape_letter_shown_${storyId}`;
+            return localStorage.getItem(key) === "1";
+        } catch {
+            return false;
+        }
+    });
     // 비밀 편지를 이미 본 적이 있는지(스토리별) 영구 플래그
     const [letterEverShown, setLetterEverShown] = useState<boolean>(false);
     const [dialogueStep, setDialogueStep] = useState<number>(0);
@@ -420,6 +482,9 @@ function EscapeIntroPageInner() {
     const [selectedPlaceConfirm, setSelectedPlaceConfirm] = useState<number | null>(null);
     const [missionUnlocked, setMissionUnlocked] = useState<boolean>(false);
     const [answersByMission, setAnswersByMission] = useState<Record<number, string>>({});
+    const [solvedMissionIds, setSolvedMissionIds] = useState<number[]>([]);
+    const [clearedMissions, setClearedMissions] = useState<Record<number, boolean>>({});
+    const [clearedPlaces, setClearedPlaces] = useState<Record<number, boolean>>({});
     const [selectedSolvedMissionId, setSelectedSolvedMissionId] = useState<number | null>(null);
     const [missionModalOpen, setMissionModalOpen] = useState<boolean>(false);
     const [activeMission, setActiveMission] = useState<any | null>(null);
@@ -455,11 +520,13 @@ function EscapeIntroPageInner() {
     const [prologueQueue, setPrologueQueue] = useState<string[]>([]);
     const [inSelectedRange, setInSelectedRange] = useState<boolean>(false);
     const [selectedDistance, setSelectedDistance] = useState<number | null>(null);
+    const [isMoving, setIsMoving] = useState<boolean>(false);
 
     const [photoFiles, setPhotoFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
     const [photoUploaded, setPhotoUploaded] = useState<boolean>(false);
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+    const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
     const [lastUploadedUrls, setLastUploadedUrls] = useState<string[]>([]);
 
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -590,8 +657,8 @@ function EscapeIntroPageInner() {
         (async () => {
             try {
                 const [storyRes, chaptersRes] = await Promise.all([
-                    fetch(`/api/escape/stories?storyId=${storyId}`),
-                    fetch(`/api/escape/chapters?storyId=${storyId}`),
+                    fetch(`/api/escape/stories?storyId=${storyId}`, { cache: "no-store" }),
+                    fetch(`/api/escape/chapters?storyId=${storyId}`, { cache: "no-store" }),
                 ]);
 
                 const storyData = await storyRes.json();
@@ -637,32 +704,24 @@ function EscapeIntroPageInner() {
 
     const currentChapter = chapters[currentChapterIdx];
 
-    const currentPlace = currentChapter
-        ? [
-              {
-                  id: currentChapter.id,
-                  name: currentChapter.location_name || currentChapter.title || "위치",
-                  latitude: Number(currentChapter.latitude ?? 37.5665),
-                  longitude: Number(currentChapter.longitude ?? 126.978),
-                  address: currentChapter.address,
-              },
-              ...(Number.isFinite(Number(selectedOptionIndex)) &&
-              currentChapter.placeOptions &&
-              currentChapter.placeOptions[selectedOptionIndex as number]
-                  ? [
-                        {
-                            id: currentChapter.placeOptions[selectedOptionIndex as number]!.id,
-                            name: currentChapter.placeOptions[selectedOptionIndex as number]!.name,
-                            latitude: Number(currentChapter.placeOptions[selectedOptionIndex as number]!.latitude ?? 0),
-                            longitude: Number(
-                                currentChapter.placeOptions[selectedOptionIndex as number]!.longitude ?? 0
-                            ),
-                            address: currentChapter.placeOptions[selectedOptionIndex as number]!.address,
-                        },
-                    ]
-                  : []),
-          ]
-        : [];
+    // 지도에서는 사용자가 장소를 선택하기 전에는 장소 마커를 표시하지 않습니다.
+    // 장소를 선택한 후에만 해당 장소 1개를 표시하고, 현재 위치와의 경로를 그립니다.
+    const currentPlace = (() => {
+        if (!currentChapter || !Array.isArray(currentChapter.placeOptions)) return [] as any[];
+        const placeList: any[] = currentChapter.placeOptions as any[];
+        const byId = selectedPlaceId ? placeList.find((p: any) => Number(p.id) === Number(selectedPlaceId)) : null;
+        const byIndex = byId || (selectedPlaceIndex != null ? placeList[selectedPlaceIndex as number] : null);
+        if (!byIndex) return [] as any[];
+        return [
+            {
+                id: byIndex.id,
+                name: byIndex.name,
+                latitude: Number(byIndex.latitude ?? 0),
+                longitude: Number(byIndex.longitude ?? 0),
+                address: byIndex.address,
+            },
+        ];
+    })();
 
     const mapPlaces = userLocation
         ? [{ id: -1, name: "현재 위치", latitude: userLocation.lat, longitude: userLocation.lng }, ...currentPlace]
@@ -697,24 +756,34 @@ function EscapeIntroPageInner() {
             .trim()
             .toLowerCase();
 
-    const canProceed = useMemo(() => {
-        if (!currentChapter) return false;
-        const payload = currentChapter.mission_payload || {};
-        const typeUpper = String(currentChapter.mission_type || "").toUpperCase();
-        if (typeUpper === "PUZZLE_ANSWER") return answerChecked === true;
-        if (typeUpper === "PHOTO") return photoUploaded === true;
-        if (Array.isArray(payload?.options) && payload.options.length > 0) {
-            if (selectedOptionIndex === null) return false;
-            const ans: any = payload?.answer;
-            if (ans === undefined || ans === null) return true;
-            if (typeof ans === "number") {
-                if (ans >= 1 && ans <= payload.options.length) return selectedOptionIndex === ans - 1;
-                return selectedOptionIndex === ans;
-            }
-            return normalize(payload.options[selectedOptionIndex]) === normalize(ans);
+    const distanceKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+        try {
+            const R = 6371; // km
+            const toRad = (v: number) => (v * Math.PI) / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLng = toRad(lng2 - lng1);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        } catch {
+            return NaN;
         }
-        return true;
-    }, [currentChapter, puzzleAnswer, selectedOptionIndex, photoUploaded, answerChecked]);
+    };
+
+    const canProceed = useMemo(() => {
+        // 장소 내 미션이 2개 이상 클리어되면 다음 카테고리로 진행 가능
+        return solvedMissionIds.length >= 2;
+    }, [solvedMissionIds.length]);
+
+    // 미션 진행 중 강제 가드: 카테고리/장소 리스트가 다시 보이는 것을 방지
+    const inMission = useMemo(() => Boolean(selectedPlaceId && missionUnlocked), [selectedPlaceId, missionUnlocked]);
+    useEffect(() => {
+        if (inMission && flowStep !== "mission") {
+            setFlowStep("mission");
+        }
+    }, [inMission, flowStep]);
 
     // 배경음 세팅 (선택 사항)
     useEffect(() => {
@@ -829,7 +898,7 @@ function EscapeIntroPageInner() {
 
             const submitResponse = await fetch("/api/submit-mission", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
                 credentials: "include",
                 body: JSON.stringify(submissionPayload),
             });
@@ -848,7 +917,7 @@ function EscapeIntroPageInner() {
 
             const nextIdx = currentChapterIdx + 1;
             if (nextIdx < chapters.length) {
-                // 미션 완료 시: 편지 조각 효과 후 다음 카테고리로
+                // 미션 완료 시: 다음 카테고리로 즉시 전환
                 setPiecesCollected((n) => n + 1);
                 setPendingNextChapterIdx(nextIdx);
                 // 현재 챕터의 카테고리를 완료 목록에 저장
@@ -867,7 +936,17 @@ function EscapeIntroPageInner() {
                         });
                     }
                 } catch {}
-                setFlowStep("pieceAward");
+                // ✅ 상태 초기화 및 다음 카테고리로 즉시 이동
+                setMissionUnlocked(false);
+                setSelectedPlaceId(null);
+                setSelectedPlaceIndex(null);
+                setSelectedPlaceConfirm(null);
+                setClearedMissions({});
+                setSolvedMissionIds([]);
+                setCurrentChapterIdx(nextIdx);
+                setDialogueStep(0);
+                setSelectedCategory(null);
+                setFlowStep("category");
             } else {
                 if (endingFlowStarted) return;
                 setEndingFlowStarted(true);
@@ -917,6 +996,53 @@ function EscapeIntroPageInner() {
             setDialogueStep(0);
             setIsDialogueActive(true);
         }
+    };
+
+    // ✨ 다음 카테고리 선택 화면으로 이동 (서버 제출 없이 UI 전환)
+    const advanceToNextCategory = () => {
+        if (isSubmitting) return;
+
+        try {
+            const firstPlace: any = (currentChapter as any)?.placeOptions?.[0] || null;
+            const categoryKey = normalizeCategory(firstPlace?.category || firstPlace?.type || "");
+            if (categoryKey) {
+                setCompletedCategories((prev) => {
+                    const updated = Array.from(new Set([...(prev || []), categoryKey]));
+                    try {
+                        const raw = localStorage.getItem(STORAGE_KEY);
+                        const obj = raw ? JSON.parse(raw) : {};
+                        obj.__completedCategories = updated;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                    } catch {}
+                    return updated;
+                });
+            }
+        } catch {}
+
+        setPiecesCollected((n) => n + 1);
+
+        const nextIdx = currentChapterIdx + 1;
+        if (nextIdx < chapters.length) {
+            setCurrentChapterIdx(nextIdx);
+        } else {
+            setFlowStep("done");
+            return;
+        }
+
+        setMissionUnlocked(false);
+        setSelectedPlaceId(null);
+        setSelectedPlaceIndex(null);
+        setSelectedPlaceConfirm(null);
+        setClearedMissions({});
+        setSolvedMissionIds([]);
+        setDialogueStep(0);
+        setSelectedCategory(null);
+        setFlowStep("category");
+        try {
+            // 이후에는 편지를 다시 보이지 않도록 플래그 유지
+            localStorage.setItem(`escape_letter_shown_${storyId}`, "1");
+            setIsLetterOpened(true);
+        } catch {}
     };
     // 1️⃣ chapters를 useMemo로 감싸기
     const memoChapters = useMemo(() => chapters, [chapters?.length]);
@@ -1061,7 +1187,8 @@ function EscapeIntroPageInner() {
     const useNewIntroUI = true;
     if (useNewIntroUI) {
         const bgUrl = story?.imageUrl || "https://stylemap-images.s3.ap-southeast-2.amazonaws.com/homepage.png";
-        const letterGateActive = currentChapter?.chapter_number === 1 && !isLetterOpened;
+        // 처음 진입 시에는 편지만 뜨도록, 챕터 번호와 무관하게 '열림 여부'만으로 게이트 판단
+        const letterGateActive = !isLetterOpened;
         return (
             <div className="relative min-h-screen">
                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }} />
@@ -1076,18 +1203,23 @@ function EscapeIntroPageInner() {
                     {/* 편지 닫기 전에는 상단 버튼 등 UI 숨김 */}
                     {!letterGateActive ? (
                         <div className="flex justify-center gap-3 mb-4">
-                            <button
-                                onClick={() => setShowMapModal(true)}
-                                className="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-gray-900 shadow"
-                            >
-                                지도 보기
-                            </button>
-                            <button
-                                onClick={() => setShowIntroModal(true)}
-                                className="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-gray-900 shadow"
-                            >
-                                대화 보기
-                            </button>
+                            {inMission ? (
+                                <button
+                                    onClick={() => setShowMapModal(true)}
+                                    className="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-gray-900 shadow"
+                                >
+                                    지도 보기
+                                </button>
+                            ) : null}
+                            {/* 편지 종료 후, 카테고리 화면에서만 표시 */}
+                            {flowStep === "category" && !inMission && (
+                                <button
+                                    onClick={() => setShowIntroModal(true)}
+                                    className="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-gray-900 shadow"
+                                >
+                                    대화 보기
+                                </button>
+                            )}
                         </div>
                     ) : null}
 
@@ -1098,29 +1230,7 @@ function EscapeIntroPageInner() {
                     >
                         {/* 좌: 대화 영역 */}
                         <div className={`space-y-3 ${letterGateActive ? "hidden" : "block"}`}>
-                            {flowStep === "prologue" && (
-                                <div className="max-h-[46vh] overflow-auto space-y-3">
-                                    {prologueQueue.slice(0, 4).map((line, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="inline-block max-w-[90%] bg-white/85 rounded-2xl px-4 py-3 text-gray-900 shadow"
-                                        >
-                                            {line}
-                                        </div>
-                                    ))}
-                                    <div>
-                                        <button
-                                            className="mt-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                                            onClick={() => {
-                                                if (prologueQueue.length > 1) setPrologueQueue((q) => q.slice(1));
-                                                else setFlowStep("category");
-                                            }}
-                                        >
-                                            {prologueQueue.length > 1 ? "다음" : "카테고리 선택"}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            {/* 초기 대화(프로로그) 섹션은 숨김 처리 */}
 
                             {flowStep === "category" && (
                                 <div
@@ -1161,7 +1271,8 @@ function EscapeIntroPageInner() {
                                                     setSelectedPlaceId(null);
                                                     setInSelectedRange(false);
                                                     setMissionUnlocked(false);
-                                                    setFlowStep("placeList");
+                                                    // 이미 미션 중이면 리스트로 회귀하지 않도록 가드
+                                                    setFlowStep(inMission ? "mission" : "placeList");
                                                 }}
                                                 className="px-4 py-3 rounded-xl bg-white/85 hover:bg-white text-gray-900 shadow"
                                             >
@@ -1172,8 +1283,25 @@ function EscapeIntroPageInner() {
                                 </div>
                             )}
 
-                            {flowStep === "placeList" && selectedCategory && (
+                            {flowStep === "placeList" && selectedCategory && !inMission && (
                                 <div className="space-y-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <button
+                                            onClick={() => {
+                                                // 카테고리 선택 화면으로 복귀
+                                                setSelectedCategory(null);
+                                                setSelectedPlaceId(null);
+                                                setSelectedPlaceIndex(null);
+                                                setSelectedPlaceConfirm(null);
+                                                setMissionUnlocked(false);
+                                                setInSelectedRange(false);
+                                                setFlowStep("category");
+                                            }}
+                                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/85 hover:bg-white text-gray-900 border shadow"
+                                        >
+                                            ← 카테고리로
+                                        </button>
+                                    </div>
                                     {(() => {
                                         const all = ((currentChapter.placeOptions || []) as any[]).slice();
                                         const list = all.filter((p: any) =>
@@ -1188,7 +1316,7 @@ function EscapeIntroPageInner() {
                                                         : "bg-white/85 hover:bg-white border-gray-200"
                                                 }`}
                                                 onClick={() => {
-                                                    // 첫 클릭: 상세(주소/시그니처)만 보여주고 선택 대기
+                                                    // 첫 클릭: 상세(주소/시그니처)만 보여주고 선택 대기 + 현재 거리 계산
                                                     if (selectedPlaceConfirm !== p.id) {
                                                         setSelectedPlaceConfirm(p.id);
                                                         setSelectedPlaceIndex(idx);
@@ -1198,9 +1326,29 @@ function EscapeIntroPageInner() {
                                                         );
                                                         setInSelectedRange(false);
                                                         setMissionUnlocked(false);
+                                                        try {
+                                                            if (
+                                                                userLocation &&
+                                                                Number.isFinite(Number(p.latitude)) &&
+                                                                Number.isFinite(Number(p.longitude))
+                                                            ) {
+                                                                const km = distanceKm(
+                                                                    Number(userLocation.lat),
+                                                                    Number(userLocation.lng),
+                                                                    Number(p.latitude),
+                                                                    Number(p.longitude)
+                                                                );
+                                                                if (Number.isFinite(km)) setSelectedDistance(km);
+                                                                else setSelectedDistance(null);
+                                                            } else {
+                                                                setSelectedDistance(null);
+                                                            }
+                                                        } catch {
+                                                            setSelectedDistance(null);
+                                                        }
                                                         return;
                                                     }
-                                                    // 두번째 클릭: 해당 장소로 확정 → 대화/미션
+                                                    // 두번째 클릭: 해당 장소로 확정 → 이동 화면 → 도착 후 대화/미션
                                                     const lines: Array<{ speaker?: string | null; text: string }> =
                                                         Array.isArray(p.stories) && p.stories.length > 0
                                                             ? p.stories
@@ -1213,17 +1361,22 @@ function EscapeIntroPageInner() {
                                                                   )
                                                             : [];
 
-                                                    // 대사가 없으면 알림(도착 메시지) 대신 바로 미션으로 이동
-                                                    if (lines.length === 0) {
-                                                        setDialogueQueue([]);
-                                                        setMissionUnlocked(true);
-                                                        setFlowStep("mission");
-                                                        return;
-                                                    }
-
-                                                    setDialogueQueue(lines);
-                                                    setFlowStep("dialogue");
-                                                    setMissionUnlocked(true);
+                                                    // 이동 화면 표시 후 상태 전환
+                                                    setIsMoving(true);
+                                                    setTimeout(() => {
+                                                        setIsMoving(false);
+                                                        if (lines.length === 0) {
+                                                            // 대화가 없더라도 바로 미션 목록을 볼 수 있게 활성화
+                                                            setDialogueQueue([]);
+                                                            setMissionUnlocked(true);
+                                                            setFlowStep("mission");
+                                                            return;
+                                                        }
+                                                        // 대화를 먼저 보여주고, 미션은 대화 종료 시점에 활성화
+                                                        setDialogueQueue(lines);
+                                                        setFlowStep("dialogue");
+                                                        setMissionUnlocked(false);
+                                                    }, 1500);
                                                 }}
                                             >
                                                 <div className="font-semibold text-gray-900">{p.name}</div>
@@ -1235,6 +1388,18 @@ function EscapeIntroPageInner() {
                                                         {p.signature && (
                                                             <div className="inline-flex items-center px-2 py-1 rounded-md bg-amber-100 text-amber-800">
                                                                 {p.signature}
+                                                            </div>
+                                                        )}
+                                                        {/* ✅ 거리 표시 추가 */}
+                                                        {selectedDistance != null && (
+                                                            <div className="text-[11px] text-gray-500">
+                                                                📍 현재 위치에서 약{" "}
+                                                                <span className="font-medium text-gray-800">
+                                                                    {selectedDistance < 1
+                                                                        ? `${Math.round(selectedDistance * 1000)}m`
+                                                                        : `${selectedDistance.toFixed(1)}km`}
+                                                                </span>{" "}
+                                                                거리
                                                             </div>
                                                         )}
                                                         <div className="text-[11px] text-gray-500">
@@ -1252,7 +1417,7 @@ function EscapeIntroPageInner() {
                                 </div>
                             )}
 
-                            {flowStep === "dialogue" && (
+                            {flowStep === "dialogue" && !inMission && (
                                 <div
                                     className={`bg-white/85 rounded-xl p-4 border shadow transition-opacity duration-500 ${
                                         flowStep !== "dialogue" ? "opacity-0" : "opacity-100"
@@ -1265,7 +1430,7 @@ function EscapeIntroPageInner() {
                                             </div>
                                         )}
                                         {dialogueQueue.length > 0 ? (
-                                            <div className="text-gray-900 whitespace-pre-wrap">
+                                            <div className="text-gray-900 whitespace-pre-wrap break-words">
                                                 {dialogueQueue[0]?.speaker && (
                                                     <div className="text-sm text-gray-500 mb-1">
                                                         {dialogueQueue[0].speaker}
@@ -1303,27 +1468,47 @@ function EscapeIntroPageInner() {
                                     <button
                                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
                                         onClick={() => {
+                                            try {
+                                                console.log("[PieceAward] click", {
+                                                    currentChapterIdx,
+                                                    chaptersLen: chapters?.length,
+                                                    pendingNextChapterIdx,
+                                                });
+                                            } catch {}
                                             if (piecesCollected >= 4) {
                                                 setEndingFlowStarted(true);
                                                 setEndingStep("finalMessage");
                                                 setFlowStep("done");
                                             } else {
-                                                // 다음 카테고리로 전환: 지도 줌아웃 연출
-                                                setFlowStep("walk");
-                                                const n =
+                                                // 다음 카테고리로 전환
+                                                const nextIndex =
                                                     typeof pendingNextChapterIdx === "number"
                                                         ? pendingNextChapterIdx
+                                                        : currentChapterIdx + 1 < chapters.length
+                                                        ? currentChapterIdx + 1
                                                         : null;
-                                                setTimeout(() => {
-                                                    if (n !== null) {
-                                                        setCurrentChapterIdx(n);
-                                                        setDialogueStep(0);
-                                                        setSelectedCategory(null);
-                                                        setSelectedPlaceIndex(null);
-                                                    }
-                                                    setFlowStep("category");
-                                                    setPendingNextChapterIdx(null);
-                                                }, 1200);
+
+                                                if (nextIndex === null) {
+                                                    setFlowStep("done");
+                                                    return;
+                                                }
+
+                                                // 다음 카테고리 즉시 적용
+                                                setCurrentChapterIdx(nextIndex);
+                                                setDialogueStep(0);
+                                                setSelectedCategory(null);
+                                                setSelectedPlaceIndex(null);
+                                                // ✅ 이전 장소/미션 상태 초기화하여 미션 패널 숨김
+                                                setSelectedPlaceId(null);
+                                                setSelectedPlaceConfirm(null);
+                                                setMissionUnlocked(false);
+                                                setClearedMissions({});
+                                                setSolvedMissionIds([]);
+                                                setFlowStep("category");
+                                                try {
+                                                    console.log("[PieceAward] moved to", { nextIndex });
+                                                } catch {}
+                                                setPendingNextChapterIdx(null);
                                             }
                                         }}
                                     >
@@ -1340,65 +1525,86 @@ function EscapeIntroPageInner() {
                                     flowStep === "walk" || letterGateActive ? "opacity-0" : "opacity-100"
                                 } ${noteOpenAnim && flowStep === "mission" ? "animate-[noteOpen_300ms_ease-out]" : ""}`}
                             >
-                                <h3 className="text-lg font-bold text-gray-800 mb-3">미션</h3>
-                                {/* 모든 미션 목록을 보여주고 사용자가 클릭하면 모달에서 풀이 */}
-                                <div className="space-y-3">
+                                <h3 className="text-lg font-bold text-gray-800 mb-3">스토리 조각</h3>
+                                {/* 모든 미션을 고정 크기 2열 카드로 표시, 클릭 시 모달로 풀이 */}
+                                <div className="grid grid-cols-2 gap-2">
                                     {(() => {
-                                        const missions = getSelectedPlaceMissions();
-                                        return missions.length > 0 ? (
-                                            missions.map((m: any, mi: number) => {
+                                        const placeList = (currentChapter as any)?.placeOptions || [];
+                                        const placeById = selectedPlaceId
+                                            ? placeList.find((p: any) => Number(p.id) === Number(selectedPlaceId))
+                                            : null;
+                                        const placeByIndex =
+                                            placeById ||
+                                            (selectedPlaceIndex != null
+                                                ? placeList[selectedPlaceIndex as number]
+                                                : null);
+                                        const missions: any[] = Array.isArray((placeByIndex as any)?.missions)
+                                            ? (placeByIndex as any).missions
+                                            : [];
+                                        if (missions.length === 0) {
+                                            return (
+                                                <div className="col-span-2 text-base text-gray-900 font-medium text-center">
+                                                    진행 가능한 미션이 없습니다.
+                                                </div>
+                                            );
+                                        }
+
+                                        return missions
+                                            .slice()
+                                            .sort(
+                                                (a: any, b: any) =>
+                                                    Number(a.order || a.missionNumber || 0) -
+                                                    Number(b.order || b.missionNumber || 0)
+                                            )
+                                            .map((m: any, mi: number) => {
                                                 const payload = m?.missionPayload || {};
+                                                const done =
+                                                    !!clearedMissions[Number(m.id)] ||
+                                                    solvedMissionIds.includes(Number(m.id));
                                                 return (
                                                     <button
-                                                        key={mi}
-                                                        className="w-full text-left rounded-lg border p-3 bg-white/95 hover:bg-white"
+                                                        key={m.id ?? mi}
                                                         onClick={() => {
+                                                            // 미션마다 사진/답변 상태를 초기화하여 간섭 방지
+                                                            setPhotoFiles([]);
+                                                            setPhotoPreviewUrl(null);
+                                                            setPhotoPreviewUrls([]);
+                                                            setPhotoUploaded(false);
+                                                            setModalAnswer("");
+                                                            setModalError(null);
                                                             setActiveMission(m);
                                                             setMissionModalOpen(true);
                                                         }}
+                                                        className={`rounded-lg border bg-white/95 hover:bg-white text-left p-3 h-28 overflow-hidden ${
+                                                            done ? "opacity-60" : ""
+                                                        }`}
                                                     >
-                                                        <div className="font-semibold text-gray-800">
-                                                            {payload.question ||
-                                                                payload.description ||
-                                                                `미션 ${mi + 1}`}
+                                                        <div className="font-semibold text-gray-800 mb-1 line-clamp-2">
+                                                            {payload.description ||
+                                                                payload.question ||
+                                                                `스토리 조각 ${mi + 1}`}
                                                         </div>
-                                                        {(() => {
-                                                            const p: any = payload || {};
-                                                            const base = p.hints ?? p.hint;
-                                                            let hints: string[] = [];
-                                                            if (Array.isArray(base)) hints = base.filter(Boolean);
-                                                            else if (typeof base === "string" && base.trim())
-                                                                hints = [base.trim()];
-                                                            else {
-                                                                Object.keys(p || {}).forEach((k) => {
-                                                                    if (/^hint[_-]?\d+$/i.test(k) && p[k])
-                                                                        hints.push(p[k]);
-                                                                });
-                                                            }
-                                                            return hints.length > 0 ? (
-                                                                <div className="text-xs text-gray-500 mt-1">
-                                                                    힌트 {hints.length}개
-                                                                </div>
-                                                            ) : null;
-                                                        })()}
+                                                        {done ? (
+                                                            <div className="text-xs text-emerald-600">✅ 완료됨</div>
+                                                        ) : (
+                                                            <div className="text-xs text-gray-500">클릭하여 진행</div>
+                                                        )}
                                                     </button>
                                                 );
-                                            })
-                                        ) : (
-                                            <div className="text-base text-gray-900 font-medium text-center">
-                                                {currentChapter.mission_payload?.question ||
-                                                    "진행 가능한 미션이 없습니다."}
-                                            </div>
-                                        );
+                                            });
                                     })()}
                                 </div>
                                 <div className="mt-4 flex justify-center">
                                     <button
-                                        onClick={goToNextChapter}
+                                        onClick={advanceToNextCategory}
                                         className="px-4 py-2 rounded-lg bg-green-600 text-white disabled:opacity-50"
                                         disabled={!canProceed || isSubmitting}
                                     >
-                                        {isSubmitting ? "처리 중..." : "미션 완료 →"}
+                                        {isSubmitting
+                                            ? "처리 중..."
+                                            : solvedMissionIds.length >= 2
+                                            ? "다음 카테고리로 →"
+                                            : `스토리 조각 ${Math.max(0, 2 - solvedMissionIds.length)}개 더 완료 필요`}
                                     </button>
                                 </div>
                             </div>
@@ -1407,7 +1613,7 @@ function EscapeIntroPageInner() {
                 </div>
 
                 {/* 기존 대화형 인트로 오버레이 재사용 (유일한 위치에서만 렌더) */}
-                {isDialogueActive && currentChapter && (
+                {isDialogueActive && currentChapter && !inMission && (
                     <DialogueFlow
                         messages={currentChapter.story_text}
                         step={dialogueStep}
@@ -1450,6 +1656,12 @@ function EscapeIntroPageInner() {
                         aria-modal="true"
                     >
                         <div className="bg-white rounded-2xl w-full max-w-md h-[78vh] overflow-hidden relative">
+                            {isMoving && (
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+                                    <div className="text-4xl mb-3">🚗</div>
+                                    <div className="text-gray-800 font-semibold">이동 중...</div>
+                                </div>
+                            )}
                             <div className="absolute top-3 right-3 z-10">
                                 <button
                                     onClick={() => setShowMapModal(false)}
@@ -1498,10 +1710,15 @@ function EscapeIntroPageInner() {
                                 }
                                 return (
                                     <div className="space-y-4">
-                                        <h4 className="text-lg font-bold text-gray-800">미션</h4>
+                                        <h4 className="text-lg font-bold text-gray-800">스토리 조각</h4>
                                         <div className="text-gray-900">
-                                            {payload.question || payload.description || "미션"}
+                                            {payload.description || payload.question || "스토리 조각"}
                                         </div>
+                                        {payload.description && (
+                                            <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                                                {payload.question}
+                                            </div>
+                                        )}
                                         {t === "PUZZLE_ANSWER" && (
                                             <div className="flex items-center gap-2">
                                                 <input
@@ -1544,8 +1761,23 @@ function EscapeIntroPageInner() {
                                                                       )
                                                                       .filter(Boolean)
                                                                 : [];
-                                                            if (placeQueue.length > 0) {
-                                                                setPostStoryQueue(placeQueue);
+                                                            // ✅ 완료 시에는 description을 추가로 보여주지 않음 (요청사항)
+                                                            const queue = placeQueue;
+                                                            // ✅ 완료 미션 집계
+                                                            if (activeMission?.id != null) {
+                                                                setSolvedMissionIds((prev) =>
+                                                                    Array.from(
+                                                                        new Set([...prev, Number(activeMission.id)])
+                                                                    )
+                                                                );
+                                                                setClearedMissions((prev) => ({
+                                                                    ...prev,
+                                                                    [Number(activeMission.id)]: true,
+                                                                }));
+                                                            }
+
+                                                            if (queue.length > 0) {
+                                                                setPostStoryQueue(queue);
                                                                 setPostStoryIdx(0);
                                                                 setShowPostStory(true);
                                                                 return;
@@ -1562,40 +1794,229 @@ function EscapeIntroPageInner() {
                                                 </button>
                                             </div>
                                         )}
+                                        {t === "TEXT" && (
+                                            <div className="space-y-2">
+                                                <textarea
+                                                    value={modalAnswer}
+                                                    onChange={(e) => {
+                                                        setModalAnswer(e.target.value);
+                                                        setModalError(null);
+                                                    }}
+                                                    placeholder="내용을 입력하세요"
+                                                    className="w-full min-h-[90px] px-3 py-2 rounded border text-gray-900"
+                                                />
+                                                <div className="flex justify-end">
+                                                    <button
+                                                        onClick={async () => {
+                                                            const text = (modalAnswer || "").trim();
+                                                            if (!text) {
+                                                                setModalError("내용을 입력해 주세요.");
+                                                                return;
+                                                            }
+                                                            try {
+                                                                // 서버 저장
+                                                                await fetch("/api/submit-mission", {
+                                                                    method: "POST",
+                                                                    headers: { "Content-Type": "application/json" },
+                                                                    credentials: "include",
+                                                                    body: JSON.stringify({
+                                                                        chapterId: currentChapter?.id,
+                                                                        isCorrect: true,
+                                                                        textAnswer: text,
+                                                                    }),
+                                                                });
+
+                                                                setMissionModalOpen(false);
+                                                                // 완료 처리 공통 로직
+                                                                try {
+                                                                    const place = (
+                                                                        currentChapter?.placeOptions || []
+                                                                    ).find(
+                                                                        (p: any) =>
+                                                                            Number(p.id) === Number(selectedPlaceId)
+                                                                    );
+                                                                    const placeQueue: string[] = Array.isArray(
+                                                                        (place as any)?.stories
+                                                                    )
+                                                                        ? (place as any).stories
+                                                                              .map((s: any) =>
+                                                                                  String(
+                                                                                      s?.dialogue ||
+                                                                                          s?.narration ||
+                                                                                          s ||
+                                                                                          ""
+                                                                                  ).trim()
+                                                                              )
+                                                                              .filter(Boolean)
+                                                                        : [];
+                                                                    const queue = placeQueue;
+                                                                    if (activeMission?.id != null) {
+                                                                        setSolvedMissionIds((prev) =>
+                                                                            Array.from(
+                                                                                new Set([
+                                                                                    ...prev,
+                                                                                    Number(activeMission.id),
+                                                                                ])
+                                                                            )
+                                                                        );
+                                                                        setClearedMissions((prev) => ({
+                                                                            ...prev,
+                                                                            [Number(activeMission.id)]: true,
+                                                                        }));
+                                                                    }
+                                                                    if (queue.length > 0) {
+                                                                        setPostStoryQueue(queue);
+                                                                        setPostStoryIdx(0);
+                                                                        setShowPostStory(true);
+                                                                        return;
+                                                                    }
+                                                                } catch {}
+                                                                goToNextChapter();
+                                                            } catch (err) {
+                                                                setModalError("저장 중 오류가 발생했어요.");
+                                                            }
+                                                        }}
+                                                        className="px-3 py-2 rounded text-sm text-white bg-blue-600 hover:bg-blue-700"
+                                                    >
+                                                        제출
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                         {modalError && <div className="text-sm text-red-600">{modalError}</div>}
                                         {t === "PHOTO" && (
-                                            <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white cursor-pointer hover:bg-gray-50">
-                                                <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    multiple
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const files = Array.from(e.target.files || []);
-                                                        if (files.length > 0) {
-                                                            setPhotoFiles(files.slice(0, 5));
-                                                            const url = URL.createObjectURL(files[0]);
-                                                            setPhotoPreviewUrl(url);
-                                                            const enough = files.length >= 2;
-                                                            setPhotoUploaded(enough);
+                                            <div className="flex flex-col gap-2">
+                                                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white cursor-pointer hover:bg-gray-50 w-fit">
+                                                    <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        multiple
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                            const files = Array.from(e.target.files || []);
+                                                            if (files.length > 0) {
+                                                                setPhotoFiles(files.slice(0, 5));
+                                                                try {
+                                                                    const urls = files
+                                                                        .slice(0, 5)
+                                                                        .map((f) => URL.createObjectURL(f));
+                                                                    setPhotoPreviewUrl(urls[0] || null);
+                                                                    setPhotoPreviewUrls(urls);
+                                                                } catch {}
+                                                                const enough = files.length >= 2;
+                                                                // 업로드 표시는 하지 않고, 확인 시 업로드하도록 변경
+                                                                setPhotoUploaded(false);
+                                                                setValidationError(
+                                                                    enough ? "" : "사진 2장을 업로드해 주세요."
+                                                                );
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span>사진 업로드 (2장)</span>
+                                                </label>
+                                                {photoPreviewUrls && photoPreviewUrls.length > 0 && (
+                                                    <div className="flex gap-1">
+                                                        {photoPreviewUrls.map((u, i) => (
+                                                            <div
+                                                                key={i}
+                                                                className="w-16 h-16 rounded-md overflow-hidden border"
+                                                            >
+                                                                <img
+                                                                    src={u}
+                                                                    alt={`미리보기-${i + 1}`}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const files = photoFiles;
+                                                            if (!files || files.length < 2) {
+                                                                setValidationError("사진 2장을 업로드해 주세요.");
+                                                                return;
+                                                            }
+                                                            setToast("사진을 압축하고 있어요...");
+                                                            // 병렬 압축(웹워커) + 품질 최적화로 속도 개선
+                                                            const options = {
+                                                                maxSizeMB: 1.2,
+                                                                maxWidthOrHeight: 1600,
+                                                                useWebWorker: true,
+                                                                initialQuality: 0.8,
+                                                            } as any;
+                                                            const compressedFiles = await Promise.all(
+                                                                files.map((file) => imageCompression(file, options))
+                                                            );
+
+                                                            const formData = new FormData();
+                                                            compressedFiles.forEach((file) =>
+                                                                formData.append("photos", file, file.name)
+                                                            );
+
+                                                            setToast("사진을 업로드하는 중...");
+                                                            const uploadResponse = await fetch("/api/upload", {
+                                                                method: "POST",
+                                                                body: formData,
+                                                                cache: "no-store",
+                                                            });
+                                                            if (!uploadResponse.ok)
+                                                                throw new Error(await uploadResponse.text());
+                                                            const uploadResult = await uploadResponse.json();
+                                                            const urls = Array.isArray(uploadResult.photo_urls)
+                                                                ? uploadResult.photo_urls
+                                                                : [];
+                                                            setLastUploadedUrls(urls);
+                                                            setPhotoUploaded(true);
+
+                                                            // 업로드 성공 처리: 미션 해결 처리 로직 실행
+                                                            setMissionModalOpen(false);
+                                                            const place = (currentChapter?.placeOptions || []).find(
+                                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                                            );
+                                                            const placeQueue: string[] = Array.isArray(
+                                                                (place as any)?.stories
+                                                            )
+                                                                ? (place as any).stories
+                                                                      .map((s: any) =>
+                                                                          String(
+                                                                              s?.dialogue || s?.narration || s || ""
+                                                                          ).trim()
+                                                                      )
+                                                                      .filter(Boolean)
+                                                                : [];
+                                                            // 완료 시에는 description 메시지 생략
+                                                            const queue = placeQueue;
+                                                            if (activeMission?.id != null) {
+                                                                setSolvedMissionIds((prev) =>
+                                                                    Array.from(
+                                                                        new Set([...prev, Number(activeMission.id)])
+                                                                    )
+                                                                );
+                                                                setClearedMissions((prev) => ({
+                                                                    ...prev,
+                                                                    [Number(activeMission.id)]: true,
+                                                                }));
+                                                            }
+                                                            if (queue.length > 0) {
+                                                                setPostStoryQueue(queue);
+                                                                setPostStoryIdx(0);
+                                                                setShowPostStory(true);
+                                                            }
+                                                        } catch (err) {
                                                             setValidationError(
-                                                                enough ? "" : "사진 2장을 업로드해 주세요."
+                                                                "업로드 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."
                                                             );
                                                         }
                                                     }}
-                                                />
-                                                <span>사진 업로드 (2장)</span>
-                                            </label>
-                                        )}
-                                        {hints.length > 0 && modalWrongOnce && (
-                                            <div className="text-sm text-gray-500 space-y-1">
-                                                {hints.map((h, i) => (
-                                                    <div key={i}>
-                                                        힌트{hints.length > 1 ? ` ${i + 1}` : ""}: {h}
-                                                    </div>
-                                                ))}
+                                                    className="px-3 py-2 rounded text-sm text-white bg-blue-600 hover:bg-blue-700"
+                                                >
+                                                    확인
+                                                </button>
                                             </div>
                                         )}
+                                        {/* 힌트 표시 제거 요청에 따라 숨김 */}
                                     </div>
                                 );
                             })()}
@@ -1607,7 +2028,7 @@ function EscapeIntroPageInner() {
                 {showPostStory && postStoryQueue.length > 0 && (
                     <div className="fixed inset-0 z-[1550] bg-black/40 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl w-full max-w-md p-5">
-                            <div className="text-gray-900 whitespace-pre-wrap min-h-[4em]">
+                            <div className="text-gray-900 whitespace-pre-wrap break-words min-h-[4em]">
                                 {postStoryQueue[postStoryIdx]}
                             </div>
                             <div className="text-right mt-4">

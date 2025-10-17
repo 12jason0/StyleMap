@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
     try {
@@ -103,7 +104,9 @@ export async function GET(request: NextRequest) {
                 },
                 imageUrl: representative.imageUrl,
                 placeOptions: list.map((p) => {
-                    const fm = Array.isArray(p.missions) && p.missions.length > 0 ? p.missions[0] : null;
+                    const missions = Array.isArray(p.missions) ? p.missions : [];
+                    // 호환용(첫 미션)
+                    const fm = missions.length > 0 ? missions[0] : null;
                     const mpRaw = fm?.missionPayload as unknown;
                     const mp =
                         mpRaw && typeof mpRaw === "object" && !Array.isArray(mpRaw)
@@ -131,6 +134,25 @@ export async function GET(request: NextRequest) {
                                       narration: s.narration,
                                   }))
                             : [],
+                        // ✅ 모든 미션 배열 제공
+                        missions: missions.map((m: any) => {
+                            const raw = m?.missionPayload as unknown;
+                            const obj =
+                                raw && typeof raw === "object" && !Array.isArray(raw)
+                                    ? (raw as Record<string, any>)
+                                    : {};
+                            return {
+                                id: m.id,
+                                missionType: m.missionType,
+                                missionPayload: {
+                                    ...obj,
+                                    question: m.question ?? obj.question,
+                                    hint: m.hint ?? obj.hint,
+                                    description: m.description ?? obj.description,
+                                },
+                            };
+                        }),
+                        // 구버전 호환 필드(첫 미션)
                         missionId: fm?.id,
                         missionType: fm?.missionType ?? undefined,
                         missionPayload: {
@@ -161,7 +183,7 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json(normalizedChapters, {
             headers: {
-                "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+                "Cache-Control": "no-store",
             },
         });
     } catch (error) {

@@ -146,3 +146,17 @@ body {
 }
 
 /* removed palette override */
+
+@font-face {
+    font-family: "TmoneyRoundWind";
+    src: url("/assets/fonts/TmoneyRoundWindRegular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "TmoneyRoundWind";
+    src: url("/assets/fonts/TmoneyRoundWindExtraBold.ttf") format("truetype");
+    font-weight: 700;
+    font-style: normal;
+}

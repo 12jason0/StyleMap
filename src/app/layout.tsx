@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     title: "StyleMap",
     description: "AI가 추천하는 나만의 여행 코스, 스타일맵",
     verification: {
-        other: { "naver-site-verification": "1ee13408c2d7ca40ef28f4556f288a139cac5b38" },
+        other: { "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1" },
     },
 };
 
