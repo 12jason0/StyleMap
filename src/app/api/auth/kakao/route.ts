@@ -1,3 +1,5 @@
+// src/app/api/auth/kakao/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/db";
@@ -5,6 +7,40 @@ import { getJwtSecret } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+// 1. 이 GET 함수가 로그인 시작을 위해 필요합니다! (추가)
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+export async function GET(request: NextRequest) {
+    const KAKAO_CLIENT_ID = process.env.KAKAO_CLIENT_ID;
+
+    if (!KAKAO_CLIENT_ID) {
+        console.error("KAKAO_CLIENT_ID가 설정되지 않았습니다.");
+        return NextResponse.json({ error: "카카오 로그인 설정이 누락되었습니다." }, { status: 500 });
+    }
+
+    // 현재 요청이 들어온 호스트(도메인)를 확인합니다.
+    const host = request.headers.get("host");
+    // Vercel 배포 환경은 'https', 로컬은 'http'를 사용합니다.
+    const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+
+    // 동적으로 Redirect URI를 생성합니다.
+    // (예: https://stylesmap.com/api/auth/kakao/callback)
+    const KAKAO_REDIRECT_URI = `${protocol}://${host}/api/auth/kakao/callback`;
+
+    // 카카오 인증 URL 생성
+    const encodedRedirectUri = encodeURIComponent(KAKAO_REDIRECT_URI);
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${encodedRedirectUri}&response_type=code`;
+
+    // 생성된 URL로 리디렉션
+    return NextResponse.redirect(kakaoAuthUrl);
+}
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// GET 함수 끝
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+// 2. 이 POST 함수는 원래 있던 코드입니다. (유지)
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 export async function POST(request: NextRequest) {
     console.log("=== 카카오 로그인 API 시작 ===");
     try {
@@ -24,13 +60,25 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "서버 설정 오류: 카카오 클라이언트 ID가 없습니다." }, { status: 500 });
         }
 
-        const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`;
+        // 🚨 중요: POST 함수 내부의 redirectUri도 동적으로 생성해야 합니다!
+        // 이 부분이 GET 함수와 일치하지 않으면 "redirect_uri mismatch" 오류가 발생합니다.
+
+        // 1. 요청 헤더에서 Host를 가져옵니다. (GET 함수와 동일한 로직)
+        // Vercel 환경에서는 request.headers.get('x-forwarded-host')를 우선적으로 확인하는 것이 더 안정적일 수 있습니다.
+        const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
+        const protocol = process.env.NODE_ENV === "production" ? "https" : "http";
+
+        // 2. GET 함수에서 사용한 것과 *똑같은* Redirect URI를 생성합니다.
+        const redirectUri = `${protocol}://${host}/api/auth/kakao/callback`;
+
+        // 3. 기존의 하드코딩된 redirectUri를 대체합니다.
+        // const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/auth/kakao/callback`; // (기존 코드)
 
         const tokenParams = new URLSearchParams({
             grant_type: "authorization_code",
             client_id: kakaoClientId,
             code: code,
-            redirect_uri: redirectUri,
+            redirect_uri: redirectUri, // 👈 동적으로 생성된 redirectUri 사용
         });
         if (process.env.KAKAO_CLIENT_SECRET) {
             tokenParams.append("client_secret", process.env.KAKAO_CLIENT_SECRET);
@@ -79,16 +127,16 @@ export async function POST(request: NextRequest) {
         let couponsAwarded = 0;
 
         // ✅ username 사용
-        const existing = await prisma.user.findFirst({
+        const existing = await (prisma as any).user.findFirst({
             where: { provider: "kakao", socialId },
-            select: { id: true, email: true, username: true, coinBalance: true },
+            select: { id: true, email: true, username: true, couponCount: true },
         });
 
         if (existing) {
             user = existing;
         } else {
             // 새로운 유저 생성 + 코인 10개 지급
-            user = await prisma.user.create({
+            user = await (prisma as any).user.create({
                 data: {
                     email,
                     username: nickname || `user_${socialId}`,
@@ -96,22 +144,22 @@ export async function POST(request: NextRequest) {
                     profileImageUrl,
                     provider: "kakao",
                     createdAt: new Date(),
-                    coinBalance: 10, // ✅ 시작 코인
+                    couponCount: 10,
                 },
-                select: { id: true, email: true, username: true, coinBalance: true },
+                select: { id: true, email: true, username: true, couponCount: true },
             });
 
             // 보상 기록 남기기
-            await prisma.userReward.create({
+            await (prisma as any).userReward.create({
                 data: {
                     userId: user.id,
                     type: "signup",
                     amount: 10,
-                    unit: "coin",
+                    unit: "coupon",
                 },
             });
 
-            message = "카카오 회원가입이 완료되었습니다. 코인 10개가 지급되었습니다.";
+            message = "카카오 회원가입이 완료되었습니다. 쿠폰 10개가 지급되었습니다.";
             isNewUser = true;
             couponsAwarded = 10;
         }
@@ -125,9 +173,9 @@ export async function POST(request: NextRequest) {
             success: true,
             message,
             token,
-            user: { id: user.id, email: user.email, name: user.username, coins: user.coinBalance },
+            user: { id: user.id, email: user.email, name: user.username, coins: (user as any).couponCount ?? 0 },
             newUser: isNewUser,
-            coinsAwarded: couponsAwarded,
+            couponsAwarded: couponsAwarded,
         };
 
         const res = NextResponse.json(responsePayload);
