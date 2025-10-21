@@ -18,11 +18,23 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ message: "storyId가 필요합니다." }, { status: 400 });
         }
 
+        // MissionSubmission.chapterId 는 Chapter 관계가 아니라 PlaceOption.id 를 가리키는 정수입니다.
+        // 따라서 storyId 에 해당하는 PlaceOption 들의 id 집합을 먼저 조회한 뒤 IN 필터로 검색합니다.
+        const placeIds = await prisma.placeOption.findMany({
+            where: { storyId },
+            select: { id: true },
+        });
+        const chapterIds = placeIds.map((p) => p.id);
+
+        if (chapterIds.length === 0) {
+            return NextResponse.json({ success: true, urls: [] });
+        }
+
         const submissions = await prisma.missionSubmission.findMany({
             where: {
                 userId,
                 photoUrl: { not: null },
-                chapter: { story_id: storyId },
+                chapterId: { in: chapterIds },
             },
             orderBy: { createdAt: "asc" },
             select: { photoUrl: true },

@@ -444,6 +444,8 @@ function EscapeIntroPageInner() {
     const STORAGE_KEY = useMemo(() => `escape_progress_${storyId}`, [storyId]);
     const [resumed, setResumed] = useState<boolean>(false);
     const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
+    const [selectedGallery, setSelectedGallery] = useState<string[]>([]);
+    const collageCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isEndFlip, setIsEndFlip] = useState<boolean>(false);
     const [badge, setBadge] = useState<{
         id: number;
@@ -452,6 +454,7 @@ function EscapeIntroPageInner() {
         image_url?: string | null;
     } | null>(null);
     const [endingFlowStarted, setEndingFlowStarted] = useState<boolean>(false);
+    const [endingDialogueStep, setEndingDialogueStep] = useState<number>(0);
     const [toast, setToast] = useState<string | null>(null);
     const [endingStep, setEndingStep] = useState<"finalMessage" | "epilogue" | "gallery" | "badge" | null>(null);
     // 대화형 인트로(기존 컴포넌트용) 상태
@@ -682,6 +685,25 @@ function EscapeIntroPageInner() {
                         .sort((a: any, b: any) => (a.chapter_number || 0) - (b.chapter_number || 0));
                     setChapters(sorted);
                 }
+
+                // DB 기반 완료 카테고리 자동 비활성화 목록 가져오기
+                try {
+                    const cr = await fetch(`/api/escape/completed-categories?storyId=${storyId}`, {
+                        credentials: "include",
+                    });
+                    const cd = await cr.json();
+                    if (cr.ok && Array.isArray(cd?.categories)) {
+                        // 정규화해 저장
+                        const norm = (cd.categories as string[])
+                            .map((s) =>
+                                String(s || "")
+                                    .toLowerCase()
+                                    .replace(/\s+/g, "")
+                            )
+                            .filter(Boolean);
+                        setCompletedCategories(Array.from(new Set(norm)));
+                    }
+                } catch {}
             } catch (error) {
                 console.error("Failed to fetch data:", error);
             } finally {
@@ -703,6 +725,7 @@ function EscapeIntroPageInner() {
     }, []);
 
     const currentChapter = chapters[currentChapterIdx];
+    // 엔딩 라벨 조건 추가했던 보조 상태 제거 (원복)
 
     // 지도에서는 사용자가 장소를 선택하기 전에는 장소 마커를 표시하지 않습니다.
     // 장소를 선택한 후에만 해당 장소 1개를 표시하고, 현재 위치와의 경로를 그립니다.
@@ -773,9 +796,23 @@ function EscapeIntroPageInner() {
     };
 
     const canProceed = useMemo(() => {
-        // 장소 내 미션이 2개 이상 클리어되면 다음 카테고리로 진행 가능
-        return solvedMissionIds.length >= 2;
-    }, [solvedMissionIds.length]);
+        // 선택된 장소의 미션 중 완료된 개수를 기준으로 진행 가능 여부를 판단한다
+        const placeList = (currentChapter as any)?.placeOptions || [];
+        const placeById = selectedPlaceId ? placeList.find((p: any) => Number(p.id) === Number(selectedPlaceId)) : null;
+        const placeByIndex = placeById || (selectedPlaceIndex != null ? placeList[selectedPlaceIndex as number] : null);
+        const missions: any[] = Array.isArray((placeByIndex as any)?.missions) ? (placeByIndex as any).missions : [];
+        const missionIds: number[] =
+            missions.length > 0
+                ? missions.map((m: any) => Number(m.id)).filter(Number.isFinite)
+                : (currentChapter as any)?.id
+                ? [Number((currentChapter as any).id)]
+                : [];
+
+        const clearedCount = missionIds.filter(
+            (mid) => !!clearedMissions[mid] || solvedMissionIds.includes(mid)
+        ).length;
+        return clearedCount >= 2;
+    }, [selectedPlaceId, selectedPlaceIndex, currentChapterIdx, currentChapter, clearedMissions, solvedMissionIds]);
 
     // 미션 진행 중 강제 가드: 카테고리/장소 리스트가 다시 보이는 것을 방지
     const inMission = useMemo(() => Boolean(selectedPlaceId && missionUnlocked), [selectedPlaceId, missionUnlocked]);
@@ -835,6 +872,172 @@ function EscapeIntroPageInner() {
         }
     }, [flowStep]);
 
+    // 엔딩 화면 기본값 보장: done 단계에서 endingStep이 비어 있으면 자동으로 갤러리로 세팅
+    useEffect(() => {
+        if (flowStep === "done" && !endingStep) {
+            setEndingStep("gallery");
+        }
+    }, [flowStep, endingStep]);
+
+    const handleToggleSelectPhoto = (url: string) => {
+        setSelectedGallery((prev) => {
+            if (prev.includes(url)) return prev.filter((u) => u !== url);
+            if (prev.length >= 4) return prev; // 최대 4장
+            return [...prev, url];
+        });
+    };
+
+    const renderCollage = async () => {
+        const urls = selectedGallery.slice(0, 4);
+        if (urls.length !== 4) return;
+        const canvas = collageCanvasRef.current || document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        // DB에서 템플릿 조회 → 실패 시 로컬 기본 템플릿 사용
+        let bgUrl = "/images/hongdaelatter_template.jpg";
+        let framesPercent: Array<{ x: number; y: number; w: number; h: number }> | null = null;
+        try {
+            const res = await fetch("/api/collages/templates", { cache: "no-store" });
+            const data = await res.json();
+            const list = Array.isArray(data?.templates) ? data.templates : [];
+            const t =
+                list.find(
+                    (it: any) =>
+                        String(it?.name || "")
+                            .toLowerCase()
+                            .includes("hongdae") || String(it?.imageUrl || "").includes("hongdaelatter_template")
+                ) || list[0];
+            if (t) {
+                if (t.imageUrl) bgUrl = String(t.imageUrl);
+                if (t.framesJson && Array.isArray(t.framesJson)) framesPercent = t.framesJson as any;
+            }
+        } catch {}
+        const loadImage = (src: string) =>
+            new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+
+        const [bg, ...photos] = await Promise.all([loadImage(bgUrl), ...urls.map(loadImage)]);
+        canvas.width = bg.naturalWidth;
+        canvas.height = bg.naturalHeight;
+        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+        // DB 좌표가 없으면 기본값 사용
+        if (!framesPercent) {
+            framesPercent = [
+                { x: 0.085, y: 0.275, w: 0.355, h: 0.315 },
+                { x: 0.555, y: 0.275, w: 0.355, h: 0.315 },
+                { x: 0.085, y: 0.705, w: 0.355, h: 0.315 },
+                { x: 0.555, y: 0.705, w: 0.355, h: 0.315 },
+            ];
+        }
+        const frames = framesPercent.map((f) => ({
+            x: Math.round(f.x * canvas.width),
+            y: Math.round(f.y * canvas.height),
+            w: Math.round(f.w * canvas.width),
+            h: Math.round(f.h * canvas.height),
+        }));
+        photos.forEach((img, i) => {
+            const f = frames[i];
+            const r = Math.min(img.naturalWidth / f.w, img.naturalHeight / f.h);
+            const sw = f.w * r;
+            const sh = f.h * r;
+            const sx = (img.naturalWidth - sw) / 2;
+            const sy = (img.naturalHeight - sh) / 2;
+            ctx.drawImage(img, sx, sy, sw, sh, f.x, f.y, f.w, f.h);
+        });
+        collageCanvasRef.current = canvas;
+    };
+
+    const handleDownloadCollage = async () => {
+        await renderCollage();
+        const canvas = collageCanvasRef.current;
+        if (!canvas) return;
+        if (canvas.toBlob) {
+            canvas.toBlob(
+                (blob) => {
+                    if (!blob) return;
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "hongdae-secret-letter-collage.jpg";
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                },
+                "image/jpeg",
+                0.92
+            );
+        } else {
+            // 폴백: 일부 구형 브라우저
+            const a = document.createElement("a");
+            a.href = canvas.toDataURL("image/jpeg", 0.92);
+            a.download = "hongdae-secret-letter-collage.jpg";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+    };
+
+    const getCollageBlob = async (): Promise<Blob | null> => {
+        await renderCollage();
+        const canvas = collageCanvasRef.current;
+        if (!canvas) return null;
+        return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92));
+    };
+
+    const handleShareToInstagram = async () => {
+        try {
+            const blob = await getCollageBlob();
+            if (!blob) return;
+            const file = new File([blob], "collage.jpg", { type: "image/jpeg" });
+            const canShareFiles = (navigator as any)?.canShare && (navigator as any).canShare({ files: [file] });
+            if ((navigator as any)?.share && canShareFiles) {
+                await (navigator as any).share({ files: [file], title: story?.title || "Stylemap", text: "#Stylemap" });
+            } else {
+                setToast("브라우저에서 직접 공유가 제한됩니다. 이미지를 다운로드해 인스타 앱에서 업로드해 주세요.");
+                await handleDownloadCollage();
+            }
+        } catch (e) {
+            setToast("공유 중 오류가 발생했습니다.");
+        }
+    };
+
+    const handleSaveToMyPage = async () => {
+        try {
+            const blob = await getCollageBlob();
+            if (!blob) return;
+            const form = new FormData();
+            form.append("files", new File([blob], "collage.jpg", { type: "image/jpeg" }));
+            const up = await fetch("/api/upload", { method: "POST", body: form, credentials: "include" });
+            if (!up.ok) throw new Error(await up.text());
+            const ur = await up.json();
+            const url: string | undefined = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
+            if (!url) throw new Error("업로드 URL 생성 실패");
+            const last = (chapters || [])
+                .slice()
+                .sort((a: any, b: any) => Number(a.chapter_number || 0) - Number(b.chapter_number || 0))
+                .pop();
+            const chapterId = last?.id || currentChapter?.id;
+            if (!chapterId) throw new Error("챕터 정보가 없습니다.");
+            const resp = await fetch("/api/submit-mission", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ chapterId, isCorrect: true, photoUrls: [url] }),
+            });
+            if (!resp.ok) throw new Error(await resp.text());
+            setToast("마이페이지에 저장되었습니다.");
+            setGalleryUrls((prev) => (prev.includes(url) ? prev : [...prev, url]));
+        } catch (e) {
+            setToast("저장 중 오류가 발생했습니다.");
+        }
+    };
+
     const handleCheckAnswer = () => {
         if (!currentChapter) return;
         const payload = currentChapter.mission_payload || {};
@@ -872,38 +1075,174 @@ function EscapeIntroPageInner() {
 
         try {
             const missionType = String(currentChapter.mission_type || "").toUpperCase();
-            let submissionPayload: any = { chapterId: currentChapter.id, isCorrect: true };
+            // chapterId는 placeOption.id(= selectedPlaceId)를 사용해야 엔딩 조회와 정확히 매칭됩니다.
+            let submissionPayload: any = { chapterId: Number(selectedPlaceId ?? currentChapter.id), isCorrect: true };
+            try {
+                console.log("[DEBUG-0] submit start", {
+                    missionType,
+                    canProceed,
+                    isSubmitting,
+                    photoFilesLen: Array.isArray(photoFiles) ? photoFiles.length : null,
+                });
+            } catch {}
 
             if (missionType === "PHOTO") {
                 if (photoFiles.length < 2) throw new Error("사진 2장을 업로드해 주세요.");
 
                 setToast("사진을 압축하고 있어요...");
                 const options = { maxSizeMB: 1.5, maxWidthOrHeight: 1920, useWebWorker: true };
-                const compressedFiles = await Promise.all(photoFiles.map((file) => imageCompression(file, options)));
+                // Blob -> File 변환하여 filename/content-type 누락 방지
+                const compressedFiles = await Promise.all(
+                    photoFiles.map(async (orig, idx) => {
+                        const blob = await imageCompression(orig, options);
+                        const ext = (orig.type?.split("/")[1] || "jpg").toLowerCase();
+                        const safeName = orig.name || `photo_${idx + 1}.${ext}`;
+                        return new File([blob], safeName, { type: "image/jpeg" });
+                    })
+                );
 
                 const formData = new FormData();
-                compressedFiles.forEach((file) => formData.append("photos", file, file.name));
+                compressedFiles.forEach((f) => formData.append("photos", f, f.name));
+                try {
+                    console.log(
+                        "[Upload] files",
+                        compressedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size }))
+                    );
+                    console.log("[photoFiles]", photoFiles);
+                    for (const [key, value] of (formData as any).entries()) {
+                        const v: any = value as any;
+                        console.log("FormData entry:", key, v?.name || v);
+                    }
+                } catch {}
 
                 setToast("사진을 업로드하는 중...");
-                const uploadResponse = await fetch("/api/upload", { method: "POST", body: formData });
+                try {
+                    console.log("[DEBUG-1] Upload start", formData);
+                } catch {}
+                const uploadResponse = await fetch("/api/upload", {
+                    method: "POST",
+                    body: formData,
+                    credentials: "include",
+                    cache: "no-store",
+                });
+                try {
+                    console.log("[DEBUG-2] Upload response status:", uploadResponse.status);
+                } catch {}
 
-                if (!uploadResponse.ok) throw new Error(`업로드 실패: ${await uploadResponse.text()}`);
+                if (!uploadResponse.ok) {
+                    const errText = await uploadResponse.text().catch(() => "(no response)");
+                    throw new Error(`업로드 실패: ${errText}`);
+                }
 
-                const uploadResult = await uploadResponse.json();
-                submissionPayload.photoUrls = uploadResult.photo_urls;
-                if (Array.isArray(uploadResult.photo_urls)) setLastUploadedUrls(uploadResult.photo_urls);
+                // 응답 파싱: JSON 실패 시 raw text로 재시도
+                let uploadResult: any = null;
+                let rawText: string | null = null;
+                try {
+                    uploadResult = await uploadResponse.json();
+                } catch (e) {
+                    try {
+                        rawText = await uploadResponse.text();
+                        uploadResult = JSON.parse(rawText);
+                    } catch {
+                        throw new Error(`업로드 응답 파싱 실패: ${String(rawText || "(empty)").slice(0, 200)}`);
+                    }
+                }
+                try {
+                    console.log("[DEBUG-3] UploadResult:", uploadResult);
+                } catch {}
+                // snake_case 또는 camelCase 모두 지원
+                let urls = (uploadResult as any)?.photo_urls || (uploadResult as any)?.photoUrls;
+                try {
+                    console.log("[urls]", urls);
+                } catch {}
+                if (!urls || urls.length === 0) {
+                    // 업로드 응답 파싱 실패 시 직전 성공값으로 폴백
+                    urls = Array.isArray(lastUploadedUrls) && lastUploadedUrls.length > 0 ? lastUploadedUrls : [];
+                    try {
+                        console.warn("[WARN] urls empty, fallback to lastUploadedUrls:", urls);
+                    } catch {}
+                    if (!urls || urls.length === 0) {
+                        throw new Error("업로드된 사진 URL을 받지 못했습니다.");
+                    }
+                }
+                // ✅ camelCase로 통일하여 서버에 전송
+                submissionPayload.photoUrls = urls;
+                try {
+                    console.log("[DEBUG-4] submissionPayload:", submissionPayload);
+                } catch {}
+                if (Array.isArray(urls)) setLastUploadedUrls(urls);
+
+                // 요청하신 인라인 저장 호출 추가
+                if (urls.length > 0) {
+                    try {
+                        const res = await fetch("/api/submit-mission", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            keepalive: true,
+                            body: JSON.stringify({
+                                chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                isCorrect: true,
+                                photoUrls: urls,
+                            }),
+                        });
+                        try {
+                            console.log("[MissionSubmit] status:", res.status);
+                        } catch {}
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            try {
+                                console.error("[MissionSubmit] failed:", err);
+                            } catch {}
+                        }
+                    } catch (err) {
+                        try {
+                            console.error("[MissionSubmit] network error:", err);
+                        } catch {}
+                        try {
+                            const payload = new Blob(
+                                [
+                                    JSON.stringify({
+                                        chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                        isCorrect: true,
+                                        photoUrls: urls,
+                                    }),
+                                ],
+                                { type: "application/json" }
+                            );
+                            const ok =
+                                (navigator as any)?.sendBeacon &&
+                                (navigator as any).sendBeacon("/api/submit-mission", payload);
+                            if (ok) console.log("[MissionSubmit] sent via sendBeacon");
+                        } catch {}
+                    }
+                }
             } else if (missionType === "PUZZLE_ANSWER") {
                 submissionPayload.textAnswer = puzzleAnswer;
+            } else {
+                try {
+                    console.log("[DEBUG-NON-PHOTO] missionType branch:", missionType);
+                } catch {}
             }
 
+            setToast("미션 결과 저장 중...");
+            try {
+                console.log("[DEBUG-5] Before submit-mission fetch, payload:", submissionPayload);
+            } catch {}
             const submitResponse = await fetch("/api/submit-mission", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
                 credentials: "include",
                 body: JSON.stringify(submissionPayload),
             });
-            const submitResult = await submitResponse.json();
-            if (!submitResponse.ok) throw new Error(submitResult.message || "미션 결과 저장에 실패했습니다.");
+            const submitResult = await submitResponse.json().catch(() => ({}));
+            try {
+                console.log("[DEBUG-6] submit-mission status:", submitResponse.status);
+                console.log("[DEBUG-7] submit-mission result:", submitResult);
+            } catch {}
+            if (!submitResponse.ok) {
+                throw new Error(submitResult?.message || "미션 결과 저장에 실패했습니다.");
+            }
 
             setToast("미션 완료!");
 
@@ -922,8 +1261,11 @@ function EscapeIntroPageInner() {
                 setPendingNextChapterIdx(nextIdx);
                 // 완료 카테고리 반영은 서버 저장 성공 이후(현재 시점)에서만 처리
                 try {
-                    const first = (currentChapter.placeOptions || [])[0] as any;
-                    const catKey = normalizeCategory(first?.category || first?.type || "");
+                    // 선택된 장소의 카테고리를 완료 처리하여 해당 카테고리만 비활성화
+                    const place = (currentChapter?.placeOptions || []).find(
+                        (p: any) => Number(p.id) === Number(selectedPlaceId)
+                    );
+                    const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
                     if (catKey) {
                         setCompletedCategories((prev) => {
                             const next = Array.from(new Set([...(prev || []), catKey]));
@@ -937,13 +1279,11 @@ function EscapeIntroPageInner() {
                         });
                     }
                 } catch {}
-                // ✅ 상태 초기화 및 다음 카테고리로 즉시 이동
+                // ✅ 다음 카테고리로 이동하되, 미션 완료 상태는 유지
                 setMissionUnlocked(false);
                 setSelectedPlaceId(null);
                 setSelectedPlaceIndex(null);
                 setSelectedPlaceConfirm(null);
-                setClearedMissions({});
-                setSolvedMissionIds([]);
                 setCurrentChapterIdx(nextIdx);
                 setDialogueStep(0);
                 setSelectedCategory(null);
@@ -980,10 +1320,6 @@ function EscapeIntroPageInner() {
                             }
                         }
                     } catch {}
-                    // 마지막 카테고리까지 성공적으로 저장된 경우에도 조각 수를 반영
-                    try {
-                        setPiecesCollected((n) => n + 1);
-                    } catch {}
                     setEndingStep("finalMessage");
                 }, 800);
             }
@@ -1007,13 +1343,69 @@ function EscapeIntroPageInner() {
     const advanceToNextCategory = () => {
         if (isSubmitting) return;
 
-        // 완료/조각 증가는 서버 저장 성공 시점(goToNextChapter after submit)에서만 처리
+        try {
+            const firstPlace: any = (currentChapter as any)?.placeOptions?.[0] || null;
+            const categoryKey = normalizeCategory(firstPlace?.category || firstPlace?.type || "");
+            if (categoryKey) {
+                setCompletedCategories((prev) => {
+                    const updated = Array.from(new Set([...(prev || []), categoryKey]));
+                    try {
+                        const raw = localStorage.getItem(STORAGE_KEY);
+                        const obj = raw ? JSON.parse(raw) : {};
+                        obj.__completedCategories = updated;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                    } catch {}
+                    return updated;
+                });
+            }
+        } catch {}
+
+        setPiecesCollected((n) => n + 1);
 
         const nextIdx = currentChapterIdx + 1;
         if (nextIdx < chapters.length) {
             setCurrentChapterIdx(nextIdx);
         } else {
+            // 모든 카테고리를 완료한 경우: 즉시 엔딩 플로우 시작
+            if (endingFlowStarted) {
+                setFlowStep("done");
+                // 이미 시작된 경우라도 엔딩 스텝이 비어 있으면 기본 갤러리로 설정
+                setEndingStep((prev) => (prev ? prev : "gallery"));
+                return;
+            }
+            setEndingFlowStarted(true);
+            setIsEndFlip(true);
             setFlowStep("done");
+            setTimeout(async () => {
+                setIsEndFlip(false);
+                try {
+                    const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, {
+                        credentials: "include",
+                    });
+                    const data = await res.json();
+                    if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
+                } catch {}
+                try {
+                    const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
+                    const bd = await br.json();
+                    if (br.ok && bd?.badge) {
+                        setBadge(bd.badge);
+                        if (bd.badge.id) {
+                            const token = localStorage.getItem("authToken");
+                            await fetch("/api/users/badges", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                                },
+                                credentials: "include",
+                                body: JSON.stringify({ badgeId: bd.badge.id }),
+                            });
+                        }
+                    }
+                } catch {}
+                setEndingStep("gallery");
+            }, 800);
             return;
         }
 
@@ -1112,22 +1504,7 @@ function EscapeIntroPageInner() {
                 if (nextChapterIndex !== -1) setCurrentChapterIdx(nextChapterIndex);
             }
 
-            // 저장된 완료 카테고리 복원 (있으면 우선 사용)
-            if (Array.isArray(obj.__completedCategories) && obj.__completedCategories.length > 0) {
-                setCompletedCategories(
-                    Array.from(new Set(obj.__completedCategories.map((s: any) => String(s || "").trim())))
-                );
-            } else if (completedNumbers.length > 0) {
-                // 완료된 챕터 번호 기반으로 카테고리 추론하여 설정
-                const cats: string[] = [];
-                completedNumbers.forEach((num) => {
-                    const ch = chapters.find((c) => c.chapter_number === num);
-                    const first = (ch?.placeOptions || [])[0] as any;
-                    const key = normalizeCategory(first?.category || first?.type || "");
-                    if (key && !cats.includes(key)) cats.push(key);
-                });
-                setCompletedCategories(cats);
-            }
+            // 초기 진입에서는 완료 카테고리를 복원하지 않는다. (미션 완료 시점에만 세팅)
         } catch {}
         setResumed(true);
     }, [chapters, STORAGE_KEY, resumed]);
@@ -1237,49 +1614,36 @@ function EscapeIntroPageInner() {
                                                 } as Record<string, string>
                                             )[k] || k);
                                         const base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
-                                        return base.map((cat) => {
-                                            const disabled = completedCategories.includes(cat.key);
-                                            return (
-                                                <button
-                                                    key={cat.key}
-                                                    onClick={() => {
-                                                        if (disabled) return;
-                                                        setSelectedCategory(cat.key);
-                                                        // 카테고리에 해당하는 챕터로 이동 (카테고리-챕터 정합성 보장)
-                                                        try {
-                                                            const targetIdx = chapters.findIndex((ch: any) => {
-                                                                const first = (ch?.placeOptions || [])[0];
-                                                                const chCat = normalizeCategory(
-                                                                    first?.category || first?.type || ""
-                                                                );
-                                                                return chCat === cat.key;
-                                                            });
-                                                            if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
-                                                        } catch {}
-                                                        setSelectedPlaceId(null);
-                                                        setInSelectedRange(false);
-                                                        setMissionUnlocked(false);
-                                                        // 이미 미션 중이면 리스트로 회귀하지 않도록 가드
-                                                        setFlowStep(inMission ? "mission" : "placeList");
-                                                    }}
-                                                    disabled={disabled}
-                                                    className={`px-4 py-3 rounded-xl text-gray-900 shadow ${
-                                                        disabled
-                                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                                            : "bg-white/85 hover:bg-white"
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{cat.label}</span>
-                                                        {disabled && (
-                                                            <span className="ml-1 text-xs text-emerald-600">
-                                                                완료됨
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        });
+                                        let cats = base.filter((c) => !completedCategories.includes(c.key));
+                                        // 모두 숨겨지면(=선택할 게 없으면) 필터링을 해제하여 보여줌
+                                        if (cats.length === 0) cats = base;
+                                        return cats.map((cat) => (
+                                            <button
+                                                key={cat.key}
+                                                onClick={() => {
+                                                    setSelectedCategory(cat.key);
+                                                    // 카테고리에 해당하는 챕터로 이동 (카테고리-챕터 정합성 보장)
+                                                    try {
+                                                        const targetIdx = chapters.findIndex((ch: any) => {
+                                                            const first = (ch?.placeOptions || [])[0];
+                                                            const chCat = normalizeCategory(
+                                                                first?.category || first?.type || ""
+                                                            );
+                                                            return chCat === cat.key;
+                                                        });
+                                                        if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
+                                                    } catch {}
+                                                    setSelectedPlaceId(null);
+                                                    setInSelectedRange(false);
+                                                    setMissionUnlocked(false);
+                                                    // 이미 미션 중이면 리스트로 회귀하지 않도록 가드
+                                                    setFlowStep(inMission ? "mission" : "placeList");
+                                                }}
+                                                className="px-4 py-3 rounded-xl bg-white/85 hover:bg-white text-gray-900 shadow"
+                                            >
+                                                {cat.label}
+                                            </button>
+                                        ));
                                     })()}
                                 </div>
                             )}
@@ -1478,8 +1842,26 @@ function EscapeIntroPageInner() {
                                             } catch {}
                                             if (piecesCollected >= 4) {
                                                 setEndingFlowStarted(true);
-                                                setEndingStep("finalMessage");
                                                 setFlowStep("done");
+                                                // 엔딩 데이터 fetch 보강 + 약간의 지연으로 렌더 안정화
+                                                setTimeout(async () => {
+                                                    try {
+                                                        const res = await fetch(
+                                                            `/api/escape/submissions?storyId=${storyId}`,
+                                                            {
+                                                                credentials: "include",
+                                                            }
+                                                        );
+                                                        const data = await res.json();
+                                                        if (res.ok && Array.isArray(data?.urls))
+                                                            setGalleryUrls(data.urls);
+                                                    } catch (err) {
+                                                        try {
+                                                            console.warn("엔딩 갤러리 데이터 로드 실패:", err);
+                                                        } catch {}
+                                                    }
+                                                    setEndingStep("gallery");
+                                                }, 300);
                                             } else {
                                                 // 다음 카테고리로 전환
                                                 const nextIndex =
@@ -1499,12 +1881,10 @@ function EscapeIntroPageInner() {
                                                 setDialogueStep(0);
                                                 setSelectedCategory(null);
                                                 setSelectedPlaceIndex(null);
-                                                // ✅ 이전 장소/미션 상태 초기화하여 미션 패널 숨김
+                                                // ✅ 다음 카테고리로 이동하되, 미션 완료 상태는 유지
                                                 setSelectedPlaceId(null);
                                                 setSelectedPlaceConfirm(null);
                                                 setMissionUnlocked(false);
-                                                setClearedMissions({});
-                                                setSolvedMissionIds([]);
                                                 setFlowStep("category");
                                                 try {
                                                     console.log("[PieceAward] moved to", { nextIndex });
@@ -1519,8 +1899,68 @@ function EscapeIntroPageInner() {
                             )}
                         </div>
 
-                        {/* 우: 미션 카드 - 지금은 선택 확정 즉시 표시 */}
-                        {selectedPlaceId && missionUnlocked ? (
+                        {/* 우: 미션/엔딩 갤러리 */}
+                        {endingStep === "gallery" && flowStep === "done" ? (
+                            <div className="rounded-2xl bg-white/85 backdrop-blur p-4 border shadow">
+                                <h3 className="text-lg font-bold text-gray-800 mb-3">엔딩 갤러리 (최대 4장 선택)</h3>
+                                {galleryUrls.length === 0 ? (
+                                    <div className="text-gray-600">표시할 사진이 없습니다.</div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-2 mb-3">
+                                        {galleryUrls.map((url) => {
+                                            const sel = selectedGallery.includes(url);
+                                            return (
+                                                <button
+                                                    key={url}
+                                                    onClick={() => handleToggleSelectPhoto(url)}
+                                                    className={`relative rounded overflow-hidden border ${
+                                                        sel ? "ring-2 ring-amber-500" : ""
+                                                    }`}
+                                                >
+                                                    <img src={url} alt="photo" className="w-full h-24 object-cover" />
+                                                    {sel && (
+                                                        <span className="absolute top-1 right-1 text-xs bg-amber-600 text-white px-1 rounded">
+                                                            선택됨
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleDownloadCollage}
+                                        disabled={selectedGallery.length !== 4}
+                                        className="px-4 py-2 rounded-lg bg-amber-600 text-white disabled:opacity-50"
+                                    >
+                                        콜라주 이미지 다운로드
+                                    </button>
+                                    <button
+                                        onClick={() => setEndingStep("badge")}
+                                        disabled={selectedGallery.length !== 4}
+                                        className="px-4 py-2 rounded-lg bg-black text-white disabled:opacity-50"
+                                    >
+                                        콜라주 확정 → 배지로
+                                    </button>
+                                    <button
+                                        onClick={handleShareToInstagram}
+                                        disabled={selectedGallery.length !== 4}
+                                        className="px-4 py-2 rounded-lg bg-pink-600 text-white disabled:opacity-50"
+                                    >
+                                        인스타 스토리 올리기
+                                    </button>
+                                    <button
+                                        onClick={handleSaveToMyPage}
+                                        disabled={selectedGallery.length !== 4}
+                                        className="px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50"
+                                    >
+                                        마이페이지에 저장
+                                    </button>
+                                    <span className="text-xs text-gray-600">4장을 선택하면 다운로드할 수 있어요.</span>
+                                </div>
+                            </div>
+                        ) : selectedPlaceId && missionUnlocked ? (
                             <div
                                 className={`rounded-2xl bg-white/85 backdrop-blur p-4 border shadow transition-opacity duration-500 ${
                                     flowStep === "walk" || letterGateActive ? "opacity-0" : "opacity-100"
@@ -1604,7 +2044,9 @@ function EscapeIntroPageInner() {
                                         {isSubmitting
                                             ? "처리 중..."
                                             : solvedMissionIds.length >= 2
-                                            ? "다음 카테고리로 →"
+                                            ? currentChapterIdx + 1 >= chapters.length
+                                                ? "엔딩 보기"
+                                                : "다음 카테고리로 →"
                                             : `스토리 조각 ${Math.max(0, 2 - solvedMissionIds.length)}개 더 완료 필요`}
                                     </button>
                                 </div>
@@ -1777,6 +2219,39 @@ function EscapeIntroPageInner() {
                                                                 }));
                                                             }
 
+                                                            // ✅ 완료된 장소의 카테고리를 비활성화 목록에 반영
+                                                            try {
+                                                                const catKey = normalizeCategory(
+                                                                    (place as any)?.category ||
+                                                                        (place as any)?.type ||
+                                                                        ""
+                                                                );
+                                                                if (catKey) {
+                                                                    setCompletedCategories((prev) => {
+                                                                        const next = Array.from(
+                                                                            new Set([...(prev || []), catKey])
+                                                                        );
+                                                                        const raw = localStorage.getItem(STORAGE_KEY);
+                                                                        const obj = raw ? JSON.parse(raw) : {};
+                                                                        obj.__completedCategories = next;
+                                                                        localStorage.setItem(
+                                                                            STORAGE_KEY,
+                                                                            JSON.stringify(obj)
+                                                                        );
+                                                                        return next;
+                                                                    });
+                                                                }
+                                                            } catch {}
+
+                                                            // ✅ 편지 게이트가 다시 열리지 않도록 강제 고정
+                                                            try {
+                                                                localStorage.setItem(
+                                                                    `escape_letter_shown_${storyId}`,
+                                                                    "1"
+                                                                );
+                                                                setIsLetterOpened(true);
+                                                            } catch {}
+
                                                             if (queue.length > 0) {
                                                                 setPostStoryQueue(queue);
                                                                 setPostStoryIdx(0);
@@ -1785,6 +2260,7 @@ function EscapeIntroPageInner() {
                                                             }
                                                         } catch {}
                                                         // 장소 스토리가 없으면 기존 흐름으로 바로 진행
+                                                        alert("goToNextChapter click");
                                                         goToNextChapter();
                                                     }}
                                                     className={`px-3 py-2 rounded text-sm text-white ${
@@ -1821,7 +2297,9 @@ function EscapeIntroPageInner() {
                                                                     headers: { "Content-Type": "application/json" },
                                                                     credentials: "include",
                                                                     body: JSON.stringify({
-                                                                        chapterId: currentChapter?.id,
+                                                                        chapterId: Number(
+                                                                            selectedPlaceId ?? currentChapter?.id
+                                                                        ),
                                                                         isCorrect: true,
                                                                         textAnswer: text,
                                                                     }),
@@ -1865,6 +2343,39 @@ function EscapeIntroPageInner() {
                                                                             [Number(activeMission.id)]: true,
                                                                         }));
                                                                     }
+                                                                    // ✅ 완료된 장소의 카테고리를 비활성화 목록에 반영
+                                                                    try {
+                                                                        const catKey = normalizeCategory(
+                                                                            (place as any)?.category ||
+                                                                                (place as any)?.type ||
+                                                                                ""
+                                                                        );
+                                                                        if (catKey) {
+                                                                            setCompletedCategories((prev) => {
+                                                                                const next = Array.from(
+                                                                                    new Set([...(prev || []), catKey])
+                                                                                );
+                                                                                const raw =
+                                                                                    localStorage.getItem(STORAGE_KEY);
+                                                                                const obj = raw ? JSON.parse(raw) : {};
+                                                                                obj.__completedCategories = next;
+                                                                                localStorage.setItem(
+                                                                                    STORAGE_KEY,
+                                                                                    JSON.stringify(obj)
+                                                                                );
+                                                                                return next;
+                                                                            });
+                                                                        }
+                                                                    } catch {}
+
+                                                                    // ✅ 편지 게이트가 다시 열리지 않도록 강제 고정
+                                                                    try {
+                                                                        localStorage.setItem(
+                                                                            `escape_letter_shown_${storyId}`,
+                                                                            "1"
+                                                                        );
+                                                                        setIsLetterOpened(true);
+                                                                    } catch {}
                                                                     if (queue.length > 0) {
                                                                         setPostStoryQueue(queue);
                                                                         setPostStoryIdx(0);
