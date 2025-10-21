@@ -920,18 +920,19 @@ function EscapeIntroPageInner() {
                 // 미션 완료 시: 다음 카테고리로 즉시 전환
                 setPiecesCollected((n) => n + 1);
                 setPendingNextChapterIdx(nextIdx);
-                // 현재 챕터의 카테고리를 완료 목록에 저장
+                // 완료 카테고리 반영은 서버 저장 성공 이후(현재 시점)에서만 처리
                 try {
                     const first = (currentChapter.placeOptions || [])[0] as any;
                     const catKey = normalizeCategory(first?.category || first?.type || "");
                     if (catKey) {
                         setCompletedCategories((prev) => {
                             const next = Array.from(new Set([...(prev || []), catKey]));
-                            // 로컬스토리지에도 함께 저장
-                            const raw = localStorage.getItem(STORAGE_KEY);
-                            const obj = raw ? JSON.parse(raw) : {};
-                            obj.__completedCategories = next;
-                            localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                            try {
+                                const raw = localStorage.getItem(STORAGE_KEY);
+                                const obj = raw ? JSON.parse(raw) : {};
+                                obj.__completedCategories = next;
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                            } catch {}
                             return next;
                         });
                     }
@@ -979,6 +980,10 @@ function EscapeIntroPageInner() {
                             }
                         }
                     } catch {}
+                    // 마지막 카테고리까지 성공적으로 저장된 경우에도 조각 수를 반영
+                    try {
+                        setPiecesCollected((n) => n + 1);
+                    } catch {}
                     setEndingStep("finalMessage");
                 }, 800);
             }
@@ -1002,24 +1007,7 @@ function EscapeIntroPageInner() {
     const advanceToNextCategory = () => {
         if (isSubmitting) return;
 
-        try {
-            const firstPlace: any = (currentChapter as any)?.placeOptions?.[0] || null;
-            const categoryKey = normalizeCategory(firstPlace?.category || firstPlace?.type || "");
-            if (categoryKey) {
-                setCompletedCategories((prev) => {
-                    const updated = Array.from(new Set([...(prev || []), categoryKey]));
-                    try {
-                        const raw = localStorage.getItem(STORAGE_KEY);
-                        const obj = raw ? JSON.parse(raw) : {};
-                        obj.__completedCategories = updated;
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-                    } catch {}
-                    return updated;
-                });
-            }
-        } catch {}
-
-        setPiecesCollected((n) => n + 1);
+        // 완료/조각 증가는 서버 저장 성공 시점(goToNextChapter after submit)에서만 처리
 
         const nextIdx = currentChapterIdx + 1;
         if (nextIdx < chapters.length) {
@@ -1249,36 +1237,49 @@ function EscapeIntroPageInner() {
                                                 } as Record<string, string>
                                             )[k] || k);
                                         const base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
-                                        let cats = base.filter((c) => !completedCategories.includes(c.key));
-                                        // 모두 숨겨지면(=선택할 게 없으면) 필터링을 해제하여 보여줌
-                                        if (cats.length === 0) cats = base;
-                                        return cats.map((cat) => (
-                                            <button
-                                                key={cat.key}
-                                                onClick={() => {
-                                                    setSelectedCategory(cat.key);
-                                                    // 카테고리에 해당하는 챕터로 이동 (카테고리-챕터 정합성 보장)
-                                                    try {
-                                                        const targetIdx = chapters.findIndex((ch: any) => {
-                                                            const first = (ch?.placeOptions || [])[0];
-                                                            const chCat = normalizeCategory(
-                                                                first?.category || first?.type || ""
-                                                            );
-                                                            return chCat === cat.key;
-                                                        });
-                                                        if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
-                                                    } catch {}
-                                                    setSelectedPlaceId(null);
-                                                    setInSelectedRange(false);
-                                                    setMissionUnlocked(false);
-                                                    // 이미 미션 중이면 리스트로 회귀하지 않도록 가드
-                                                    setFlowStep(inMission ? "mission" : "placeList");
-                                                }}
-                                                className="px-4 py-3 rounded-xl bg-white/85 hover:bg-white text-gray-900 shadow"
-                                            >
-                                                {cat.label}
-                                            </button>
-                                        ));
+                                        return base.map((cat) => {
+                                            const disabled = completedCategories.includes(cat.key);
+                                            return (
+                                                <button
+                                                    key={cat.key}
+                                                    onClick={() => {
+                                                        if (disabled) return;
+                                                        setSelectedCategory(cat.key);
+                                                        // 카테고리에 해당하는 챕터로 이동 (카테고리-챕터 정합성 보장)
+                                                        try {
+                                                            const targetIdx = chapters.findIndex((ch: any) => {
+                                                                const first = (ch?.placeOptions || [])[0];
+                                                                const chCat = normalizeCategory(
+                                                                    first?.category || first?.type || ""
+                                                                );
+                                                                return chCat === cat.key;
+                                                            });
+                                                            if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
+                                                        } catch {}
+                                                        setSelectedPlaceId(null);
+                                                        setInSelectedRange(false);
+                                                        setMissionUnlocked(false);
+                                                        // 이미 미션 중이면 리스트로 회귀하지 않도록 가드
+                                                        setFlowStep(inMission ? "mission" : "placeList");
+                                                    }}
+                                                    disabled={disabled}
+                                                    className={`px-4 py-3 rounded-xl text-gray-900 shadow ${
+                                                        disabled
+                                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                            : "bg-white/85 hover:bg-white"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{cat.label}</span>
+                                                        {disabled && (
+                                                            <span className="ml-1 text-xs text-emerald-600">
+                                                                완료됨
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        });
                                     })()}
                                 </div>
                             )}
