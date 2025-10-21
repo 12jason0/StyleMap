@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/db";
 import jwt from "jsonwebtoken";
-import { getJwtSecret } from "@/lib/auth";
+import { getJwtSecret, resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,24 +17,44 @@ type SubmitMissionBody = {
 
 export async function POST(request: NextRequest) {
     try {
-        const body = (await request.json()) as SubmitMissionBody;
+        const body = (await request.json()) as any;
+        console.log("[/api/submit-mission] incoming", {
+            chapterId: body?.chapterId,
+            hasPhotos: Array.isArray(body?.photoUrls) || Array.isArray(body?.photo_urls),
+            photosLen: Array.isArray(body?.photoUrls)
+                ? body?.photoUrls?.length
+                : Array.isArray(body?.photo_urls)
+                ? body?.photo_urls?.length
+                : null,
+            isCorrect: body?.isCorrect,
+        });
 
-        // 인증 쿠키에서 userId 추출 (서버에서 강제 주입)
-        const token = request.cookies.get("auth")?.value;
-        if (!token) {
+        // 통합 인증: Authorization 헤더 또는 auth 쿠키 허용
+        let resolvedUserId = resolveUserId(request);
+        if (!resolvedUserId) {
+            // 구버전 호환: auth 쿠키 직접 파싱
+            const token = request.cookies.get("auth")?.value;
+            if (token) {
+                try {
+                    const payload = jwt.verify(token, getJwtSecret()) as { userId?: number | string };
+                    if (payload?.userId) resolvedUserId = Number(payload.userId);
+                } catch {}
+            }
+        }
+        if (!Number.isFinite(Number(resolvedUserId))) {
             return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
         }
-        const payload = jwt.verify(token, getJwtSecret()) as { userId?: number | string };
-        const resolvedUserId = payload?.userId ? Number(payload.userId) : NaN;
-        if (!Number.isFinite(resolvedUserId)) {
-            return NextResponse.json({ message: "유효하지 않은 사용자입니다." }, { status: 401 });
-        }
+        resolvedUserId = Number(resolvedUserId);
 
         if (!body?.chapterId) {
             return NextResponse.json({ message: "chapterId가 필요합니다." }, { status: 400 });
         }
 
-        const { chapterId, isCorrect = false, textAnswer, photoUrls } = body;
+        const photoUrls: string[] | undefined = body?.photoUrls || body?.photo_urls;
+        const { chapterId, isCorrect = false, textAnswer } = body as SubmitMissionBody;
+        if (!Number.isFinite(Number(chapterId))) {
+            return NextResponse.json({ message: "유효하지 않은 chapterId" }, { status: 400 });
+        }
 
         // PHOTO 미션: URL 배열 각각을 별도 레코드로 저장
         if (Array.isArray(photoUrls) && photoUrls.length > 0) {
@@ -46,10 +66,8 @@ export async function POST(request: NextRequest) {
                     photoUrl: url,
                 })),
             });
-            return NextResponse.json(
-                { success: true, count: created.count },
-                { headers: { "Cache-Control": "no-store" } }
-            );
+            console.log("[/api/submit-mission] photo createMany count=", created.count);
+            return NextResponse.json({ success: true, type: "photo", count: created.count });
         }
 
         // 텍스트/객관식 정답 등은 textAnswer로 저장
@@ -61,12 +79,10 @@ export async function POST(request: NextRequest) {
                 textAnswer: textAnswer ?? null,
             },
         });
-
-        return NextResponse.json({ success: true, data: created }, { headers: { "Cache-Control": "no-store" } });
+        console.log("[/api/submit-mission] text create id=", created.id);
+        return NextResponse.json({ success: true, type: "text", id: created.id });
     } catch (error: any) {
-        return NextResponse.json(
-            { message: error?.message || "저장 실패" },
-            { status: 500, headers: { "Cache-Control": "no-store" } }
-        );
+        console.error("[/api/submit-mission] ERROR", error);
+        return NextResponse.json({ message: error?.message || "저장 실패" }, { status: 500 });
     }
 }

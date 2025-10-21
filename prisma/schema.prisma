@@ -39,6 +39,7 @@ model User {
   userPreference     UserPreference?
   rewards            UserReward[]
   userStoryProgress  UserStoryProgress[]
+  UserCollage        UserCollage[]
 
   @@index([provider, socialId])
   @@map("users")
@@ -175,6 +176,7 @@ model Story {
   placeDialogues         PlaceDialogue[]
   reward_badge           Badge?              @relation(fields: [reward_badge_id], references: [id])
   userstoryprogress      UserStoryProgress[]
+  CollageTemplate        CollageTemplate[]
 
   @@map("stories")
 }
@@ -234,6 +236,35 @@ model PlaceStory {
   narration   String?
   nextTrigger String?
   place       PlaceOption @relation(fields: [placeId], references: [id])
+}
+
+model UserCollage {
+  id           Int              @id @default(autoincrement())
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int
+  storyId      Int?
+  template     CollageTemplate? @relation(fields: [templateId], references: [id])
+  templateId   Int?
+  collageUrl   String           @map("collage_url")
+  thumbnailUrl String?          @map("thumbnail_url")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  @@map("user_collages")
+}
+
+model CollageTemplate {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(50)
+  imageUrl    String?       @map("image_url")
+  framesJson  Json?         @map("frames_json")
+  isPublic    Boolean       @default(true) @map("is_public")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  userCollage UserCollage[]
+  storyId     Int? // Story의 id를 실제 참조
+  story       Story?        @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@map("collage_templates")
 }
 
 model Badge {

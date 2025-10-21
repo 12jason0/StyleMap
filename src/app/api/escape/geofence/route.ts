@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
         // If a specific place option is provided, check only that
         if (placeOptionId && Number.isFinite(placeOptionId)) {
-            const opt = await (prisma as any).placeOption.findUnique({ where: { id: placeOptionId } });
+            const opt = await prisma.placeOption.findUnique({ where: { id: placeOptionId } });
             if (opt?.latitude != null && opt?.longitude != null) {
                 const d = haversineMeters(lat, lng, Number(opt.latitude), Number(opt.longitude));
                 const inRange = d <= RADIUS;
@@ -61,16 +61,20 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Fetch story station and chapters
-        const [story, chapters] = await Promise.all([
+        // Fetch story station and place options (with coordinates)
+        const [story, options] = await Promise.all([
             prisma.story.findUnique({ where: { id: storyId } }),
-            prisma.storyChapter.findMany({
-                where: { story_id: storyId, latitude: { not: null }, longitude: { not: null } },
-                select: { id: true, latitude: true, longitude: true, chapter_number: true },
+            prisma.placeOption.findMany({
+                where: { storyId: storyId, latitude: { not: null }, longitude: { not: null } },
+                select: { id: true, latitude: true, longitude: true },
             }),
         ]);
 
-        let nearest = { type: "none" as "none" | "station" | "chapter", id: null as number | null, distance: Infinity };
+        let nearest = {
+            type: "none" as "none" | "station" | "placeOption",
+            id: null as number | null,
+            distance: Infinity,
+        };
 
         const stationLat = (story as any)?.stationLat ?? (story as any)?.stationlat ?? null;
         const stationLng = (story as any)?.stationLng ?? (story as any)?.stationlng ?? null;
@@ -79,9 +83,9 @@ export async function POST(request: NextRequest) {
             if (d < nearest.distance) nearest = { type: "station", id: null, distance: d };
         }
 
-        for (const ch of chapters) {
-            const d = haversineMeters(lat, lng, Number(ch.latitude), Number(ch.longitude));
-            if (d < nearest.distance) nearest = { type: "chapter", id: ch.id, distance: d };
+        for (const opt of options) {
+            const d = haversineMeters(lat, lng, Number(opt.latitude), Number(opt.longitude));
+            if (d < nearest.distance) nearest = { type: "placeOption", id: opt.id, distance: d };
         }
 
         const inRange = nearest.distance <= RADIUS;
