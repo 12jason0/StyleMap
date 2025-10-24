@@ -20,7 +20,7 @@ export class SimpleTTLCache {
     }
 
     get<T>(key: string): T | undefined {
-        const entry = this.store.get(key) as CacheEntry<T> | undefined;
+        const entry = this.store.get(key) as CacheEntry<T> | undefined; 
         if (!entry) return undefined;
         if (entry.expiresAt <= Date.now()) {
             this.store.delete(key);

@@ -308,6 +308,21 @@ const MyPage = () => {
         setCasePhotoLoading(true);
         try {
             const token = localStorage.getItem("authToken");
+            // 1) 콜라주가 있으면 우선 표시
+            const resCollages = await fetch(`/api/collages?storyId=${storyId}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            });
+            if (resCollages.ok) {
+                const data = await resCollages.json();
+                const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+                const urls = items.map((it) => String(it?.thumbnailUrl || it?.collageUrl || "")).filter(Boolean);
+                if (urls.length > 0) {
+                    setCasePhotoUrls(urls);
+                    return;
+                }
+            }
+
+            // 2) 폴백: 미션 제출 사진을 표시
             const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             });

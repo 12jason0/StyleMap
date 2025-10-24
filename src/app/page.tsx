@@ -51,6 +51,14 @@ export default function Home() {
     const router = useRouter();
     const hasShownCheckinModalRef = useRef(false);
 
+    const getLocalTodayKey = () => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    };
+
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
@@ -148,33 +156,36 @@ export default function Home() {
     }, []);
 
     // 주차 계산 및 출석 데이터 조회 (7칸 사이클 표현으로 단순화)
-    const fetchAndSetWeekStamps = async () => {
+    const fetchAndSetWeekStamps = async (): Promise<{ stamps: boolean[]; todayChecked: boolean } | null> => {
         try {
             const token = localStorage.getItem("authToken");
-            if (!token) return null as boolean[] | null;
+            if (!token) return null;
             const res = await fetch("/api/users/checkins", {
                 cache: "no-store",
                 headers: { Authorization: `Bearer ${token}` },
             });
-            if (!res.ok) return null as boolean[] | null;
+            if (!res.ok) return null;
             const data = await res.json();
-            const stamps: boolean[] = Array.isArray(data?.weekStamps)
+            // 서버에서 내려오는 도장 배열이 중간 인덱스부터 채워질 수 있어, 개수 기준으로 1번부터 연속 채움
+            const rawStamps: boolean[] | undefined = Array.isArray(data?.weekStamps)
                 ? (data.weekStamps as boolean[])
-                : (() => {
-                      const list: { date: string }[] = data?.checkins || [];
-                      const total = list.length || 0;
-                      const remainder = total % 7;
-                      return new Array(7).fill(false).map((_, i) => i < remainder);
-                  })();
-            const already = Boolean(data?.todayChecked);
+                : undefined;
+            const filledCount: number = (() => {
+                if (Array.isArray(rawStamps)) return rawStamps.filter(Boolean).length;
+                const list: { date: string }[] = data?.checkins || [];
+                const total = list.length || 0;
+                return total % 7;
+            })();
+            const stamps: boolean[] = new Array(7).fill(false).map((_, i) => i < filledCount);
+            const todayChecked = Boolean(data?.todayChecked);
 
             // 상태 반영
             setWeekStamps(stamps);
             setCycleProgress((stamps.filter(Boolean).length % 7) as number);
-            setAlreadyToday(already);
-            return stamps;
+            setAlreadyToday(todayChecked);
+            return { stamps, todayChecked };
         } catch {
-            return null as boolean[] | null;
+            return null;
         }
     };
 
@@ -182,21 +193,23 @@ export default function Home() {
         try {
             const token = localStorage.getItem("authToken");
             if (!token) return;
-            const loginTime = localStorage.getItem("loginTime");
-            const shownLoginTime = localStorage.getItem("checkinModalShownLoginTime");
-            if (hasShownCheckinModalRef.current) return;
-            if (loginTime && shownLoginTime === loginTime) return;
-            await fetchAndSetWeekStamps();
-            const todayKey = new Date().toISOString().slice(0, 10);
-            const dismissed = localStorage.getItem("checkinModalDismissedDate");
+
+            const todayKey = getLocalTodayKey();
+            const shownDateAtStart = localStorage.getItem("checkinModalShownDate");
+            if (hasShownCheckinModalRef.current && shownDateAtStart === todayKey) return;
+
+            const result = await fetchAndSetWeekStamps();
+            const already = Boolean(result?.todayChecked);
+            const shownDate = localStorage.getItem("checkinModalShownDate");
+            const dismissedDate = localStorage.getItem("checkinModalDismissedDate");
             setAnimStamps(null);
 
-            // 오늘 이미 출석했으면 모달을 띄우지 않음. 아직 미출석인 경우에만 표시
-            if (!alreadyToday && dismissed !== todayKey) {
+            // 오늘 이미 출석했으면 모달을 띄우지 않음. 아직 미출석이면서 오늘 아직 노출/해제 이력이 없을 때만 표시
+            if (!already && shownDate !== todayKey && dismissedDate !== todayKey) {
                 setStampCompleted(false);
                 setShowCheckinModal(true);
                 hasShownCheckinModalRef.current = true;
-                if (loginTime) localStorage.setItem("checkinModalShownLoginTime", loginTime);
+                localStorage.setItem("checkinModalShownDate", todayKey);
             }
         } catch {}
     };
@@ -481,7 +494,11 @@ export default function Home() {
                             {!stampCompleted && !alreadyToday ? (
                                 <>
                                     <button
-                                        onClick={() => setShowCheckinModal(false)}
+                                        onClick={() => {
+                                            const todayKey = getLocalTodayKey();
+                                            localStorage.setItem("checkinModalDismissedDate", todayKey);
+                                            setShowCheckinModal(false);
+                                        }}
                                         className="px-4 py-2 border rounded-lg text-gray-700"
                                     >
                                         나중에
@@ -549,7 +566,7 @@ export default function Home() {
                                 <button
                                     onClick={() => {
                                         // 오늘 확인했음을 기록하여 같은 날 재등장 방지
-                                        const todayKey = new Date().toISOString().slice(0, 10);
+                                        const todayKey = getLocalTodayKey();
                                         localStorage.setItem("checkinModalDismissedDate", todayKey);
                                         setShowCheckinModal(false);
                                         setAnimStamps(null);

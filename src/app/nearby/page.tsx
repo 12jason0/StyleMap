@@ -158,7 +158,7 @@ export default function NearbyPage() {
                             >
                                 초기화
                             </button>
-                        </div>
+                        </div>  
 
                         {loading ? (
                             <div className="p-8 text-center text-gray-500">불러오는 중...</div>

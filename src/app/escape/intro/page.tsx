@@ -1,9 +1,67 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import FrameRenderer from "@/components/FrameRenderer";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamicImport from "next/dynamic";
 import imageCompression from "browser-image-compression";
+function EpilogueFromDB({
+    storyId,
+    step,
+    onNext,
+    onComplete,
+}: {
+    storyId: number;
+    step: number;
+    onNext: () => void;
+    onComplete: () => void;
+}) {
+    const [lines, setLines] = React.useState<string[] | null>(null);
+    const [dialogues, setDialogues] = React.useState<DialogueMessage[] | null>(null);
+    React.useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const res = await fetch(`/api/escape/outro?storyId=${storyId}`, { cache: "no-store" });
+                const data = await res.json();
+                if (!alive) return;
+                const arr = Array.isArray(data?.messages)
+                    ? (data.messages as any[]).map((m) => ({
+                          speaker: String(m?.speaker || ""),
+                          role: String(m?.role || ""),
+                          text: String(m?.text || ""),
+                      }))
+                    : [];
+                if (arr.length > 0) {
+                    setDialogues(arr as any);
+                } else {
+                    setLines(["오늘의 편지를 잘 전했어요.", "이제 앨범에서 추억을 골라 템플릿를 완성해 볼까요?"]);
+                }
+            } catch {
+                if (!alive) return;
+                setLines(["오늘의 편지를 잘 전했어요.", "이제 앨범에서 추억을 골라 템플릿를 완성해 볼까요?"]);
+            }
+        })();
+        return () => {
+            alive = false;
+        };
+    }, [storyId]);
+
+    if (!lines && !dialogues) return null;
+    return (
+        <DialogueFlow
+            messages={
+                dialogues && dialogues.length
+                    ? (dialogues as any)
+                    : (lines || []).map((t) => ({ text: t, speaker: "narrator" } as any))
+            }
+            step={step}
+            onNext={onNext}
+            onComplete={onComplete}
+            letterMode
+        />
+    );
+}
 
 // --- 타입 정의 ---
 type DialogueMessage = {
@@ -242,7 +300,7 @@ const DialogueFlow = ({
                             } overflow-hidden flex-1 min-h-0`}
                             style={{ maxHeight: opened ? "unset" : 0 }}
                         >
-                            <h3 className="text-center text-xl font-semibold text-gray-800 mb-3">비밀 편지</h3>
+                            {/* 제목 제거: 디자인 요구사항 */}
                             <div
                                 ref={messageListRef}
                                 className="max-h-[56vh] overflow-y-auto space-y-3 pr-1 pb-3 cursor-pointer"
@@ -445,6 +503,8 @@ function EscapeIntroPageInner() {
     const [resumed, setResumed] = useState<boolean>(false);
     const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
     const [selectedGallery, setSelectedGallery] = useState<string[]>([]);
+    // 사진 자리 교체를 위한 첫 번째 선택
+    const [swapFrom, setSwapFrom] = useState<string | null>(null);
     const collageCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isEndFlip, setIsEndFlip] = useState<boolean>(false);
     const [badge, setBadge] = useState<{
@@ -499,6 +559,7 @@ function EscapeIntroPageInner() {
     const [showPostStory, setShowPostStory] = useState<boolean>(false);
     const [postStoryQueue, setPostStoryQueue] = useState<string[]>([]);
     const [postStoryIdx, setPostStoryIdx] = useState<number>(0);
+    const [galleryPage, setGalleryPage] = useState<number>(0);
 
     const normalizeAnswer = (v: any): string =>
         String(v ?? "")
@@ -531,6 +592,151 @@ function EscapeIntroPageInner() {
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
     const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
     const [lastUploadedUrls, setLastUploadedUrls] = useState<string[]>([]);
+
+    // 콜라주 미리보기
+    const [showCollagePreview, setShowCollagePreview] = useState<boolean>(false);
+    const [collagePreviewUrl, setCollagePreviewUrl] = useState<string | null>(null);
+    // FrameRenderer 기반 미리보기용 템플릿(배경/프레임 좌표)
+    const [framePreviewTemplate, setFramePreviewTemplate] = useState<
+        import("@/components/FrameRenderer").FrameTemplate | null
+    >(null);
+
+    // 미리보기: 기준 컨테이너(w-full flex-1 ... ) 크기 기준으로 배치
+    const previewRootRef = useRef<HTMLDivElement | null>(null);
+    const frameImageRef = useRef<HTMLImageElement | null>(null);
+    const [previewDims, setPreviewDims] = useState<{
+        iw: number;
+        ih: number;
+        offsetX: number;
+        offsetY: number;
+        baseW: number;
+        baseH: number;
+    }>({ iw: 0, ih: 0, offsetX: 0, offsetY: 0, baseW: 0, baseH: 0 });
+
+    useEffect(() => {
+        if (!showCollagePreview) return;
+        const rootEl = previewRootRef.current;
+        const imgEl = frameImageRef.current;
+        if (!rootEl || !imgEl) return;
+        const calc = () => {
+            const base = rootEl.getBoundingClientRect();
+            const bw = base.width;
+            const bh = base.height;
+            const BASE_W = imgEl.naturalWidth || 1080;
+            const BASE_H = imgEl.naturalHeight || 1920;
+            const scale = Math.min(bw / BASE_W, bh / BASE_H);
+            const iw = Math.round(BASE_W * scale);
+            const ih = Math.round(BASE_H * scale);
+            const offsetX = (bw - iw) / 2;
+            const offsetY = (bh - ih) / 2;
+            setPreviewDims({ iw, ih, offsetX, offsetY, baseW: BASE_W, baseH: BASE_H });
+        };
+        if (imgEl.complete) calc();
+        else imgEl.addEventListener("load", calc);
+        window.addEventListener("resize", calc);
+        return () => {
+            try {
+                imgEl.removeEventListener("load", calc);
+            } catch {}
+            window.removeEventListener("resize", calc);
+        };
+    }, [showCollagePreview, framePreviewTemplate]);
+
+    const renderedPreviewPhotos = useMemo(() => {
+        const { iw, ih, offsetX, offsetY, baseW, baseH } = previewDims;
+        if (iw === 0 || ih === 0) return null;
+        const BASE_W = baseW || 1080;
+        const BASE_H = baseH || 1920;
+        const paddingRatio = 0.08;
+        const raw = (framePreviewTemplate as any)?.framesJson || (framePreviewTemplate as any)?.frames_json || [];
+        const frames = Array.isArray(raw) ? raw : [];
+        const urls = selectedGallery.slice(0, 4);
+        const sx = iw / BASE_W;
+        const sy = ih / BASE_H;
+        return frames.slice(0, urls.length).map((f: any, i: number) => {
+            const isPercent = f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1;
+            const px = isPercent
+                ? { x: f.x * BASE_W, y: f.y * BASE_H, w: f.w * BASE_W, h: f.h * BASE_H }
+                : { x: f.x, y: f.y, w: f.w, h: f.h };
+            const pad = Math.round(Math.min(px.w, px.h) * paddingRatio);
+            const left = offsetX + (px.x + pad) * sx;
+            const top = offsetY + (px.y + pad) * sy;
+            const width = Math.max(0, (px.w - pad * 2) * sx);
+            const height = Math.max(0, (px.h - pad * 2) * sy);
+            return (
+                <img
+                    key={i}
+                    alt={`photo-${i + 1}`}
+                    src={urls[i]}
+                    style={{
+                        position: "absolute",
+                        left,
+                        top,
+                        width,
+                        height,
+                        objectFit: "cover",
+                        zIndex: 2,
+                        borderRadius: 4,
+                    }}
+                />
+            );
+        });
+    }, [previewDims, framePreviewTemplate, selectedGallery]);
+
+    // --- 미리보기 측정 모드 (contentBounds 추출용) ---
+    const [measureMode, setMeasureMode] = useState<boolean>(false);
+    const [measurePoints, setMeasurePoints] = useState<Array<{ x: number; y: number }>>([]);
+    const measureOverlay = useMemo(() => {
+        const { iw, ih, offsetX, offsetY, baseW, baseH } = previewDims;
+        if (measurePoints.length < 2 || iw === 0 || ih === 0) return null;
+        const [p1, p2] = measurePoints;
+        const x = Math.min(p1.x, p2.x);
+        const y = Math.min(p1.y, p2.y);
+        const w = Math.abs(p1.x - p2.x);
+        const h = Math.abs(p1.y - p2.y);
+        const left = ((x + offsetX) / (offsetX * 2 + iw)) * 100; // percent within preview root
+        const top = ((y + offsetY) / (offsetY * 2 + ih)) * 100;
+        const width = (w / (offsetX * 2 + iw)) * 100;
+        const height = (h / (offsetY * 2 + ih)) * 100;
+        return { left, top, width, height };
+    }, [measurePoints, previewDims]);
+
+    const handleMeasureClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!measureMode) return;
+        const root = previewRootRef.current;
+        const { iw, ih, offsetX, offsetY, baseW, baseH } = previewDims;
+        if (!root || iw === 0 || ih === 0) return;
+        const rect = root.getBoundingClientRect();
+        const cx = e.clientX - rect.left - offsetX;
+        const cy = e.clientY - rect.top - offsetY;
+        const sx = iw / (baseW || 1080);
+        const sy = ih / (baseH || 1920);
+        const bx = Math.max(0, Math.min(baseW || 1080, Math.round(cx / sx)));
+        const by = Math.max(0, Math.min(baseH || 1920, Math.round(cy / sy)));
+        setMeasurePoints((prev) => {
+            const next = [...prev, { x: bx, y: by }].slice(-2);
+            if (next.length === 2) {
+                const [p1, p2] = next;
+                const x = Math.min(p1.x, p2.x);
+                const y = Math.min(p1.y, p2.y);
+                const w = Math.abs(p1.x - p2.x);
+                const h = Math.abs(p1.y - p2.y);
+                const bw = baseW || 1080;
+                const bh = baseH || 1920;
+                const percent = {
+                    x: +(x / bw).toFixed(4),
+                    y: +(y / bh).toFixed(4),
+                    w: +(w / bw).toFixed(4),
+                    h: +(h / bh).toFixed(4),
+                };
+                // eslint-disable-next-line no-console
+                console.log("content_bounds (px):", { x, y, w, h });
+                // eslint-disable-next-line no-console
+                console.log("content_bounds (percent):", percent);
+            }
+            return next;
+        });
+    };
 
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     useEffect(() => {
@@ -631,6 +837,76 @@ function EscapeIntroPageInner() {
     const [isMobile, setIsMobile] = useState<boolean>(false);
     const [showMapModal, setShowMapModal] = useState<boolean>(false);
     const [showIntroModal, setShowIntroModal] = useState<boolean>(false);
+    // 엔딩 시작 중복 클릭 방지
+    const endingStartedRef = useRef<boolean>(false);
+
+    // 스토리 전체 완료 여부(로컬 진행 기준)
+    const isAllChaptersCompleted = useMemo(() => {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            const obj = raw ? JSON.parse(raw) : {};
+            const nums = (chapters || [])
+                .map((c: any) => Number(c?.chapter_number || 0))
+                .filter((n) => Number.isFinite(n) && n > 0);
+            if (nums.length === 0) return false;
+            return nums.every((n) => Boolean(obj[String(n)]?.completed));
+        } catch {
+            return false;
+        }
+    }, [chapters?.length, currentChapterIdx, piecesCollected, flowStep]);
+
+    // 모든 카테고리의 미션을 다 클리어했는지 판단 (카테고리 기반)
+    // availableCategoryKeys는 아래에서 계산되므로 의존성만 받아 쓰도록 지연 선언을 사용할 수 없어서,
+    // 함수 형태로 계산해 바로 아래 useMemo에 전달합니다.
+    const computeAllCategoriesCleared = (keys: string[]) => {
+        if (!keys || keys.length === 0) return false;
+        const s = new Set((completedCategories || []).map((k) => String(k)));
+        return keys.every((k) => s.has(String(k)));
+    };
+
+    // 엔딩 플로우 시작 헬퍼
+    const startEndingFlow = async () => {
+        if (endingStartedRef.current) return;
+        endingStartedRef.current = true;
+        setEndingFlowStarted(true);
+        setFlowStep("done");
+        setEndingStep("epilogue");
+        try {
+            setMissionModalOpen(false);
+            setActiveMission(null);
+        } catch {}
+        try {
+            setShowPostStory(false);
+            setPostStoryQueue([]);
+            setPostStoryIdx(0);
+        } catch {}
+        try {
+            setIsDialogueActive(false);
+            setEndingDialogueStep(0);
+            setIsLetterOpened(true);
+            setLetterEverShown(true);
+            setMissionUnlocked(false);
+            setSelectedPlaceId(null);
+            setSelectedPlaceIndex(null);
+            setSelectedPlaceConfirm(null);
+            setShowMapModal(false);
+            setInSelectedRange(false);
+        } catch {}
+        try {
+            const [subResult, badgeResult] = await Promise.allSettled([
+                fetch(`/api/escape/submissions?storyId=${storyId}`, { credentials: "include" }),
+                fetch(`/api/escape/badge?storyId=${storyId}`),
+            ]);
+            if (subResult.status === "fulfilled" && subResult.value?.ok) {
+                const data = await subResult.value.json();
+                if (Array.isArray(data?.urls)) setGalleryUrls(data.urls);
+            }
+            if (badgeResult.status === "fulfilled" && badgeResult.value?.ok) {
+                const bd = await badgeResult.value.json();
+                if (bd?.badge) setBadge(bd.badge);
+            }
+        } catch {}
+    };
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -643,10 +919,13 @@ function EscapeIntroPageInner() {
 
     useEffect(() => {
         if (typeof document !== "undefined") {
-            const originalOverflow = document.body.style.overflow;
+            const originalBodyOverflow = document.body.style.overflow;
+            const originalHtmlOverflow = document.documentElement.style.overflow;
             document.body.style.overflow = "hidden";
+            document.documentElement.style.overflow = "hidden";
             return () => {
-                document.body.style.overflow = originalOverflow;
+                document.body.style.overflow = originalBodyOverflow;
+                document.documentElement.style.overflow = originalHtmlOverflow;
             };
         }
     }, []);
@@ -817,6 +1096,7 @@ function EscapeIntroPageInner() {
     // 미션 진행 중 강제 가드: 카테고리/장소 리스트가 다시 보이는 것을 방지
     const inMission = useMemo(() => Boolean(selectedPlaceId && missionUnlocked), [selectedPlaceId, missionUnlocked]);
     useEffect(() => {
+        if (flowStep === "done") return; // 엔딩 중에는 단계 고정
         if (inMission && flowStep !== "mission") {
             setFlowStep("mission");
         }
@@ -872,12 +1152,12 @@ function EscapeIntroPageInner() {
         }
     }, [flowStep]);
 
-    // 엔딩 화면 기본값 보장: done 단계에서 endingStep이 비어 있으면 자동으로 갤러리로 세팅
+    // 엔딩 화면 기본값 보장: done 단계에서 endingStep이 비어 있고, 별도 플로우 시작 표시가 없을 때만 갤러리로 세팅
     useEffect(() => {
-        if (flowStep === "done" && !endingStep) {
+        if (flowStep === "done" && !endingStep && !endingFlowStarted) {
             setEndingStep("gallery");
         }
-    }, [flowStep, endingStep]);
+    }, [flowStep, endingStep, endingFlowStarted]);
 
     const handleToggleSelectPhoto = (url: string) => {
         setSelectedGallery((prev) => {
@@ -887,8 +1167,23 @@ function EscapeIntroPageInner() {
         });
     };
 
+    // 썸네일 클릭: 선택된 항목을 다시 클릭하면 즉시 선택 해제
+    const handleClickPhoto = (url: string) => {
+        const isSelected = selectedGallery.includes(url);
+        if (isSelected) {
+            setSelectedGallery((prev) => prev.filter((u) => u !== url));
+            setSwapFrom(null);
+            return;
+        }
+        if (selectedGallery.length >= 4) return; // 최대 4장 제한 유지
+        setSelectedGallery((prev) => [...prev, url]);
+    };
+
     const renderCollage = async () => {
-        const urls = selectedGallery.slice(0, 4);
+        const urls = (
+            Array.isArray(selectedGallery) && selectedGallery.length > 0 ? selectedGallery : galleryUrls || []
+        ).slice(0, 4);
+        if (urls.length === 0) return;
         if (urls.length !== 4) return;
         const canvas = collageCanvasRef.current || document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -915,40 +1210,84 @@ function EscapeIntroPageInner() {
         const loadImage = (src: string) =>
             new Promise<HTMLImageElement>((resolve, reject) => {
                 const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.onload = () => resolve(img);
-                img.onerror = reject;
-                img.src = src;
+                // CORS 이미지도 프록시를 통해 우회
+                try {
+                    const needProxy = /^https?:\/\//i.test(src) && !src.startsWith(location.origin);
+                    const proxied = needProxy
+                        ? `${location.origin}/api/image-proxy?url=${encodeURIComponent(src)}`
+                        : src;
+                    img.crossOrigin = "anonymous";
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = proxied;
+                } catch {
+                    img.onload = () => resolve(img);
+                    img.onerror = reject;
+                    img.src = src;
+                }
             });
 
-        const [bg, ...photos] = await Promise.all([loadImage(bgUrl), ...urls.map(loadImage)]);
+        const [bg, ...photos] = await Promise.all([loadImage(bgUrl), ...urls.map((u) => loadImage(u))]);
         canvas.width = bg.naturalWidth;
         canvas.height = bg.naturalHeight;
         ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-        // DB 좌표가 없으면 기본값 사용
+        // DB 좌표가 없으면 기본값 사용 (요청된 픽셀 좌표 2x2 프레임)
         if (!framesPercent) {
             framesPercent = [
-                { x: 0.085, y: 0.275, w: 0.355, h: 0.315 },
-                { x: 0.555, y: 0.275, w: 0.355, h: 0.315 },
-                { x: 0.085, y: 0.705, w: 0.355, h: 0.315 },
-                { x: 0.555, y: 0.705, w: 0.355, h: 0.315 },
+                { x: 60, y: 230, w: 300, h: 420 }, // TL
+                { x: 410, y: 230, w: 300, h: 420 }, // TR
+                { x: 60, y: 730, w: 300, h: 420 }, // BL
+                { x: 410, y: 730, w: 300, h: 420 }, // BR
             ];
         }
-        const frames = framesPercent.map((f) => ({
-            x: Math.round(f.x * canvas.width),
-            y: Math.round(f.y * canvas.height),
-            w: Math.round(f.w * canvas.width),
-            h: Math.round(f.h * canvas.height),
-        }));
+        // frames_json이 퍼센트(0~1)인지 픽셀인지 자동 판별
+        const isPercent = framesPercent.every((f: any) => f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1);
+        const frames = framesPercent.map((f: any) =>
+            isPercent
+                ? {
+                      x: Math.round(f.x * canvas.width),
+                      y: Math.round(f.y * canvas.height),
+                      w: Math.round(f.w * canvas.width),
+                      h: Math.round(f.h * canvas.height),
+                  }
+                : {
+                      x: Math.round(f.x),
+                      y: Math.round(f.y),
+                      w: Math.round(f.w),
+                      h: Math.round(f.h),
+                  }
+        );
+        // 프레임 안쪽에 딱 맞게 그리고, 경계선 넘지 않도록 클리핑
+        const FRAME_PADDING_RATIO = 0.08; // 8% 여백으로 사용자 사진을 조금 더 작게
         photos.forEach((img, i) => {
             const f = frames[i];
-            const r = Math.min(img.naturalWidth / f.w, img.naturalHeight / f.h);
-            const sw = f.w * r;
-            const sh = f.h * r;
-            const sx = (img.naturalWidth - sw) / 2;
-            const sy = (img.naturalHeight - sh) / 2;
-            ctx.drawImage(img, sx, sy, sw, sh, f.x, f.y, f.w, f.h);
+            const pad = Math.round(Math.min(f.w, f.h) * FRAME_PADDING_RATIO);
+            const ix = f.x + pad;
+            const iy = f.y + pad;
+            const iw = f.w - pad * 2;
+            const ih = f.h - pad * 2;
+
+            // 클리핑 사각형 설정 → 프레임 밖으로 삐져나온 픽셀 제거
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(ix, iy, iw, ih);
+            ctx.clip();
+
+            // cover 방식으로 중앙 배치(소스는 전체 사용, 대상에 스케일+클리핑으로 자르기)
+            const scale = Math.max(iw / img.naturalWidth, ih / img.naturalHeight);
+            const dw = Math.round(img.naturalWidth * scale);
+            const dh = Math.round(img.naturalHeight * scale);
+            const dx = Math.round(ix + (iw - dw) / 2);
+            const dy = Math.round(iy + (ih - dh) / 2);
+            ctx.drawImage(img, dx, dy, dw, dh);
+            ctx.restore();
         });
+
+        // 미리보기 URL 생성 (디버그 용)
+        try {
+            const preview = canvas.toDataURL("image/jpeg", 0.92);
+            setCollagePreviewUrl(preview);
+        } catch {}
         collageCanvasRef.current = canvas;
     };
 
@@ -990,6 +1329,32 @@ function EscapeIntroPageInner() {
         return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92));
     };
 
+    // 콜라주 자동 저장: 캔버스 → 업로드 → /api/collages 저장
+    const autoSaveCollage = async (): Promise<string | null> => {
+        try {
+            const blob = await getCollageBlob();
+            if (!blob) return null;
+            const form = new FormData();
+            form.append("photos", new File([blob], "collage.jpg", { type: "image/jpeg" }));
+            const up = await fetch("/api/upload", { method: "POST", body: form, credentials: "include" });
+            if (!up.ok) return null;
+            const ur = await up.json();
+            const url: string | undefined = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
+            if (!url) return null;
+            try {
+                await fetch("/api/collages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ storyId, collageUrl: url }),
+                });
+            } catch {}
+            return url;
+        } catch {
+            return null;
+        }
+    };
+
     const handleShareToInstagram = async () => {
         try {
             const blob = await getCollageBlob();
@@ -1012,25 +1377,38 @@ function EscapeIntroPageInner() {
             const blob = await getCollageBlob();
             if (!blob) return;
             const form = new FormData();
-            form.append("files", new File([blob], "collage.jpg", { type: "image/jpeg" }));
+            form.append("photos", new File([blob], "collage.jpg", { type: "image/jpeg" }));
             const up = await fetch("/api/upload", { method: "POST", body: form, credentials: "include" });
             if (!up.ok) throw new Error(await up.text());
             const ur = await up.json();
             const url: string | undefined = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
             if (!url) throw new Error("업로드 URL 생성 실패");
+
+            // 유저 콜라주로 저장
+            try {
+                await fetch("/api/collages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ storyId, collageUrl: url, templateId: null }),
+                });
+            } catch {}
+
+            // 완료 처리와 동일하게 제출 기록에도 반영(마이페이지 사진 갤러리 호환)
             const last = (chapters || [])
                 .slice()
                 .sort((a: any, b: any) => Number(a.chapter_number || 0) - Number(b.chapter_number || 0))
                 .pop();
             const chapterId = last?.id || currentChapter?.id;
-            if (!chapterId) throw new Error("챕터 정보가 없습니다.");
-            const resp = await fetch("/api/submit-mission", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ chapterId, isCorrect: true, photoUrls: [url] }),
-            });
-            if (!resp.ok) throw new Error(await resp.text());
+            if (chapterId) {
+                await fetch("/api/submit-mission", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ chapterId, isCorrect: true, photoUrls: [url] }),
+                });
+            }
+
             setToast("마이페이지에 저장되었습니다.");
             setGalleryUrls((prev) => (prev.includes(url) ? prev : [...prev, url]));
         } catch (e) {
@@ -1320,7 +1698,7 @@ function EscapeIntroPageInner() {
                             }
                         }
                     } catch {}
-                    setEndingStep("finalMessage");
+                    setEndingStep("epilogue");
                 }, 800);
             }
         } catch (error: any) {
@@ -1435,6 +1813,8 @@ function EscapeIntroPageInner() {
         if (["restaurant", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s)) return "restaurant";
         if (["date", "walk", "산책", "데이트"].includes(s)) return "date";
         if (["dinner", "다이닝"].includes(s)) return "dinner"; // dinner 별도 취급
+        // 야경(나이트뷰) 카테고리 지원
+        if (["night", "nightview", "야경"].includes(s)) return "night";
         if (s === "") return "misc";
         return s;
     };
@@ -1555,20 +1935,31 @@ function EscapeIntroPageInner() {
         // 처음 진입 시에는 편지만 뜨도록, 챕터 번호와 무관하게 '열림 여부'만으로 게이트 판단
         const letterGateActive = !isLetterOpened;
         return (
-            <div className="relative min-h-screen">
+            <div className="relative min-h-screen overflow-hidden">
                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }} />
                 <div
                     className={`absolute inset-0 ${
                         letterGateActive ? "bg-transparent" : flowStep === "walk" ? "bg-black/45" : "bg-black/30"
-                    } transition-colors duration-[1400ms] ${
-                        flowStep === "done" ? "animate-[sunset_3000ms_linear_forwards]" : ""
-                    }`}
-                />
-                <div className="absolute bottom-10 left-0 right-0 max-w-[980px] mx-auto px-4 pb-6">
+                    } transition-colors duration-[1400ms]`}
+                >
+                    {/* 엔딩 편지 봉투/편지: sunset 오버레이 안쪽에 렌더 */}
+                    {flowStep === "done" && endingStep === "epilogue" && (
+                        <EpilogueFromDB
+                            storyId={storyId}
+                            step={endingDialogueStep}
+                            onNext={() => setEndingDialogueStep((s) => s + 1)}
+                            onComplete={() => {
+                                setFlowStep("done");
+                                setEndingStep("gallery");
+                            }}
+                        />
+                    )}
+                </div>
+                <div className="absolute inset-x-0 bottom-10 max-w-[980px] mx-auto px-4 pb-6">
                     {/* 편지 닫기 전에는 상단 버튼 등 UI 숨김 */}
-                    {!letterGateActive ? (
-                        <div className="flex justify-center gap-3 mb-4">
-                            {inMission ? (
+                    {!letterGateActive && (flowStep as unknown as string) !== "done" ? (
+                        <div className="flex justify-center gap-3 mb-4 absolute inset-x-0 bottom-[100%] md:static md:mb-4">
+                            {inMission && flowStep !== "done" ? (
                                 <button
                                     onClick={() => setShowMapModal(true)}
                                     className="px-4 py-2 rounded-xl bg-white/80 hover:bg-white text-gray-900 shadow"
@@ -1585,6 +1976,16 @@ function EscapeIntroPageInner() {
                                     대화 보기
                                 </button>
                             )}
+                            {flowStep === "category" &&
+                                !inMission &&
+                                computeAllCategoriesCleared(availableCategoryKeys) && (
+                                    <button
+                                        onClick={startEndingFlow}
+                                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow"
+                                    >
+                                        엔딩 보기
+                                    </button>
+                                )}
                         </div>
                     ) : null}
 
@@ -1601,7 +2002,7 @@ function EscapeIntroPageInner() {
                                 <div
                                     className={`grid grid-cols-2 gap-3 ${
                                         titlePopAnim ? "animate-[titlePop_400ms_ease-out]" : ""
-                                    }`}
+                                    } max-h-[56vh] overflow-auto pr-1`}
                                 >
                                     {(() => {
                                         const label = (k: string) =>
@@ -1613,37 +2014,57 @@ function EscapeIntroPageInner() {
                                                     dinner: "🍷 다이닝",
                                                 } as Record<string, string>
                                             )[k] || k);
-                                        const base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
-                                        let cats = base.filter((c) => !completedCategories.includes(c.key));
-                                        // 모두 숨겨지면(=선택할 게 없으면) 필터링을 해제하여 보여줌
-                                        if (cats.length === 0) cats = base;
-                                        return cats.map((cat) => (
-                                            <button
-                                                key={cat.key}
-                                                onClick={() => {
-                                                    setSelectedCategory(cat.key);
-                                                    // 카테고리에 해당하는 챕터로 이동 (카테고리-챕터 정합성 보장)
-                                                    try {
-                                                        const targetIdx = chapters.findIndex((ch: any) => {
-                                                            const first = (ch?.placeOptions || [])[0];
-                                                            const chCat = normalizeCategory(
-                                                                first?.category || first?.type || ""
-                                                            );
-                                                            return chCat === cat.key;
-                                                        });
-                                                        if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
-                                                    } catch {}
-                                                    setSelectedPlaceId(null);
-                                                    setInSelectedRange(false);
-                                                    setMissionUnlocked(false);
-                                                    // 이미 미션 중이면 리스트로 회귀하지 않도록 가드
-                                                    setFlowStep(inMission ? "mission" : "placeList");
-                                                }}
-                                                className="px-4 py-3 rounded-xl bg-white/85 hover:bg-white text-gray-900 shadow"
-                                            >
-                                                {cat.label}
-                                            </button>
-                                        ));
+                                        // 카테고리 우선순위: 기본 정렬 후 조건에 따라 야경/다이닝을 마지막으로 배치
+                                        let base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
+                                        const hasNight = base.some((c) => c.key === "night");
+                                        // 야경이 있으면 야경을, 없으면 다이닝을 가장 마지막으로
+                                        base = base.sort((a, b) => {
+                                            const lastKey = hasNight ? "night" : "dinner";
+                                            if (a.key === lastKey && b.key !== lastKey) return 1;
+                                            if (b.key === lastKey && a.key !== lastKey) return -1;
+                                            return 0;
+                                        });
+                                        return base.map((cat) => {
+                                            const disabled = completedCategories.includes(cat.key);
+                                            return (
+                                                <button
+                                                    key={cat.key}
+                                                    onClick={() => {
+                                                        if (disabled) return;
+                                                        setSelectedCategory(cat.key);
+                                                        try {
+                                                            const targetIdx = chapters.findIndex((ch: any) => {
+                                                                const first = (ch?.placeOptions || [])[0];
+                                                                const chCat = normalizeCategory(
+                                                                    first?.category || first?.type || ""
+                                                                );
+                                                                return chCat === cat.key;
+                                                            });
+                                                            if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
+                                                        } catch {}
+                                                        setSelectedPlaceId(null);
+                                                        setInSelectedRange(false);
+                                                        setMissionUnlocked(false);
+                                                        setFlowStep(inMission ? "mission" : "placeList");
+                                                    }}
+                                                    disabled={disabled}
+                                                    className={`px-4 py-3 rounded-xl text-gray-900 shadow ${
+                                                        disabled
+                                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                            : "bg-white/85 hover:bg-white"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span>{cat.label}</span>
+                                                        {disabled && (
+                                                            <span className="ml-1 text-xs text-emerald-600">
+                                                                완료됨
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        });
                                     })()}
                                 </div>
                             )}
@@ -1826,44 +2247,82 @@ function EscapeIntroPageInner() {
                                 </div>
                             )}
 
-                            {flowStep === "pieceAward" && (
+                            {flowStep === "pieceAward" && !endingFlowStarted && (
                                 <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-900 px-4 py-5 text-center animate-[pieceFloat_800ms_ease-out]">
                                     <div className="text-2xl mb-2">✉️ 편지 조각 {piecesCollected} 획득!</div>
                                     <div className="text-sm mb-4">4개를 모으면 엔딩이 열립니다.</div>
                                     <button
                                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
-                                        onClick={() => {
+                                        onClick={async () => {
                                             try {
-                                                console.log("[PieceAward] click", {
-                                                    currentChapterIdx,
-                                                    chaptersLen: chapters?.length,
-                                                    pendingNextChapterIdx,
-                                                });
-                                            } catch {}
-                                            if (piecesCollected >= 4) {
-                                                setEndingFlowStarted(true);
-                                                setFlowStep("done");
-                                                // 엔딩 데이터 fetch 보강 + 약간의 지연으로 렌더 안정화
-                                                setTimeout(async () => {
+                                                // 1️⃣ 조각 4개 이상이면 엔딩 플로우 시작
+                                                if (piecesCollected >= 4) {
+                                                    if (endingStartedRef.current) return;
+                                                    endingStartedRef.current = true;
+                                                    // ✅ 화면 상태를 가장 먼저 엔딩으로 전환
+                                                    setEndingFlowStarted(true);
+                                                    setFlowStep("done");
+                                                    setEndingStep("epilogue");
+
+                                                    // 모달/오버레이 및 진행 상태 강제 정리 후 엔딩 유지
                                                     try {
-                                                        const res = await fetch(
-                                                            `/api/escape/submissions?storyId=${storyId}`,
-                                                            {
+                                                        setMissionModalOpen(false);
+                                                        setActiveMission(null);
+                                                    } catch {}
+                                                    try {
+                                                        setShowPostStory(false);
+                                                        setPostStoryQueue([]);
+                                                        setPostStoryIdx(0);
+                                                    } catch {}
+                                                    try {
+                                                        setIsDialogueActive(false);
+                                                        setEndingDialogueStep(0);
+                                                        setIsLetterOpened(true);
+                                                        setLetterEverShown(true);
+                                                    } catch {}
+                                                    // 미션 진행 강제 가드 해제 (inMission 효과 방지)
+                                                    try {
+                                                        setMissionUnlocked(false);
+                                                        setSelectedPlaceId(null);
+                                                        setSelectedPlaceIndex(null);
+                                                        setSelectedPlaceConfirm(null);
+                                                        setShowMapModal(false);
+                                                        setInSelectedRange(false);
+                                                    } catch {}
+                                                    // 2️⃣ 갤러리와 배지 데이터 미리 불러오기 (실패해도 진행)
+                                                    try {
+                                                        const [subResult, badgeResult] = await Promise.allSettled([
+                                                            fetch(`/api/escape/submissions?storyId=${storyId}`, {
                                                                 credentials: "include",
-                                                            }
-                                                        );
-                                                        const data = await res.json();
-                                                        if (res.ok && Array.isArray(data?.urls))
-                                                            setGalleryUrls(data.urls);
-                                                    } catch (err) {
-                                                        try {
-                                                            console.warn("엔딩 갤러리 데이터 로드 실패:", err);
-                                                        } catch {}
-                                                    }
-                                                    setEndingStep("gallery");
-                                                }, 300);
-                                            } else {
-                                                // 다음 카테고리로 전환
+                                                            }),
+                                                            fetch(`/api/escape/badge?storyId=${storyId}`),
+                                                        ]);
+
+                                                        if (
+                                                            subResult.status === "fulfilled" &&
+                                                            subResult.value &&
+                                                            subResult.value.ok
+                                                        ) {
+                                                            const data = await subResult.value.json();
+                                                            if (Array.isArray(data?.urls)) setGalleryUrls(data.urls);
+                                                        }
+
+                                                        if (
+                                                            badgeResult.status === "fulfilled" &&
+                                                            badgeResult.value &&
+                                                            badgeResult.value.ok
+                                                        ) {
+                                                            const bd = await badgeResult.value.json();
+                                                            if (bd?.badge) setBadge(bd.badge);
+                                                        }
+                                                    } catch {}
+                                                    // 엔딩 띄운 이후에는 한 번만 트리거되도록 플래그 해제 금지
+
+                                                    // 나머지는 DialogueFlow/onComplete 에서 수동 진행
+                                                    return;
+                                                }
+
+                                                // 2️⃣ 아직 조각이 4개 미만이면 기존 로직대로 다음 장소로 이동
                                                 const nextIndex =
                                                     typeof pendingNextChapterIdx === "number"
                                                         ? pendingNextChapterIdx
@@ -1876,20 +2335,18 @@ function EscapeIntroPageInner() {
                                                     return;
                                                 }
 
-                                                // 다음 카테고리 즉시 적용
+                                                // 다음 카테고리 이동
                                                 setCurrentChapterIdx(nextIndex);
                                                 setDialogueStep(0);
                                                 setSelectedCategory(null);
                                                 setSelectedPlaceIndex(null);
-                                                // ✅ 다음 카테고리로 이동하되, 미션 완료 상태는 유지
                                                 setSelectedPlaceId(null);
                                                 setSelectedPlaceConfirm(null);
                                                 setMissionUnlocked(false);
                                                 setFlowStep("category");
-                                                try {
-                                                    console.log("[PieceAward] moved to", { nextIndex });
-                                                } catch {}
                                                 setPendingNextChapterIdx(null);
+                                            } catch (err) {
+                                                console.error("엔딩 보기 오류:", err);
                                             }
                                         }}
                                     >
@@ -1899,73 +2356,211 @@ function EscapeIntroPageInner() {
                             )}
                         </div>
 
-                        {/* 우: 미션/엔딩 갤러리 */}
-                        {endingStep === "gallery" && flowStep === "done" ? (
-                            <div className="rounded-2xl bg-white/85 backdrop-blur p-4 border shadow">
-                                <h3 className="text-lg font-bold text-gray-800 mb-3">엔딩 갤러리 (최대 4장 선택)</h3>
-                                {galleryUrls.length === 0 ? (
-                                    <div className="text-gray-600">표시할 사진이 없습니다.</div>
-                                ) : (
-                                    <div className="grid grid-cols-3 gap-2 mb-3">
-                                        {galleryUrls.map((url) => {
-                                            const sel = selectedGallery.includes(url);
-                                            return (
-                                                <button
-                                                    key={url}
-                                                    onClick={() => handleToggleSelectPhoto(url)}
-                                                    className={`relative rounded overflow-hidden border ${
-                                                        sel ? "ring-2 ring-amber-500" : ""
-                                                    }`}
-                                                >
-                                                    <img src={url} alt="photo" className="w-full h-24 object-cover" />
-                                                    {sel && (
-                                                        <span className="absolute top-1 right-1 text-xs bg-amber-600 text-white px-1 rounded">
-                                                            선택됨
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
+                        {/* 우: 엔딩 아웃트로 → 갤러리 */}
+                        {flowStep === "done" && endingStep === "gallery" ? (
+                            <div className="fixed inset-0 z-[2000] bg-black/40 flex items-end md:items-center justify-center p-2">
+                                <div className="w-[92vw] max-w-[520px] sm:max-w-[640px] max-h-[76vh] md:max-h-[86vh] rounded-2xl bg-white/85 backdrop-blur p-3 border shadow overflow-hidden flex flex-col">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-3">
+                                        엔딩 갤러리 (최대 4장 선택)
+                                    </h3>
+                                    <div className="flex-1 overflow-auto pr-1 min-h-0">
+                                        {galleryUrls.length === 0 ? (
+                                            <div className="text-gray-600">표시할 사진이 없습니다.</div>
+                                        ) : (
+                                            <div className="grid grid-cols-3 gap-2 mb-3">
+                                                {galleryUrls.slice(galleryPage * 9, galleryPage * 9 + 9).map((url) => {
+                                                    const sel = selectedGallery.includes(url);
+                                                    return (
+                                                        <button
+                                                            key={url}
+                                                            onClick={() => handleClickPhoto(url)}
+                                                            className={`relative rounded overflow-hidden border ${
+                                                                sel ? "ring-2 ring-amber-500" : ""
+                                                            }`}
+                                                        >
+                                                            <img
+                                                                src={url}
+                                                                alt="photo"
+                                                                className="w-full h-[78px] sm:h-24 object-cover"
+                                                            />
+                                                            {swapFrom === url && selectedGallery.length === 4 && (
+                                                                <span className="absolute inset-0 bg-amber-500/20" />
+                                                            )}
+                                                            {sel && (
+                                                                <span className="absolute top-1 right-1 text-xs bg-amber-600 text-white px-1 rounded">
+                                                                    선택됨
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={handleDownloadCollage}
-                                        disabled={selectedGallery.length !== 4}
-                                        className="px-4 py-2 rounded-lg bg-amber-600 text-white disabled:opacity-50"
-                                    >
-                                        콜라주 이미지 다운로드
-                                    </button>
-                                    <button
-                                        onClick={() => setEndingStep("badge")}
-                                        disabled={selectedGallery.length !== 4}
-                                        className="px-4 py-2 rounded-lg bg-black text-white disabled:opacity-50"
-                                    >
-                                        콜라주 확정 → 배지로
-                                    </button>
-                                    <button
-                                        onClick={handleShareToInstagram}
-                                        disabled={selectedGallery.length !== 4}
-                                        className="px-4 py-2 rounded-lg bg-pink-600 text-white disabled:opacity-50"
-                                    >
-                                        인스타 스토리 올리기
-                                    </button>
-                                    <button
-                                        onClick={handleSaveToMyPage}
-                                        disabled={selectedGallery.length !== 4}
-                                        className="px-4 py-2 rounded-lg bg-blue-600 text-white disabled:opacity-50"
-                                    >
-                                        마이페이지에 저장
-                                    </button>
-                                    <span className="text-xs text-gray-600">4장을 선택하면 다운로드할 수 있어요.</span>
+                                    <div className="flex flex-col items-center justify-between mt-1 pt-1">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setGalleryPage((p) => Math.max(0, p - 1))}
+                                                className="px-3 py-1.5 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                            >
+                                                이전 장
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    setGalleryPage((p) =>
+                                                        (p + 1) * 9 < galleryUrls.length ? p + 1 : p
+                                                    )
+                                                }
+                                                className="px-3 py-1.5 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                            >
+                                                다음 장
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => setEndingStep("epilogue")}
+                                                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                            >
+                                                이전
+                                            </button>
+                                            <button
+                                                onClick={handleDownloadCollage}
+                                                disabled={selectedGallery.length !== 4}
+                                                className="px-4 py-2 rounded-lg bg-amber-600 text-white disabled:opacity-50"
+                                            >
+                                                템플릿 이미지 다운로드
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (selectedGallery.length !== 4) return;
+                                                    try {
+                                                        // 템플릿 조회 (미리보기는 캔버스 대신 FrameRenderer 사용)
+                                                        let bgUrl = "/images/hongdaelatter_template.jpg";
+                                                        let frames: Array<{
+                                                            x: number;
+                                                            y: number;
+                                                            w: number;
+                                                            h: number;
+                                                        }> | null = null;
+                                                        try {
+                                                            const res = await fetch("/api/collages/templates", {
+                                                                cache: "no-store",
+                                                            });
+                                                            const data = await res.json();
+                                                            const list = Array.isArray(data?.templates)
+                                                                ? data.templates
+                                                                : [];
+                                                            const t =
+                                                                list.find(
+                                                                    (it: any) =>
+                                                                        String(it?.name || "")
+                                                                            .toLowerCase()
+                                                                            .includes("hongdae") ||
+                                                                        String(it?.imageUrl || "").includes(
+                                                                            "hongdaelatter_template"
+                                                                        )
+                                                                ) || list[0];
+                                                            if (t) {
+                                                                if (t.imageUrl) bgUrl = String(t.imageUrl);
+                                                                if (t.framesJson && Array.isArray(t.framesJson))
+                                                                    frames = t.framesJson as any;
+                                                            }
+                                                        } catch {}
+                                                        if (!frames) {
+                                                            frames = [
+                                                                { x: 60, y: 230, w: 300, h: 420 },
+                                                                { x: 410, y: 230, w: 300, h: 420 },
+                                                                { x: 60, y: 730, w: 300, h: 420 },
+                                                                { x: 410, y: 730, w: 300, h: 420 },
+                                                            ];
+                                                        }
+
+                                                        // 배경 원본 사이즈를 알 수 없으므로, 미리보기 컨테이너에서 scale 처리
+                                                        setFramePreviewTemplate({
+                                                            imageUrl: bgUrl,
+                                                            framesJson: frames,
+                                                            width: 800,
+                                                            height: 1200,
+                                                        } as any);
+                                                        setShowCollagePreview(true);
+                                                    } catch {}
+                                                }}
+                                                disabled={selectedGallery.length !== 4}
+                                                className="px-4 py-2 rounded-lg bg-black text-white disabled:opacity-50"
+                                            >
+                                                템플릿 미리보기
+                                            </button>
+                                            <button
+                                                onClick={handleShareToInstagram}
+                                                disabled={selectedGallery.length !== 4}
+                                                className="px-4 py-2 rounded-lg bg-pink-600 text-white disabled:opacity-50"
+                                            >
+                                                인스타 스토리 올리기
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        ) : selectedPlaceId && missionUnlocked ? (
+                        ) : flowStep === "done" && endingStep === "badge" ? (
+                            <div className="fixed inset-0 z-[2000] bg-black/40 flex items-center justify-center p-4">
+                                <div className="rounded-2xl bg-white/90 backdrop-blur p-5 border shadow max-w-md w-full text-center">
+                                    <h3 className="text-xl font-bold text-gray-800 mb-3">보상 배지</h3>
+                                    {badge ? (
+                                        <div className="flex flex-col items-center gap-3">
+                                            {badge.image_url ? (
+                                                <img
+                                                    src={badge.image_url as any}
+                                                    alt={badge.name}
+                                                    className="w-28 h-28 object-cover rounded-full border mx-auto"
+                                                />
+                                            ) : null}
+                                            <div className="text-gray-900 font-semibold">{badge.name}</div>
+                                            {badge.description ? (
+                                                <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                                                    {badge.description}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ) : (
+                                        <div className="text-gray-600">배지 정보를 불러오는 중이에요.</div>
+                                    )}
+                                    <div className="mt-5 flex justify-center gap-2">
+                                        <button
+                                            onClick={() => setEndingStep("gallery")}
+                                            className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                        >
+                                            템플릿 다시 보기
+                                        </button>
+                                        <button
+                                            onClick={handleCloseBook}
+                                            className="px-4 py-2 rounded-lg bg-black text-white"
+                                        >
+                                            완료
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : selectedPlaceId && missionUnlocked && flowStep !== "done" ? (
                             <div
                                 className={`rounded-2xl bg-white/85 backdrop-blur p-4 border shadow transition-opacity duration-500 ${
                                     flowStep === "walk" || letterGateActive ? "opacity-0" : "opacity-100"
                                 } ${noteOpenAnim && flowStep === "mission" ? "animate-[noteOpen_300ms_ease-out]" : ""}`}
                             >
+                                <div className="mb-2 flex items-center justify-between">
+                                    <button
+                                        onClick={() => {
+                                            setMissionUnlocked(false);
+                                            setSelectedPlaceId(null);
+                                            setSelectedPlaceIndex(null);
+                                            setSelectedPlaceConfirm(null);
+                                            setInSelectedRange(false);
+                                            setFlowStep("placeList");
+                                        }}
+                                        className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                    >
+                                        ← 뒤로
+                                    </button>
+                                </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-3">스토리 조각</h3>
                                 {/* 모든 미션을 고정 크기 2열 카드로 표시, 클릭 시 모달로 풀이 */}
                                 <div className="grid grid-cols-2 gap-2">
@@ -2056,7 +2651,7 @@ function EscapeIntroPageInner() {
                 </div>
 
                 {/* 기존 대화형 인트로 오버레이 재사용 (유일한 위치에서만 렌더) */}
-                {isDialogueActive && currentChapter && !inMission && (
+                {isDialogueActive && currentChapter && !inMission && flowStep !== "done" && (
                     <DialogueFlow
                         messages={currentChapter.story_text}
                         step={dialogueStep}
@@ -2090,7 +2685,60 @@ function EscapeIntroPageInner() {
                     />
                 )}
 
-                {isMobile && showMapModal && (
+                {/* 콜라주 미리보기 모달 */}
+                {showCollagePreview && (
+                    <div className="fixed inset-0 z-[2100] bg-black/50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-4 max-w-[720px] w-full max-h-[90vh] overflow-hidden flex flex-col">
+                            <div className="text-center mb-3 font-semibold">템플릿 미리보기</div>
+                            <div
+                                ref={previewRootRef}
+                                onClick={handleMeasureClick}
+                                className="w-full flex-1 flex items-center justify-center overflow-hidden"
+                                style={{ cursor: measureMode ? "crosshair" : undefined }}
+                            >
+                                {framePreviewTemplate ? (
+                                    <div className="w-full flex justify-center">
+                                        <div style={{ width: "100%", maxWidth: 360 }}>
+                                            <div style={{ aspectRatio: "9 / 16", width: "100%" }}>
+                                                <FrameRenderer
+                                                    template={framePreviewTemplate as any}
+                                                    photos={selectedGallery.slice(0, 4)}
+                                                    style={{ width: "100%", height: "100%" }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : collagePreviewUrl ? (
+                                    <img
+                                        src={collagePreviewUrl}
+                                        alt="collage-preview"
+                                        className="max-h-[72vh] w-full h-auto object-contain rounded"
+                                    />
+                                ) : null}
+                            </div>
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button
+                                    onClick={() => setShowCollagePreview(false)}
+                                    className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+                                >
+                                    닫기
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        setShowCollagePreview(false);
+                                        await autoSaveCollage();
+                                        setEndingStep("badge");
+                                    }}
+                                    className="px-4 py-2 rounded bg-amber-600 text-white"
+                                >
+                                    저장하고 계속
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {isMobile && showMapModal && flowStep !== "done" && (
                     <div
                         className={`fixed inset-0 z-[1400] bg-black/50 flex items-center justify-center p-4 ${
                             flowStep === "walk" ? "animate-[zoomOutBg_1000ms_ease-out]" : ""
@@ -2151,6 +2799,113 @@ function EscapeIntroPageInner() {
                                         if (/^hint[_-]?\d+$/i.test(k) && p[k]) hints.push(p[k]);
                                     });
                                 }
+                                // 통합 확인 핸들러: PHOTO는 업로드+저장, TEXT는 텍스트 저장 후 공통 후처리
+                                const handleConfirm = async () => {
+                                    try {
+                                        if (t === "PHOTO") {
+                                            const files = photoFiles || [];
+                                            if (files.length < 2) {
+                                                setValidationError("사진 2장을 업로드해 주세요.");
+                                                return;
+                                            }
+                                            setToast("사진을 압축하고 있어요...");
+                                            const options: any = {
+                                                maxSizeMB: 1.2,
+                                                maxWidthOrHeight: 1600,
+                                                useWebWorker: true,
+                                                initialQuality: 0.8,
+                                            };
+                                            const compressedFiles = await Promise.all(
+                                                files.map((f) => imageCompression(f, options))
+                                            );
+                                            const formData = new FormData();
+                                            compressedFiles.forEach((file) =>
+                                                formData.append("photos", file, file.name)
+                                            );
+                                            setToast("사진을 업로드하는 중...");
+                                            const uploadResponse = await fetch("/api/upload", {
+                                                method: "POST",
+                                                body: formData,
+                                                cache: "no-store",
+                                            });
+                                            if (!uploadResponse.ok) throw new Error(await uploadResponse.text());
+                                            const uploadResult = await uploadResponse.json();
+                                            const urls: string[] = Array.isArray(uploadResult.photo_urls)
+                                                ? uploadResult.photo_urls
+                                                : [];
+                                            if (urls.length === 0) throw new Error("업로드된 사진 URL이 없습니다.");
+
+                                            setToast("미션 결과 저장 중...");
+                                            const submitRes = await fetch("/api/submit-mission", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                credentials: "include",
+                                                body: JSON.stringify({
+                                                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                                    isCorrect: true,
+                                                    photoUrls: urls,
+                                                }),
+                                            });
+                                            if (!submitRes.ok) {
+                                                const err = await submitRes.json().catch(() => ({}));
+                                                throw new Error(err?.message || "미션 저장 실패");
+                                            }
+                                        } else if (t === "PUZZLE_ANSWER") {
+                                            const ok = isCorrectForPayload(payload, modalAnswer);
+                                            if (!ok) {
+                                                setModalWrongOnce(true);
+                                                setModalError("정답이 아니에요");
+                                                return;
+                                            }
+                                            setModalError(null);
+                                            setModalWrongOnce(false);
+                                            await fetch("/api/submit-mission", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                credentials: "include",
+                                                body: JSON.stringify({
+                                                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                                    isCorrect: true,
+                                                    textAnswer: (modalAnswer || "").trim(),
+                                                }),
+                                            });
+                                        }
+
+                                        // 공통 후처리: 모달 종료 및 이후 스토리/완료 처리 연결
+                                        setMissionModalOpen(false);
+                                        try {
+                                            const place = (currentChapter?.placeOptions || []).find(
+                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                            );
+                                            const placeQueue: string[] = Array.isArray((place as any)?.stories)
+                                                ? (place as any).stories
+                                                      .map((s: any) =>
+                                                          String(s?.dialogue || s?.narration || s || "").trim()
+                                                      )
+                                                      .filter(Boolean)
+                                                : [];
+                                            if (activeMission?.id != null) {
+                                                setSolvedMissionIds((prev) =>
+                                                    Array.from(new Set([...prev, Number(activeMission.id)]))
+                                                );
+                                                setClearedMissions((prev) => ({
+                                                    ...prev,
+                                                    [Number(activeMission.id)]: true,
+                                                }));
+                                            }
+                                            if (placeQueue.length > 0) {
+                                                setPostStoryQueue(placeQueue);
+                                                setPostStoryIdx(0);
+                                                setShowPostStory(true);
+                                            }
+                                        } catch {}
+                                    } catch (e: any) {
+                                        setValidationError(e?.message || "오류가 발생했습니다.");
+                                    } finally {
+                                        setToast(null);
+                                    }
+                                };
+
                                 return (
                                     <div className="space-y-4">
                                         <h4 className="text-lg font-bold text-gray-800">스토리 조각</h4>
@@ -2162,112 +2917,29 @@ function EscapeIntroPageInner() {
                                                 {payload.question}
                                             </div>
                                         )}
-                                        {t === "PUZZLE_ANSWER" && (
+                                        {/* PHOTO 전용 상단 확인 버튼 제거 (공통 확인 버튼만 사용) */}
+                                        {(t === "PUZZLE_ANSWER" || t === "PHOTO") && (
                                             <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={modalAnswer}
-                                                    onChange={(e) => {
-                                                        setModalAnswer(e.target.value);
-                                                        setModalError(null);
-                                                    }}
-                                                    placeholder="정답 입력"
-                                                    className="flex-1 px-3 py-2 rounded border text-gray-900"
-                                                />
+                                                {t === "PUZZLE_ANSWER" && (
+                                                    <input
+                                                        type="text"
+                                                        value={modalAnswer}
+                                                        onChange={(e) => {
+                                                            setModalAnswer(e.target.value);
+                                                            setModalError(null);
+                                                        }}
+                                                        placeholder="정답 입력"
+                                                        className="flex-1 px-3 py-2 rounded border text-gray-900"
+                                                    />
+                                                )}
                                                 <button
-                                                    onClick={() => {
-                                                        const ok = isCorrectForPayload(payload, modalAnswer);
-                                                        if (!ok) {
-                                                            setModalWrongOnce(true);
-                                                            setModalError("정답이 아니에요");
-                                                            return;
-                                                        }
-                                                        setModalError(null);
-                                                        setModalWrongOnce(false);
-                                                        // 정답 처리: 챕터 진행 조건 충족을 위해 상태 동기화
-                                                        setAnswerChecked(true);
-                                                        setPuzzleAnswer(modalAnswer || "");
-                                                        setMissionModalOpen(false);
-                                                        // 미션 완룔 후: 선택한 장소의 stories 우선 재생
-                                                        try {
-                                                            const place = (currentChapter?.placeOptions || []).find(
-                                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
-                                                            );
-                                                            const placeQueue: string[] = Array.isArray(
-                                                                (place as any)?.stories
-                                                            )
-                                                                ? (place as any).stories
-                                                                      .map((s: any) =>
-                                                                          String(
-                                                                              s?.dialogue || s?.narration || s || ""
-                                                                          ).trim()
-                                                                      )
-                                                                      .filter(Boolean)
-                                                                : [];
-                                                            // ✅ 완료 시에는 description을 추가로 보여주지 않음 (요청사항)
-                                                            const queue = placeQueue;
-                                                            // ✅ 완료 미션 집계
-                                                            if (activeMission?.id != null) {
-                                                                setSolvedMissionIds((prev) =>
-                                                                    Array.from(
-                                                                        new Set([...prev, Number(activeMission.id)])
-                                                                    )
-                                                                );
-                                                                setClearedMissions((prev) => ({
-                                                                    ...prev,
-                                                                    [Number(activeMission.id)]: true,
-                                                                }));
-                                                            }
-
-                                                            // ✅ 완료된 장소의 카테고리를 비활성화 목록에 반영
-                                                            try {
-                                                                const catKey = normalizeCategory(
-                                                                    (place as any)?.category ||
-                                                                        (place as any)?.type ||
-                                                                        ""
-                                                                );
-                                                                if (catKey) {
-                                                                    setCompletedCategories((prev) => {
-                                                                        const next = Array.from(
-                                                                            new Set([...(prev || []), catKey])
-                                                                        );
-                                                                        const raw = localStorage.getItem(STORAGE_KEY);
-                                                                        const obj = raw ? JSON.parse(raw) : {};
-                                                                        obj.__completedCategories = next;
-                                                                        localStorage.setItem(
-                                                                            STORAGE_KEY,
-                                                                            JSON.stringify(obj)
-                                                                        );
-                                                                        return next;
-                                                                    });
-                                                                }
-                                                            } catch {}
-
-                                                            // ✅ 편지 게이트가 다시 열리지 않도록 강제 고정
-                                                            try {
-                                                                localStorage.setItem(
-                                                                    `escape_letter_shown_${storyId}`,
-                                                                    "1"
-                                                                );
-                                                                setIsLetterOpened(true);
-                                                            } catch {}
-
-                                                            if (queue.length > 0) {
-                                                                setPostStoryQueue(queue);
-                                                                setPostStoryIdx(0);
-                                                                setShowPostStory(true);
-                                                                return;
-                                                            }
-                                                        } catch {}
-                                                        // 장소 스토리가 없으면 기존 흐름으로 바로 진행
-                                                        alert("goToNextChapter click");
-                                                        goToNextChapter();
-                                                    }}
+                                                    onClick={handleConfirm}
+                                                    disabled={isSubmitting || (t === "PHOTO" && photoFiles.length < 2)}
                                                     className={`px-3 py-2 rounded text-sm text-white ${
-                                                        answerChecked ? "bg-green-600" : "bg-blue-600"
-                                                    }`}
+                                                        isSubmitting ? "bg-gray-400" : "bg-blue-600"
+                                                    } disabled:opacity-50`}
                                                 >
-                                                    {answerChecked ? "확인됨" : "제출"}
+                                                    {isSubmitting ? "처리 중..." : "확인"}
                                                 </button>
                                             </div>
                                         )}
@@ -2442,90 +3114,7 @@ function EscapeIntroPageInner() {
                                                         ))}
                                                     </div>
                                                 )}
-                                                <button
-                                                    onClick={async () => {
-                                                        try {
-                                                            const files = photoFiles;
-                                                            if (!files || files.length < 2) {
-                                                                setValidationError("사진 2장을 업로드해 주세요.");
-                                                                return;
-                                                            }
-                                                            setToast("사진을 압축하고 있어요...");
-                                                            // 병렬 압축(웹워커) + 품질 최적화로 속도 개선
-                                                            const options = {
-                                                                maxSizeMB: 1.2,
-                                                                maxWidthOrHeight: 1600,
-                                                                useWebWorker: true,
-                                                                initialQuality: 0.8,
-                                                            } as any;
-                                                            const compressedFiles = await Promise.all(
-                                                                files.map((file) => imageCompression(file, options))
-                                                            );
-
-                                                            const formData = new FormData();
-                                                            compressedFiles.forEach((file) =>
-                                                                formData.append("photos", file, file.name)
-                                                            );
-
-                                                            setToast("사진을 업로드하는 중...");
-                                                            const uploadResponse = await fetch("/api/upload", {
-                                                                method: "POST",
-                                                                body: formData,
-                                                                cache: "no-store",
-                                                            });
-                                                            if (!uploadResponse.ok)
-                                                                throw new Error(await uploadResponse.text());
-                                                            const uploadResult = await uploadResponse.json();
-                                                            const urls = Array.isArray(uploadResult.photo_urls)
-                                                                ? uploadResult.photo_urls
-                                                                : [];
-                                                            setLastUploadedUrls(urls);
-                                                            setPhotoUploaded(true);
-
-                                                            // 업로드 성공 처리: 미션 해결 처리 로직 실행
-                                                            setMissionModalOpen(false);
-                                                            const place = (currentChapter?.placeOptions || []).find(
-                                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
-                                                            );
-                                                            const placeQueue: string[] = Array.isArray(
-                                                                (place as any)?.stories
-                                                            )
-                                                                ? (place as any).stories
-                                                                      .map((s: any) =>
-                                                                          String(
-                                                                              s?.dialogue || s?.narration || s || ""
-                                                                          ).trim()
-                                                                      )
-                                                                      .filter(Boolean)
-                                                                : [];
-                                                            // 완료 시에는 description 메시지 생략
-                                                            const queue = placeQueue;
-                                                            if (activeMission?.id != null) {
-                                                                setSolvedMissionIds((prev) =>
-                                                                    Array.from(
-                                                                        new Set([...prev, Number(activeMission.id)])
-                                                                    )
-                                                                );
-                                                                setClearedMissions((prev) => ({
-                                                                    ...prev,
-                                                                    [Number(activeMission.id)]: true,
-                                                                }));
-                                                            }
-                                                            if (queue.length > 0) {
-                                                                setPostStoryQueue(queue);
-                                                                setPostStoryIdx(0);
-                                                                setShowPostStory(true);
-                                                            }
-                                                        } catch (err) {
-                                                            setValidationError(
-                                                                "업로드 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."
-                                                            );
-                                                        }
-                                                    }}
-                                                    className="px-3 py-2 rounded text-sm text-white bg-blue-600 hover:bg-blue-700"
-                                                >
-                                                    확인
-                                                </button>
+                                                {/* 하단 PHOTO 확인 버튼 제거: 공통 확인 버튼(handleConfirm)만 사용 */}
                                             </div>
                                         )}
                                         {/* 힌트 표시 제거 요청에 따라 숨김 */}
@@ -2552,6 +3141,8 @@ function EscapeIntroPageInner() {
                                             setShowPostStory(false);
                                             setPostStoryQueue([]);
                                             setPostStoryIdx(0);
+                                            // 미션 완료 후 조각 수 반영
+                                            setPiecesCollected((n) => n + 1);
                                             // 스토리 종료 후 조각 획득 단계로 연결
                                             setFlowStep("pieceAward");
                                         }
