@@ -22,7 +22,7 @@ export default function HeroSlider({ items }: HeroSliderProps) {
     const [isTouching, setIsTouching] = useState(false);
 
     return (
-        <section className="relative px-4">
+        <section className="relative px-4 pt-10">
             <div
                 className="relative h-[200px] overflow-hidden shadow-xl cursor-grab select-none"
                 style={{

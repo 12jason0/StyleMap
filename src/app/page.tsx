@@ -29,8 +29,6 @@ type Course = {
 
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
-    const [searchRegion, setSearchRegion] = useState(""); // 입력값
-    const [submittedRegion, setSubmittedRegion] = useState(""); // 실제 검색어
     const [currentSlide] = useState(0);
     const [, setLoading] = useState(true);
     const [showWelcome, setShowWelcome] = useState(false);
@@ -39,14 +37,13 @@ export default function Home() {
     const [isSignup, setIsSignup] = useState(false);
     const [showAiAdModal, setShowAiAdModal] = useState(false);
     const [showLoginRequiredModal, setShowLoginRequiredModal] = useState(false);
-    // 출석 체크 모달 상태 및 애니메이션 상태
     const [showCheckinModal, setShowCheckinModal] = useState(false);
     const [weekStamps, setWeekStamps] = useState<boolean[]>([false, false, false, false, false, false, false]);
     const [animStamps, setAnimStamps] = useState<boolean[] | null>(null);
     const [isStamping, setIsStamping] = useState(false);
     const [stampCompleted, setStampCompleted] = useState(false);
     const [alreadyToday, setAlreadyToday] = useState(false);
-    const [cycleProgress, setCycleProgress] = useState(0); // total%7
+    const [cycleProgress, setCycleProgress] = useState(0);
     const [todayIndex, setTodayIndex] = useState(0);
     const router = useRouter();
     const hasShownCheckinModalRef = useRef(false);
@@ -66,38 +63,24 @@ export default function Home() {
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const qs = new URLSearchParams({ limit: "100", imagePolicy: "any", lean: "1" });
-                if (submittedRegion.trim()) qs.set("region", submittedRegion.trim());
-                const response = await fetch(`/api/courses?${qs.toString()}` as any, {
+                const response = await fetch(`/api/courses?limit=100&imagePolicy=any&lean=1` as any, {
                     cache: "force-cache",
                     next: { revalidate: 300 },
                 });
                 if (!response.ok) {
-                    setErrorMessage("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
                     setCourses([]);
                     return;
                 }
                 const data = await response.json().catch(() => null);
-                if (Array.isArray(data)) {
-                    setCourses(data);
-                } else if (data.error) {
-                    console.error("API Error:", data.error, data.details);
-                    setErrorMessage("데이터베이스 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-                    setCourses([]);
-                } else {
-                    console.error("Unexpected data format:", data);
-                    setCourses([]);
-                }
-            } catch (error) {
-                console.error("Failed to fetch courses:", error);
-                setErrorMessage("코스 데이터를 가져오는데 실패했습니다. 네트워크 연결을 확인해주세요.");
+                setCourses(Array.isArray(data) ? data : []);
+            } catch {
                 setCourses([]);
             } finally {
                 setLoading(false);
             }
         };
         fetchCourses();
-    }, [submittedRegion]);
+    }, []);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -114,7 +97,6 @@ export default function Home() {
 
         if (loginSuccess === "true") {
             setShowLoginModal(true);
-            // 홈 진입 즉시 출석 모달 표시 (로그인 성공으로 들어온 경우)
             maybeOpenCheckinModal();
             const token = localStorage.getItem("authToken");
             if (token) {
@@ -130,7 +112,6 @@ export default function Home() {
             setShowLoginModal(true);
             setIsSignup(true);
             localStorage.setItem("loginTime", Date.now().toString());
-            // 홈 진입 즉시 출석 모달 표시 (회원가입 직후)
             maybeOpenCheckinModal();
             const newUrl = window.location.pathname;
             window.history.replaceState({}, "", newUrl);
@@ -147,7 +128,6 @@ export default function Home() {
                 if (!hideUntil || now > parseInt(hideUntil)) {
                     setShowAiAdModal(true);
                 }
-                // 로그인 직후 출석 모달 오픈 (하루 1회)
                 maybeOpenCheckinModal();
             }
         };
@@ -155,7 +135,6 @@ export default function Home() {
         return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
     }, []);
 
-    // 주차 계산 및 출석 데이터 조회 (7칸 사이클 표현으로 단순화)
     const fetchAndSetWeekStamps = async (): Promise<{ stamps: boolean[]; todayChecked: boolean } | null> => {
         try {
             const token = localStorage.getItem("authToken");
@@ -166,7 +145,6 @@ export default function Home() {
             });
             if (!res.ok) return null;
             const data = await res.json();
-            // 서버에서 내려오는 도장 배열이 중간 인덱스부터 채워질 수 있어, 개수 기준으로 1번부터 연속 채움
             const rawStamps: boolean[] | undefined = Array.isArray(data?.weekStamps)
                 ? (data.weekStamps as boolean[])
                 : undefined;
@@ -179,7 +157,6 @@ export default function Home() {
             const stamps: boolean[] = new Array(7).fill(false).map((_, i) => i < filledCount);
             const todayChecked = Boolean(data?.todayChecked);
 
-            // 상태 반영
             setWeekStamps(stamps);
             setCycleProgress((stamps.filter(Boolean).length % 7) as number);
             setAlreadyToday(todayChecked);
@@ -204,7 +181,6 @@ export default function Home() {
             const dismissedDate = localStorage.getItem("checkinModalDismissedDate");
             setAnimStamps(null);
 
-            // 오늘 이미 출석했으면 모달을 띄우지 않음. 아직 미출석이면서 오늘 아직 노출/해제 이력이 없을 때만 표시
             if (!already && shownDate !== todayKey && dismissedDate !== todayKey) {
                 setStampCompleted(false);
                 setShowCheckinModal(true);
@@ -214,7 +190,6 @@ export default function Home() {
         } catch {}
     };
 
-    // 첫 방문 시(메인 진입 때마다) 로그인 되어있으면 출석 모달 표시
     useEffect(() => {
         const token = localStorage.getItem("authToken");
         if (token) {
@@ -241,7 +216,6 @@ export default function Home() {
         })
         .slice(0, 8);
 
-    // --- 추천 코스 (간단 버전) ---
     const [recs, setRecs] = useState<any[]>([]);
     useEffect(() => {
         (async () => {
@@ -283,9 +257,9 @@ export default function Home() {
                 </div>
             )}
             {showWelcome && (
-                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
+                <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
                     <div className="flex items-center space-x-2">
-                        <span className="text-xl">🎉</span>
+                        <span className="text-xl">🌿</span>
                         <span className="font-semibold">카카오 로그인에 성공했습니다!</span>
                     </div>
                 </div>
@@ -306,9 +280,9 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-                        <div className="text-6xl mb-4">🎉</div>
+                        <div className="text-6xl mb-4">🌿</div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-2">로그인 성공!</h2>
-                        <p className="text-gray-600 mb-4">StyleMap에 오신 것을 환영합니다</p>
+                        <p className="text-gray-600 mb-4">두나에 오신 것을 환영합니다</p>
                         <div className="flex items-center justify-center space-x-2 text-green-600">
                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                                 <path
@@ -332,10 +306,9 @@ export default function Home() {
                                         setShowAiAdModal(true);
                                     }
                                 }
-                                // 로그인 확인 후 출석 모달도 체크
                                 maybeOpenCheckinModal();
                             }}
-                            className="mt-6 btn-primary hover:cursor-pointer"
+                            className="mt-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all hover:cursor-pointer"
                         >
                             확인
                         </button>
@@ -358,14 +331,17 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-                        <div className="text-4xl mb-4">🤖</div>
+                        <div className="text-4xl mb-4">🌳</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">AI 추천 티켓 지급!</h2>
                         <p className="text-gray-600 mb-4">새로 가입하신 고객님을 위한 특별한 혜택</p>
-                        <div className="bg-sky-500 text-white p-4 rounded-lg mb-4">
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white p-4 rounded-lg mb-4">
                             <div className="text-2xl font-bold mb-1">AI 추천 티켓 1회</div>
                             <div className="text-sm opacity-90">개인 맞춤 코스 추천을 받아보세요!</div>
                         </div>
-                        <button onClick={() => setShowAdModal(false)} className="btn-primary hover:cursor-pointer">
+                        <button
+                            onClick={() => setShowAdModal(false)}
+                            className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all hover:cursor-pointer w-full"
+                        >
                             확인
                         </button>
                     </div>
@@ -391,14 +367,14 @@ export default function Home() {
                                 />
                             </svg>
                         </button>
-                        <div className="text-4xl mb-4">🤖</div>
+                        <div className="text-4xl mb-4">🌳</div>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">
                             AI가 당신에게 꼭 맞는 여행 코스를 찾아드려요
                         </h2>
                         <p className="text-gray-600 mb-4">
                             몇 가지 질문에 답하면 취향에 맞는 특별한 코스가 완성됩니다.
                         </p>
-                        <div className="bg-sky-500 text-white p-4 rounded-lg mb-4">
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white p-4 rounded-lg mb-4">
                             <div className="text-2xl font-bold mb-1">나만의 맞춤 추천</div>
                             <div className="text-sm opacity-90">고민 없이 바로 추천받고 시작해보세요</div>
                         </div>
@@ -408,7 +384,7 @@ export default function Home() {
                                     setShowAiAdModal(false);
                                     router.push("/personalized-home");
                                 }}
-                                className="btn-primary hover:cursor-pointer"
+                                className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-2.5 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all hover:cursor-pointer"
                             >
                                 AI로 나만의 코스 추천받기
                             </button>
@@ -449,7 +425,7 @@ export default function Home() {
                         <div className="flex gap-3 justify-center">
                             <button
                                 onClick={() => setShowLoginRequiredModal(false)}
-                                className="hover:cursor-pointer btn-secondary"
+                                className="hover:cursor-pointer px-5 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
                             >
                                 취소
                             </button>
@@ -458,7 +434,7 @@ export default function Home() {
                                     setShowLoginRequiredModal(false);
                                     router.push("/login?redirect=/onboarding");
                                 }}
-                                className="hover:cursor-pointer btn-primary"
+                                className="hover:cursor-pointer bg-gradient-to-r from-green-500 to-emerald-500 text-white px-5 py-2.5 rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all"
                             >
                                 로그인하기
                             </button>
@@ -466,7 +442,6 @@ export default function Home() {
                     </div>
                 </div>
             )}
-            {/* 출석 체크 모달 */}
             {showCheckinModal && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
@@ -481,10 +456,12 @@ export default function Home() {
                                     <div key={i} className="flex flex-col items-center gap-1">
                                         <span
                                             className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-transform duration-150 ${
-                                                stamped ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
+                                                stamped
+                                                    ? "bg-gradient-to-br from-lime-400 to-green-500 text-white"
+                                                    : "bg-gray-200 text-gray-600"
                                             } ${pulse ? "scale-110" : ""}`}
                                         >
-                                            {stamped ? "✔" : String(i + 1)}
+                                            {stamped ? "🌱" : String(i + 1)}
                                         </span>
                                     </div>
                                 );
@@ -499,7 +476,7 @@ export default function Home() {
                                             localStorage.setItem("checkinModalDismissedDate", todayKey);
                                             setShowCheckinModal(false);
                                         }}
-                                        className="px-4 py-2 border rounded-lg text-gray-700"
+                                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                                     >
                                         나중에
                                     </button>
@@ -515,11 +492,9 @@ export default function Home() {
                                                 });
                                                 const data = await res.json();
                                                 if (res.ok) {
-                                                    // 기존 도장은 유지하고, 새로 찍는 칸만 강조 애니메이션 처리
-                                                    const prevProgress = cycleProgress || 0; // 0~6
-                                                    const targetIdx = prevProgress === 6 ? 6 : prevProgress; // 오늘 새로 찍을 인덱스
+                                                    const prevProgress = cycleProgress || 0;
+                                                    const targetIdx = prevProgress === 6 ? 6 : prevProgress;
 
-                                                    // 애니 시작: 강조 대상만 pulse
                                                     setAnimStamps([false, false, false, false, false, false, false]);
                                                     setTimeout(() => {
                                                         setAnimStamps((_) => {
@@ -532,11 +507,10 @@ export default function Home() {
                                                                 false,
                                                                 false,
                                                             ];
-                                                            next[targetIdx] = true; // pulse 대상
+                                                            next[targetIdx] = true;
                                                             return next;
                                                         });
                                                         setTimeout(() => {
-                                                            // 최종 반영: weekStamps에 새 도장 고정, animStamps 해제
                                                             setWeekStamps((prev) => {
                                                                 const next = [...prev];
                                                                 next[targetIdx] = true;
@@ -555,8 +529,10 @@ export default function Home() {
                                                 setIsStamping(false);
                                             }
                                         }}
-                                        className={`px-4 py-2 rounded-lg text-white ${
-                                            isStamping ? "bg-gray-400" : "bg-purple-600"
+                                        className={`px-4 py-2 rounded-lg text-white font-semibold ${
+                                            isStamping
+                                                ? "bg-gray-400"
+                                                : "bg-gradient-to-r from-lime-400 to-green-500 hover:from-lime-500 hover:to-green-600"
                                         }`}
                                     >
                                         {isStamping ? "도장 찍는 중..." : "출석 체크 하기"}
@@ -565,14 +541,13 @@ export default function Home() {
                             ) : (
                                 <button
                                     onClick={() => {
-                                        // 오늘 확인했음을 기록하여 같은 날 재등장 방지
                                         const todayKey = getLocalTodayKey();
                                         localStorage.setItem("checkinModalDismissedDate", todayKey);
                                         setShowCheckinModal(false);
                                         setAnimStamps(null);
                                         setStampCompleted(false);
                                     }}
-                                    className="hover:cursor-pointer px-6 py-2 rounded-lg bg-blue-600 text-white"
+                                    className="hover:cursor-pointer px-6 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:from-green-600 hover:to-emerald-600"
                                 >
                                     확인
                                 </button>
@@ -583,31 +558,7 @@ export default function Home() {
             )}
 
             <>
-                {/* 지역 검색 바 */}
-                <div className="max-w-7xl mx-auto px-4 mb-4 mt-2">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            value={searchRegion}
-                            onChange={(e) => setSearchRegion(e.target.value)}
-                            placeholder="지역으로 검색"
-                            className="w-full border border-gray-300 rounded-xl py-3 pl-3 pr-28 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800"
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") setSubmittedRegion(searchRegion.trim());
-                            }}
-                        />
-                        <button
-                            onClick={() => setSubmittedRegion(searchRegion.trim())}
-                            className="hover:cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
-                        >
-                            검색
-                        </button>
-                    </div>
-                    {submittedRegion && (
-                        <div className="mt-2 text-sm text-gray-600">지역: "{submittedRegion}" 추천 결과</div>
-                    )}
-                </div>
-                {/* Hero Section - 대형 슬라이드 (카드형) */}
+                {/* 검색 바 제거 */}
                 <HeroSlider
                     items={topCourses.map((c) => ({
                         id: c.id,
@@ -617,18 +568,19 @@ export default function Home() {
                         tags: c.tags,
                     }))}
                 />
-                {/* 컨셉/인기/새로운 탭형 가로 캐러셀 섹션 */}
                 <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
-                {/* ✨ 개인화 추천 섹션 */}
                 {recs.length > 0 && (
                     <section className="py-10">
                         <div className="max-w-7xl mx-auto px-4">
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-black ">✨ 당신을 위한 추천</h2>
+                                <h2 className="text-xl font-bold text-black flex items-center gap-2">
+                                    <span className="text-2xl">🌿</span>
+                                    당신을 위한 추천
+                                </h2>
                                 <Link
                                     href="/courses?recommended=1"
                                     aria-label="코스 더 보기"
-                                    className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 text-gray-700 hover:bg-gray-50"
+                                    className="w-8 h-8 flex items-center justify-center rounded-full border border-green-300 text-green-700 hover:bg-green-50"
                                 >
                                     ›
                                 </Link>
@@ -638,16 +590,20 @@ export default function Home() {
                                     <Link
                                         key={c.id}
                                         href={`/courses/${c.id}`}
-                                        className="min-w-[200px] bg-white rounded-xl shadow border border-gray-200 hover:shadow-md transition"
+                                        className="min-w-[200px] bg-white rounded-xl shadow border border-green-100 hover:shadow-md hover:border-green-200 transition"
                                     >
-                                        <div className="relative text-black w-full h-32 overflow-hidden rounded-t-xl bg-gray-100">
-                                            <Image
-                                                src={c.imageUrl || "/images/maker.png"}
-                                                alt={c.title}
-                                                fill
-                                                sizes="(max-width: 768px) 200px, 240px"
-                                                className="object-cover"
-                                            />
+                                        <div className="relative text-black w-full h-32 overflow-hidden rounded-t-xl bg-gray-200">
+                                            {c.imageUrl ? (
+                                                <Image
+                                                    src={c.imageUrl}
+                                                    alt={c.title}
+                                                    fill
+                                                    sizes="(max-width: 768px) 200px, 240px"
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-gray-200" />
+                                            )}
                                         </div>
                                         <div className="p-3">
                                             <div className="font-semibold line-clamp-1 text-black">{c.title}</div>
@@ -661,7 +617,6 @@ export default function Home() {
                         </div>
                     </section>
                 )}
-                {/* 개인화 온보딩 섹션 */}
                 <OnboardingSection onStart={handleStartOnboarding} />
             </>
         </>
@@ -721,7 +676,6 @@ function TabbedConcepts({
     const cardBase =
         "snap-start w-[130px] min-w-[130px] bg-white rounded-2xl border border-gray-200 text-black flex flex-col items-center py-6";
 
-    // 데스크톱에서 마우스 드래그로 가로 스크롤 지원
     const trackRef = useRef<HTMLDivElement | null>(null);
     const isDownRef = useRef(false);
     const startXRef = useRef(0);
@@ -754,7 +708,6 @@ function TabbedConcepts({
         trackRef.current.scrollLeft = scrollLeftRef.current - dx;
     };
 
-    // 네이티브 wheel 이벤트를 passive: false로 등록하여 콘솔 경고 없이 세로휠→가로스크롤 처리
     useEffect(() => {
         const el = trackRef.current;
         if (!el) return;
@@ -788,7 +741,7 @@ function TabbedConcepts({
                             onClick={() => setActiveTab(tab.key as any)}
                             className={`px-4 py-2 rounded-full border transition shadow-sm hover:cursor-pointer ${
                                 activeTab === tab.key
-                                    ? "bg-white text-blue-600 border-blue-300 shadow"
+                                    ? "bg-white text-green-600 border-green-300 shadow"
                                     : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-white "
                             }`}
                         >
@@ -809,7 +762,7 @@ function TabbedConcepts({
                             <button
                                 key={item.name}
                                 onClick={() => router.push(`/courses?concept=${encodeURIComponent(item.name)}`)}
-                                className={`${cardBase} cursor-pointer`}
+                                className={`${cardBase} cursor-pointer hover:border-green-200 hover:shadow-md transition`}
                             >
                                 <div className="w-20 h-20 rounded-full overflow-hidden mb-4 ">
                                     {item.imageUrl ? (
@@ -821,11 +774,11 @@ function TabbedConcepts({
                                             className="object-cover w-full h-full"
                                         />
                                     ) : (
-                                        <div className="w-full h-full bg-gray-200" />
+                                        <div className="w-full h-full bg-gradient-to-br from-green-100 to-emerald-100" />
                                     )}
                                 </div>
                                 <div className="text-lg font-bold text-gray-900 mb-2">{item.name}</div>
-                                <div className="text-blue-600 font-semibold">{item.count}개 코스</div>
+                                <div className="text-green-600 font-semibold">{item.count}개 코스</div>
                             </button>
                         ))}
                     </div>
@@ -840,7 +793,11 @@ function TabbedConcepts({
                         onMouseMove={handleMouseMove}
                     >
                         {hotCourses.map((c) => (
-                            <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
+                            <Link
+                                key={c.id}
+                                href={`/courses/${c.id}`}
+                                className={`${cardBase} hover:border-green-200 hover:shadow-md transition`}
+                            >
                                 <div className="w-20 h-20  rounded-full overflow-hidden mb-4">
                                     {c.imageUrl ? (
                                         <Image
@@ -855,7 +812,7 @@ function TabbedConcepts({
                                     )}
                                 </div>
                                 <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
-                                <div className="text-blue-600 font-semibold">
+                                <div className="text-green-600 font-semibold">
                                     {(typeof c.view_count === "number" && Number.isFinite(c.view_count)
                                         ? c.view_count
                                         : (c as any).viewCount ?? 0
@@ -876,7 +833,11 @@ function TabbedConcepts({
                         onMouseMove={handleMouseMove}
                     >
                         {newCourses.map((c) => (
-                            <Link key={c.id} href={`/courses/${c.id}`} className={`${cardBase}`}>
+                            <Link
+                                key={c.id}
+                                href={`/courses/${c.id}`}
+                                className={`${cardBase} hover:border-green-200 hover:shadow-md transition`}
+                            >
                                 <div className="w-20 h-20  rounded-full overflow-hidden mb-4">
                                     {c.imageUrl ? (
                                         <Image
@@ -891,7 +852,10 @@ function TabbedConcepts({
                                     )}
                                 </div>
                                 <div className="text-lg font-bold text-gray-900 mb-1 line-clamp-1">{c.title}</div>
-                                <div className="text-blue-600 font-semibold">NEW</div>
+                                <div className="text-green-600 font-semibold flex items-center gap-1">
+                                    <span className="text-lg">🌱</span>
+                                    NEW
+                                </div>
                             </Link>
                         ))}
                     </div>
@@ -922,16 +886,16 @@ function ConceptSection() {
         fetchConceptCounts();
     }, []);
     const concepts = [
-        { name: "카페투어", icon: "☕", gradient: "from-brown-400 to-amber-500" },
+        { name: "카페투어", icon: "☕", gradient: "from-amber-400 to-orange-400" },
         { name: "맛집탐방", icon: "🍜", gradient: "from-red-400 to-orange-500" },
-        { name: "인생샷", icon: "📸", gradient: "from-purple-400 to-pink-500" },
-        { name: "체험", icon: "🎯", gradient: "from-blue-400 to-indigo-500" },
+        { name: "인생샷", icon: "📸", gradient: "from-green-300 to-emerald-400" },
+        { name: "체험", icon: "🎯", gradient: "from-lime-400 to-green-500" },
         { name: "힐링", icon: "🌿", gradient: "from-green-400 to-emerald-500" },
-        { name: "공연·전시", icon: "🏛️", gradient: "from-yellow-400 to-orange-500" },
-        { name: "야경", icon: "🌃", gradient: "from-purple-500 to-pink-500" },
-        { name: "힙스터", icon: "🎨", gradient: "from-pink-400 to-red-500" },
-        { name: "테마파크", icon: "🎢", gradient: "from-indigo-500 to-sky-500" },
-        { name: "핫플레이스", icon: "🔥", gradient: "from-rose-500 to-pink-500" },
+        { name: "공연·전시", icon: "🏛️", gradient: "from-teal-400 to-cyan-500" },
+        { name: "야경", icon: "🌃", gradient: "from-green-500 to-teal-600" },
+        { name: "힙스터", icon: "🎨", gradient: "from-lime-400 to-green-500" },
+        { name: "테마파크", icon: "🎢", gradient: "from-emerald-400 to-green-500" },
+        { name: "핫플레이스", icon: "🔥", gradient: "from-orange-400 to-red-500" },
         { name: "이색데이트", icon: "🧪", gradient: "from-teal-400 to-cyan-500" },
     ];
     if (loading) {
@@ -971,15 +935,15 @@ function ConceptSection() {
                                 {hasCourses ? (
                                     <Link
                                         href={`/courses?concept=${encodeURIComponent(concept.name)}`}
-                                        className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block"
+                                        className="group relative p-6 bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 block border border-green-100 hover:border-green-200"
                                     >
-                                        <div className="absolute inset-0 bg-sky-100 opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity" />
+                                        <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-emerald-50 opacity-0 group-hover:opacity-100 rounded-2xl transition-opacity" />
                                         <div className="relative text-center">
                                             <div className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">
                                                 {concept.icon}
                                             </div>
                                             <h3 className="font-bold text-gray-800">{concept.name}</h3>
-                                            <p className="text-sm text-gray-500 mt-1">
+                                            <p className="text-sm text-green-600 mt-1 font-medium">
                                                 {conceptCounts[concept.name]}개 코스
                                             </p>
                                         </div>
@@ -1001,7 +965,7 @@ function ConceptSection() {
                     <div className="text-center mt-8">
                         <button
                             onClick={() => setShowAll(true)}
-                            className="rounded-2xl hover:cursor-pointer w-full border border-gray-200 bg-white text-gray-800 py-3 text-center hover:bg-gray-50"
+                            className="rounded-2xl hover:cursor-pointer w-full border border-green-200 bg-white text-gray-800 py-3 text-center hover:bg-green-50 transition-colors"
                         >
                             더 많은 컨셉 보기 ({concepts.length - 6}개 더)
                         </button>
@@ -1011,7 +975,7 @@ function ConceptSection() {
                     <div className="text-center mt-8">
                         <button
                             onClick={() => setShowAll(false)}
-                            className="rounded-2xl hover:cursor-pointer w-full border border-gray-200 bg-white text-gray-800 py-3 text-center hover:bg-gray-50"
+                            className="rounded-2xl hover:cursor-pointer w-full border border-green-200 bg-white text-gray-800 py-3 text-center hover:bg-green-50 transition-colors"
                         >
                             접기
                         </button>

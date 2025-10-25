@@ -6,6 +6,7 @@ import Script from "next/script";
 import "./globals.css";
 import LayoutContent from "@/components/LayoutContent";
 import { Providers } from "@/components/Providers";
+import Footer from "@/components/Footer";
 
 const inter = Inter({
     variable: "--font-geist-sans",
@@ -48,9 +49,14 @@ export default function RootLayout({
                     }}
                 />
             </head>
-            {/* [수정] h-screen과 overflow-hidden을 추가하여 body 자체의 스크롤을 막습니다. */}
             <body
-                className={`${inter.variable} antialiased h-screen overflow-hidden flex flex-col typography-smooth bg-gray-100`}
+                className={`${inter.variable} antialiased h-screen overflow-hidden flex flex-col typography-smooth`}
+                style={{
+                    background: "var(--background)",
+                    color: "var(--foreground)",
+                    backgroundImage:
+                        "radial-gradient(1200px 600px at 10% -10%, rgba(153,192,142,0.18), transparent), radial-gradient(900px 500px at 110% 20%, rgba(121,160,111,0.15), transparent)",
+                }}
             >
                 <Script src="https://www.googletagmanager.com/gtag/js?id=G-R3EYQNXY13" strategy="afterInteractive" />
                 <Script
@@ -62,6 +68,7 @@ export default function RootLayout({
                 />
                 <Providers>
                     <LayoutContent>{children}</LayoutContent>
+                    <Footer />
                 </Providers>
             </body>
         </html>

@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
 :root {
-    --background: #ffffff;
-    --foreground: #171717;
+    --brand-green: #99c08e;
+    --brand-green-dark: #7aa06f;
+    --brand-green-verydark: #4f6d45;
+    --brand-cream: #f5f7f2;
+    --brand-ink: #1e2a1a;
+
+    --background: var(--brand-cream);
+    --foreground: var(--brand-ink);
 }
 
 :root {
@@ -11,10 +17,11 @@
     --font-sans: var(--font-geist-sans);
     --font-mono: var(--font-geist-mono);
 }
+/* 다크모드도 자연 그린톤 유지 (채도/명도 보정) */
 @media (prefers-color-scheme: dark) {
     :root {
-        --background: #0a0a0a;
-        --foreground: #ededed;
+        --background: #0f1710; /* 어두운 포레스트 */
+        --foreground: #e7efe4; /* 밝은 크림 텍스트 */
     }
 }
 
@@ -117,23 +124,41 @@ body {
 /* 공통 컴포넌트 스타일 (팔레트/컴포넌트 통일) */
 @layer components {
     .btn-primary {
-        @apply inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm active:shadow;
+        @apply inline-flex items-center justify-center px-4 py-2 text-white rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm active:shadow;
+        background-color: var(--brand-green);
+    }
+    .btn-primary:hover {
+        background-color: var(--brand-green-dark);
     }
 
     .btn-secondary {
-        @apply inline-flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors shadow-sm active:shadow;
+        @apply inline-flex items-center justify-center px-4 py-2 border rounded-lg font-medium transition-colors shadow-sm active:shadow;
+        background-color: #ffffff;
+        border-color: var(--brand-green);
+        color: var(--brand-ink);
+    }
+    .btn-secondary:hover {
+        background-color: #f9fbf7;
     }
 
     .input {
-        @apply w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow;
+        @apply w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 transition-shadow;
+        border-color: color-mix(in oklab, var(--brand-green) 30%, #d1d5db);
+        --tw-ring-color: var(--brand-green);
+        --tw-ring-offset-shadow: 0 0 #0000;
+        --tw-ring-shadow: 0 0 #0000;
     }
 
     .textarea {
-        @apply w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow min-h-28;
+        @apply w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 transition-shadow min-h-28;
+        border-color: color-mix(in oklab, var(--brand-green) 30%, #d1d5db);
+        --tw-ring-color: var(--brand-green);
     }
 
     .card {
-        @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+        @apply rounded-xl border shadow-sm;
+        border-color: color-mix(in oklab, var(--brand-green) 25%, #e5e7eb);
+        background: #ffffff;
     }
 
     /* 제목/브랜드 영역에 사용하는 폰트 유틸 */

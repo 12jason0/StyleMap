@@ -223,12 +223,8 @@ const Header = () => {
                 <div className="flex justify-between items-center h-16">
                     {/* 로고 */}
                     <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
-                        <img
-                            src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoicon-navy.png"
-                            alt="StyleMap"
-                            className="w-8 h-8 rounded-lg object-contain"
-                        />
-                        <span className="text-xl font-bold text-gray-900">StyleMap</span>
+                        <img src="" alt="dona" className="w-8 h-8 rounded-lg object-contain" />
+                        <span className="text-xl font-bold text-gray-900">두나</span>
                     </Link>
 
                     {/* 모바일 스타일 헤더를 웹에서도 동일하게 사용 */}

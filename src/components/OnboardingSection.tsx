@@ -22,7 +22,7 @@ export default function OnboardingSection({ onStart }: Props) {
                             <p className="text-gray-600 mb-4">3분만 투자하면 완전히 다른 경험을 드릴게요</p>
                             <button
                                 onClick={onStart}
-                                className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+                                className="hover:cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-[#99c08e] text-white rounded-lg font-semibold transition-colors"
                             >
                                 내 취향 설정하기<span>→</span>
                             </button>
@@ -33,10 +33,3 @@ export default function OnboardingSection({ onStart }: Props) {
         </section>
     );
 }
-
-
-
-
-
-
-
