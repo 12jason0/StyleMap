@@ -10,7 +10,7 @@ export type ItemType = "tree" | "fence" | "path" | null;
 
 export default function GardenScene() {
     const router = useRouter();
-    const [mode, setMode] = useState<"view" | "edit">("view");
+    const [mode, setMode] = useState<"view" | "edit">("view");  
     const [selectedItem, setSelectedItem] = useState<ItemType>(null);
 
     // 12x12 정원 grid
