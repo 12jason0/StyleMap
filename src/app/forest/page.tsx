@@ -3,68 +3,63 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function GrowForestPage() {
-    const [level, setLevel] = useState(1); // 유지: 시각적 크기 변화용 (선택)
-    const [exp, setExp] = useState(0); // 유지: 막대 표현 재사용
-    const [water, setWater] = useState(3);
-    const [watersCount, setWatersCount] = useState(0); // 누적 물주기 횟수
-    const [completedTrees, setCompletedTrees] = useState<number>(0);
+    const router = useRouter();
+    const [level, setLevel] = useState(1); // 시각적 크기 변화용
+    const [exp, setExp] = useState(0);
+    const [watersCount, setWatersCount] = useState(0);
     const [hasGardenKey, setHasGardenKey] = useState<boolean>(false);
     const REQUIRED_WATERS = 15;
     const [lastWaterAt, setLastWaterAt] = useState<number | null>(null);
 
     useEffect(() => {
-        try {
-            const raw = localStorage.getItem("forest_state");
-            if (raw) {
-                const s = JSON.parse(raw);
-                setLevel(s.level ?? 1);
-                setExp(s.exp ?? 0);
-                setWater(s.water ?? 3);
-                setLastWaterAt(s.lastWaterAt ?? null);
-                setWatersCount(s.watersCount ?? 0);
-                setCompletedTrees(s.completedTrees ?? 0);
-                setHasGardenKey(s.hasGardenKey ?? false);
-            }
-        } catch {}
+        (async () => {
+            try {
+                const token = localStorage.getItem("authToken");
+                const headers: any = token ? { Authorization: `Bearer ${token}` } : {};
+                const res = await fetch("/api/forest/tree/current", { headers, cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                const count = Number(data?.waterCount || 0);
+                const required = Number(data?.required || REQUIRED_WATERS);
+                setWatersCount(count);
+                setExp(Math.min(100, Math.round((count / required) * 100)));
+            } catch {}
+            try {
+                const token = localStorage.getItem("authToken");
+                const headers: any = token ? { Authorization: `Bearer ${token}` } : {};
+                const res = await fetch("/api/garden", { headers, cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                const unlocked = Boolean(data?.garden?.isUnlocked);
+                setHasGardenKey(unlocked);
+                if (unlocked) router.push("/garden");
+            } catch {}
+        })();
     }, []);
 
-    useEffect(() => {
+    const handleWater = async (amount = 1) => {
         try {
-            localStorage.setItem(
-                "forest_state",
-                JSON.stringify({ level, exp, water, lastWaterAt, watersCount, completedTrees, hasGardenKey })
-            );
-        } catch {}
-    }, [level, exp, water, lastWaterAt, watersCount, completedTrees, hasGardenKey]);
-
-    const handleWater = () => {
-        if (water <= 0) return;
-        setWater((w) => w - 1);
-        setWatersCount((n) => {
-            const next = n + 1;
-            // 진행도 바 - 15회를 100% 기준으로 환산
-            setExp(Math.min(100, Math.round((next / REQUIRED_WATERS) * 100)));
-            if (next >= REQUIRED_WATERS) {
-                // 나무 완성 처리
-                setCompletedTrees((c) => c + 1);
+            const token = localStorage.getItem("authToken");
+            const headers: any = { "Content-Type": "application/json" };
+            if (token) headers.Authorization = `Bearer ${token}`;
+            const res = await fetch("/api/forest/water", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({ source: "admin", amount }),
+            });
+            const data = await res.json().catch(() => ({}));
+            const required = Number(data?.required || REQUIRED_WATERS);
+            const count = Number(data?.waterCount || 0);
+            setWatersCount(count);
+            setExp(Math.min(100, Math.round((count / required) * 100)));
+            if (data?.completed) {
                 setHasGardenKey(true);
-                try {
-                    const raw = localStorage.getItem("garden_trees");
-                    const list: any[] = raw ? JSON.parse(raw) : [];
-                    const id = Date.now();
-                    list.push({ id, completedAt: Date.now() });
-                    localStorage.setItem("garden_trees", JSON.stringify(list));
-                } catch {}
-                // 다음 나무를 위한 초기화
-                setWatersCount(0);
-                setExp(0);
-                setLevel((lv) => lv + 1); // 크기 업그레이드 유지(선택)
+                setLevel((lv) => lv + 1);
+                router.push("/garden");
             }
-            return next >= REQUIRED_WATERS ? 0 : next;
-        });
-        setLastWaterAt(Date.now());
+            setLastWaterAt(Date.now());
+        } catch {}
     };
 
     return (
@@ -99,35 +94,25 @@ export default function GrowForestPage() {
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                     <button
-                        onClick={handleWater}
-                        disabled={water <= 0}
-                        className={`px-4 py-2 rounded-lg text-white text-sm sm:text-base font-semibold ${
-                            water > 0 ? "bg-green-600 hover:bg-green-700" : "bg-gray-400"
-                        }`}
+                        onClick={() => handleWater(1)}
+                        className="px-4 py-2 rounded-lg text-white text-sm sm:text-base font-semibold bg-green-600 hover:bg-green-700"
                     >
-                        물 주기 ({water}회)
+                        물 주기
                     </button>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setWater((w) => w + 10)}
+                            onClick={() => handleWater(10)}
                             className="px-3 py-2 rounded-lg border border-green-300 text-green-700 text-sm hover:bg-green-50"
                         >
                             물 10개 받기
                         </button>
                         {hasGardenKey && (
-                            <a
-                                href="/garden"
-                                className="px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm"
+                            <button
+                                onClick={() => router.push("/garden")}
+                                className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm"
                             >
-                                정원 열기
-                            </a>
-                        )}
-                        {lastWaterAt ? (
-                            <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
-                                마지막 물주기 {new Date(lastWaterAt).toLocaleTimeString()}
-                            </div>
-                        ) : (
-                            <div className="text-xs sm:text-sm text-gray-400">아직 기록 없음</div>
+                                🏡 나의 정원으로 가기
+                            </button>
                         )}
                     </div>
                 </div>

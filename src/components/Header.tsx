@@ -223,7 +223,7 @@ const Header = () => {
                 <div className="flex justify-between items-center h-16">
                     {/* 로고 */}
                     <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
-                        <img src="" alt="dona" className="w-8 h-8 rounded-lg object-contain" />
+                        {/* <img src="" alt="dona" className="w-8 h-8 rounded-lg object-contain" /> */}
                         <span className="text-xl font-bold text-gray-900">두나</span>
                     </Link>
 
@@ -327,6 +327,20 @@ const Header = () => {
                             onClick={closeMenu}
                         >
                             지도
+                        </Link>
+                        <Link
+                            href="/forest"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            숲
+                        </Link>
+                        <Link
+                            href="/garden"
+                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                            onClick={closeMenu}
+                        >
+                            정원
                         </Link>
                         <Link
                             href="/escape"

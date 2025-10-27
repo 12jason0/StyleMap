@@ -565,6 +565,82 @@ function EscapeIntroPageInner() {
         String(v ?? "")
             .trim()
             .toLowerCase();
+
+    // --- 통합 상태 전환 헬퍼 ---
+    const changeFlowStep = (newStep: typeof flowStep, options?: { resetMission?: boolean; resetPlace?: boolean }) => {
+        if (endingStartedRef.current && newStep !== "done") return;
+        setFlowStep(newStep);
+        if (options?.resetMission) {
+            try {
+                setMissionUnlocked(false);
+                setActiveMission(null);
+                setMissionModalOpen(false);
+                setModalAnswer("");
+                setModalError(null);
+                setModalWrongOnce(false);
+            } catch {}
+        }
+        if (options?.resetPlace) {
+            try {
+                setSelectedPlaceId(null);
+                setSelectedPlaceIndex(null);
+                setSelectedPlaceConfirm(null);
+            } catch {}
+        }
+    };
+
+    // --- 제출 후 진행 통합 ---
+    const proceedAfterMission = async () => {
+        try {
+            const place = (currentChapter?.placeOptions || []).find(
+                (p: any) => Number(p.id) === Number(selectedPlaceId)
+            );
+            const queue: string[] = Array.isArray((place as any)?.stories)
+                ? (place as any).stories
+                      .map((s: any) => String(s?.dialogue || s?.narration || s || "").trim())
+                      .filter(Boolean)
+                : [];
+            if (queue.length > 0) {
+                setPostStoryQueue(queue);
+                setPostStoryIdx(0);
+                setShowPostStory(true);
+                return;
+            }
+        } catch {}
+        // 스토리 없으면 카테고리 화면으로
+        changeFlowStep("category", { resetMission: true });
+    };
+
+    // --- 통합 제출 함수 ---
+    const submitMission = async (args: {
+        chapterId: number;
+        missionType: string;
+        photoUrls?: string[];
+        textAnswer?: string;
+        isCorrect?: boolean;
+    }): Promise<{ success: boolean; error?: string }> => {
+        try {
+            const res = await fetch("/api/submit-mission", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    chapterId: args.chapterId,
+                    isCorrect: args.isCorrect ?? true,
+                    textAnswer: args.textAnswer,
+                    photoUrls: args.photoUrls,
+                    missionType: args.missionType,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({} as any));
+                return { success: false, error: err?.message || "제출 실패" };
+            }
+            return { success: true };
+        } catch (e: any) {
+            return { success: false, error: e?.message || "제출 실패" };
+        }
+    };
     const isCorrectForPayload = (payload: any, userInput: string): boolean => {
         const user = normalizeAnswer(userInput);
         const ans = (payload && (payload.answer ?? payload.correct ?? payload.answers)) as any;
@@ -1401,12 +1477,7 @@ function EscapeIntroPageInner() {
                 .pop();
             const chapterId = last?.id || currentChapter?.id;
             if (chapterId) {
-                await fetch("/api/submit-mission", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ chapterId, isCorrect: true, photoUrls: [url] }),
-                });
+                await submitMission({ chapterId, missionType: "PHOTO", isCorrect: true, photoUrls: [url] });
             }
 
             setToast("마이페이지에 저장되었습니다.");
@@ -1550,77 +1621,30 @@ function EscapeIntroPageInner() {
                 } catch {}
                 if (Array.isArray(urls)) setLastUploadedUrls(urls);
 
-                // 요청하신 인라인 저장 호출 추가
-                if (urls.length > 0) {
-                    try {
-                        const res = await fetch("/api/submit-mission", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            keepalive: true,
-                            body: JSON.stringify({
-                                chapterId: Number(selectedPlaceId ?? currentChapter?.id),
-                                isCorrect: true,
-                                photoUrls: urls,
-                            }),
-                        });
-                        try {
-                            console.log("[MissionSubmit] status:", res.status);
-                        } catch {}
-                        if (!res.ok) {
-                            const err = await res.json().catch(() => ({}));
-                            try {
-                                console.error("[MissionSubmit] failed:", err);
-                            } catch {}
-                        }
-                    } catch (err) {
-                        try {
-                            console.error("[MissionSubmit] network error:", err);
-                        } catch {}
-                        try {
-                            const payload = new Blob(
-                                [
-                                    JSON.stringify({
-                                        chapterId: Number(selectedPlaceId ?? currentChapter?.id),
-                                        isCorrect: true,
-                                        photoUrls: urls,
-                                    }),
-                                ],
-                                { type: "application/json" }
-                            );
-                            const ok =
-                                (navigator as any)?.sendBeacon &&
-                                (navigator as any).sendBeacon("/api/submit-mission", payload);
-                            if (ok) console.log("[MissionSubmit] sent via sendBeacon");
-                        } catch {}
-                    }
-                }
+                // 통합 제출 사용
+                const r = await submitMission({
+                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                    missionType,
+                    photoUrls: urls,
+                    isCorrect: true,
+                });
+                if (!r.success) throw new Error(r.error || "미션 저장 실패");
             } else if (missionType === "PUZZLE_ANSWER") {
-                submissionPayload.textAnswer = puzzleAnswer;
+                const r = await submitMission({
+                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                    missionType,
+                    isCorrect: true,
+                    textAnswer: puzzleAnswer,
+                });
+                if (!r.success) throw new Error(r.error || "미션 저장 실패");
             } else {
                 try {
                     console.log("[DEBUG-NON-PHOTO] missionType branch:", missionType);
                 } catch {}
             }
 
-            setToast("미션 결과 저장 중...");
-            try {
-                console.log("[DEBUG-5] Before submit-mission fetch, payload:", submissionPayload);
-            } catch {}
-            const submitResponse = await fetch("/api/submit-mission", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-                credentials: "include",
-                body: JSON.stringify(submissionPayload),
-            });
-            const submitResult = await submitResponse.json().catch(() => ({}));
-            try {
-                console.log("[DEBUG-6] submit-mission status:", submitResponse.status);
-                console.log("[DEBUG-7] submit-mission result:", submitResult);
-            } catch {}
-            if (!submitResponse.ok) {
-                throw new Error(submitResult?.message || "미션 결과 저장에 실패했습니다.");
-            }
+            // 저장 완료 안내
+            setToast("미션 완료!");
 
             setToast("미션 완료!");
 
@@ -1658,14 +1682,10 @@ function EscapeIntroPageInner() {
                     }
                 } catch {}
                 // ✅ 다음 카테고리로 이동하되, 미션 완료 상태는 유지
-                setMissionUnlocked(false);
-                setSelectedPlaceId(null);
-                setSelectedPlaceIndex(null);
-                setSelectedPlaceConfirm(null);
+                changeFlowStep("category", { resetMission: true, resetPlace: true });
                 setCurrentChapterIdx(nextIdx);
                 setDialogueStep(0);
                 setSelectedCategory(null);
-                setFlowStep("category");
             } else {
                 if (endingFlowStarted) return;
                 setEndingFlowStarted(true);
@@ -1743,64 +1763,53 @@ function EscapeIntroPageInner() {
         const nextIdx = currentChapterIdx + 1;
         if (nextIdx < chapters.length) {
             setCurrentChapterIdx(nextIdx);
-        } else {
-            // 모든 카테고리를 완료한 경우: 즉시 엔딩 플로우 시작
-            if (endingFlowStarted) {
-                setFlowStep("done");
-                // 이미 시작된 경우라도 엔딩 스텝이 비어 있으면 기본 갤러리로 설정
-                setEndingStep((prev) => (prev ? prev : "gallery"));
-                return;
-            }
-            setEndingFlowStarted(true);
-            setIsEndFlip(true);
-            setFlowStep("done");
-            setTimeout(async () => {
-                setIsEndFlip(false);
-                try {
-                    const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, {
-                        credentials: "include",
-                    });
-                    const data = await res.json();
-                    if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
-                } catch {}
-                try {
-                    const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
-                    const bd = await br.json();
-                    if (br.ok && bd?.badge) {
-                        setBadge(bd.badge);
-                        if (bd.badge.id) {
-                            const token = localStorage.getItem("authToken");
-                            await fetch("/api/users/badges", {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                                },
-                                credentials: "include",
-                                body: JSON.stringify({ badgeId: bd.badge.id }),
-                            });
-                        }
-                    }
-                } catch {}
-                setEndingStep("gallery");
-            }, 800);
+            changeFlowStep("category", { resetMission: true, resetPlace: true });
+            setDialogueStep(0);
+            setSelectedCategory(null);
+            try {
+                localStorage.setItem(`escape_letter_shown_${storyId}`, "1");
+                setIsLetterOpened(true);
+            } catch {}
             return;
         }
 
-        setMissionUnlocked(false);
-        setSelectedPlaceId(null);
-        setSelectedPlaceIndex(null);
-        setSelectedPlaceConfirm(null);
-        setClearedMissions({});
-        setSolvedMissionIds([]);
-        setDialogueStep(0);
-        setSelectedCategory(null);
-        setFlowStep("category");
-        try {
-            // 이후에는 편지를 다시 보이지 않도록 플래그 유지
-            localStorage.setItem(`escape_letter_shown_${storyId}`, "1");
-            setIsLetterOpened(true);
-        } catch {}
+        // 모든 카테고리 완료 → 엔딩 진입(가드 포함)
+        if (endingFlowStarted) {
+            setFlowStep("done");
+            setEndingStep((prev) => (prev ? prev : "gallery"));
+            return;
+        }
+        setEndingFlowStarted(true);
+        setIsEndFlip(true);
+        setFlowStep("done");
+        setTimeout(async () => {
+            setIsEndFlip(false);
+            try {
+                const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, { credentials: "include" });
+                const data = await res.json();
+                if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
+            } catch {}
+            try {
+                const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
+                const bd = await br.json();
+                if (br.ok && bd?.badge) {
+                    setBadge(bd.badge);
+                    if (bd.badge.id) {
+                        const token = localStorage.getItem("authToken");
+                        await fetch("/api/users/badges", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                            credentials: "include",
+                            body: JSON.stringify({ badgeId: bd.badge.id }),
+                        });
+                    }
+                }
+            } catch {}
+            setEndingStep("gallery");
+        }, 800);
     };
     // 1️⃣ chapters를 useMemo로 감싸기
     const memoChapters = useMemo(() => chapters, [chapters?.length]);
@@ -2836,20 +2845,13 @@ function EscapeIntroPageInner() {
                                             if (urls.length === 0) throw new Error("업로드된 사진 URL이 없습니다.");
 
                                             setToast("미션 결과 저장 중...");
-                                            const submitRes = await fetch("/api/submit-mission", {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                credentials: "include",
-                                                body: JSON.stringify({
-                                                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
-                                                    isCorrect: true,
-                                                    photoUrls: urls,
-                                                }),
+                                            const r = await submitMission({
+                                                chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                                missionType: t,
+                                                photoUrls: urls,
+                                                isCorrect: true,
                                             });
-                                            if (!submitRes.ok) {
-                                                const err = await submitRes.json().catch(() => ({}));
-                                                throw new Error(err?.message || "미션 저장 실패");
-                                            }
+                                            if (!r.success) throw new Error(r.error || "미션 저장 실패");
                                         } else if (t === "PUZZLE_ANSWER") {
                                             const ok = isCorrectForPayload(payload, modalAnswer);
                                             if (!ok) {
@@ -2859,46 +2861,26 @@ function EscapeIntroPageInner() {
                                             }
                                             setModalError(null);
                                             setModalWrongOnce(false);
-                                            await fetch("/api/submit-mission", {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                credentials: "include",
-                                                body: JSON.stringify({
-                                                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
-                                                    isCorrect: true,
-                                                    textAnswer: (modalAnswer || "").trim(),
-                                                }),
+                                            await submitMission({
+                                                chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                                missionType: t,
+                                                isCorrect: true,
+                                                textAnswer: (modalAnswer || "").trim(),
                                             });
                                         }
 
-                                        // 공통 후처리: 모달 종료 및 이후 스토리/완료 처리 연결
+                                        // 공통 후처리
                                         setMissionModalOpen(false);
-                                        try {
-                                            const place = (currentChapter?.placeOptions || []).find(
-                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                        if (activeMission?.id != null) {
+                                            setSolvedMissionIds((prev) =>
+                                                Array.from(new Set([...prev, Number(activeMission.id)]))
                                             );
-                                            const placeQueue: string[] = Array.isArray((place as any)?.stories)
-                                                ? (place as any).stories
-                                                      .map((s: any) =>
-                                                          String(s?.dialogue || s?.narration || s || "").trim()
-                                                      )
-                                                      .filter(Boolean)
-                                                : [];
-                                            if (activeMission?.id != null) {
-                                                setSolvedMissionIds((prev) =>
-                                                    Array.from(new Set([...prev, Number(activeMission.id)]))
-                                                );
-                                                setClearedMissions((prev) => ({
-                                                    ...prev,
-                                                    [Number(activeMission.id)]: true,
-                                                }));
-                                            }
-                                            if (placeQueue.length > 0) {
-                                                setPostStoryQueue(placeQueue);
-                                                setPostStoryIdx(0);
-                                                setShowPostStory(true);
-                                            }
-                                        } catch {}
+                                            setClearedMissions((prev) => ({
+                                                ...prev,
+                                                [Number(activeMission.id)]: true,
+                                            }));
+                                        }
+                                        await proceedAfterMission();
                                     } catch (e: any) {
                                         setValidationError(e?.message || "오류가 발생했습니다.");
                                     } finally {

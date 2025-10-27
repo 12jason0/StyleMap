@@ -30,16 +30,19 @@ model User {
   completedEscapes   CompletedEscape[]
   bookings           Booking[]
   courses            Course[]
+  garden             Garden?
   missionSubmissions MissionSubmission[]
   reviews            Review[]
+  trees              Tree[]
   userBadges         UserBadge[]
   checkins           UserCheckin[]
+  UserCollage        UserCollage[]
   userFavorites      UserFavorite[]
   interactions       UserInteraction[]
   userPreference     UserPreference?
   rewards            UserReward[]
   userStoryProgress  UserStoryProgress[]
-  UserCollage        UserCollage[]
+  waterLogs          WaterLog[]
 
   @@index([provider, socialId])
   @@map("users")
@@ -174,9 +177,9 @@ model Story {
   scenario               String?
   completedEscapes       CompletedEscape[]
   placeDialogues         PlaceDialogue[]
+  CollageTemplate        CollageTemplate[]
   reward_badge           Badge?              @relation(fields: [reward_badge_id], references: [id])
   userstoryprogress      UserStoryProgress[]
-  CollageTemplate        CollageTemplate[]
 
   @@map("stories")
 }
@@ -203,13 +206,13 @@ model PlaceDialogue {
   placeId     Int?
   order       Int          @default(1)
   type        String       @default("main")
-  role        SpeakerRole  @default(npc)
   speaker     String?
   message     String
   imageUrl    String?
-  isLetter    Boolean      @default(false) // ✅ 편지인지 표시
-  letterIndex Int? // ✅ 편지 번호 (1, 2, 3 …)
   createdAt   DateTime     @default(now())
+  isLetter    Boolean      @default(false)
+  letterIndex Int?
+  role        SpeakerRole  @default(npc)
   place       PlaceOption? @relation(fields: [placeId], references: [id])
   story       Story        @relation(fields: [storyId], references: [id])
 }
@@ -240,15 +243,15 @@ model PlaceStory {
 
 model UserCollage {
   id           Int              @id @default(autoincrement())
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       Int
-  storyId      Int?
-  template     CollageTemplate? @relation(fields: [templateId], references: [id])
   templateId   Int?
   collageUrl   String           @map("collage_url")
   thumbnailUrl String?          @map("thumbnail_url")
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
+  storyId      Int?
+  template     CollageTemplate? @relation(fields: [templateId], references: [id])
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_collages")
 }
@@ -260,9 +263,9 @@ model CollageTemplate {
   framesJson  Json?         @map("frames_json")
   isPublic    Boolean       @default(true) @map("is_public")
   createdAt   DateTime      @default(now()) @map("created_at")
-  userCollage UserCollage[]
-  storyId     Int? // Story의 id를 실제 참조
+  storyId     Int?
   story       Story?        @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  userCollage UserCollage[]
 
   @@map("collage_templates")
 }
@@ -447,6 +450,74 @@ model CourseTagToCourses {
   @@map("_CourseTagToCourses")
 }
 
+model Tree {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  name        String?     @db.VarChar(100)
+  variant     String?     @db.VarChar(50)
+  waterCount  Int         @default(0)
+  status      TreeStatus  @default(seedling)
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime    @updatedAt
+  gardenTree  GardenTree?
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  waterLogs   WaterLog[]
+
+  @@index([userId])
+  @@map("trees")
+}
+
+model WaterLog {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  treeId    Int
+  amount    Int
+  source    WaterSource
+  meta      Json?
+  createdAt DateTime    @default(now())
+  tree      Tree        @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([treeId])
+  @@map("water_logs")
+}
+
+model Garden {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @unique
+  name        String?      @db.VarChar(100)
+  isUnlocked  Boolean      @default(false)
+  openedAt    DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  gardenTrees GardenTree[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gardens")
+}
+
+model GardenTree {
+  id        Int      @id @default(autoincrement())
+  gardenId  Int
+  treeId    Int?     @unique
+  posX      Float    @default(0)
+  posY      Float    @default(0)
+  posZ      Float    @default(0)
+  rotX      Float    @default(0)
+  rotY      Float    @default(0)
+  rotZ      Float    @default(0)
+  scale     Float    @default(1)
+  placedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  garden    Garden   @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  tree      Tree?    @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  @@index([gardenId])
+  @@map("garden_trees")
+}
+
 enum ChapterType {
   intro
   restaurant
@@ -478,9 +549,21 @@ enum RewardUnit {
   coupon
 }
 
-// 🎙️ 대화 역할 (화자 구분)
 enum SpeakerRole {
   user
   npc
   system
+}
+
+enum TreeStatus {
+  seedling
+  growing
+  completed
+}
+
+enum WaterSource {
+  course
+  escape
+  admin
+  bonus
 }

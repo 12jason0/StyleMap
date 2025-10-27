@@ -4,9 +4,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import LayoutContent from "@/components/LayoutContent";
 import { Providers } from "@/components/Providers";
-import Footer from "@/components/Footer";
+import ClientBodyLayout from "./ClientBodyLayout";
 
 const inter = Inter({
     variable: "--font-geist-sans",
@@ -21,11 +20,15 @@ export const metadata: Metadata = {
     },
 };
 
-export default function RootLayout({
-    children,
-}: Readonly<{
-    children: React.ReactNode;
-}>) {
+function BodyLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <Providers>
+            <ClientBodyLayout>{children}</ClientBodyLayout>
+        </Providers>
+    );
+}
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
     return (
         <html lang="ko">
             <head>
@@ -66,10 +69,7 @@ export default function RootLayout({
                         __html: "window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-R3EYQNXY13');",
                     }}
                 />
-                <Providers>
-                    <LayoutContent>{children}</LayoutContent>
-                    <Footer />
-                </Providers>
+                <BodyLayout>{children}</BodyLayout>
             </body>
         </html>
     );
