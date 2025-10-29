@@ -30,6 +30,9 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                                         src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"
                                         alt="DoNa Logo"
                                         className="w-full h-full object-contain"
+                                        loading="lazy"
+                                        decoding="async"
+                                        fetchPriority="low"
                                     />
                                 </div>
                             </div>
@@ -111,7 +114,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                 )}
                 <div className="relative h-full bg-white min-[600px]:w-[500px] min-[600px]:shadow-lg flex flex-col">
                     {/* 헤더 영역 */}
-                    <div className={`${isEscapeIntroPage ? "hidden" : "block"} flex-shrink-0`}>
+                    <div className={`${isEscapeIntroPage || isCourseStart ? "hidden" : "block"} flex-shrink-0`}>
                         <Header />
                     </div>
                     <main className="flex-1 overflow-y-auto overscroll-contain no-scrollbar scrollbar-hide">

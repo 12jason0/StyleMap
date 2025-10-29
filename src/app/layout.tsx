@@ -55,19 +55,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css"
                 />
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sunn-us/SUIT/fonts/variable/stylesheet.css" />
-                <Script
-                    strategy="beforeInteractive"
-                    src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${
-                        process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || ""
-                    }`}
+                {/* 지도 스크립트는 전역이 아닌 지도 컴포넌트에서 지연 로드 */}
+                <link
+                    rel="preconnect"
+                    href="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com"
+                    crossOrigin="anonymous"
                 />
-                <Script
-                    id="naver-auth-failure"
-                    strategy="beforeInteractive"
-                    dangerouslySetInnerHTML={{
-                        __html: "window.navermap_authFailure = function () { console.error('Naver Maps auth failed - check ncpKeyId and domain.'); };",
-                    }}
-                />
+                <link rel="dns-prefetch" href="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com" />
             </head>
             <body
                 className={`${inter.variable} antialiased h-screen overflow-hidden flex flex-col typography-smooth`}

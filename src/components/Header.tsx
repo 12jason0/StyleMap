@@ -40,8 +40,15 @@ const Header = () => {
 
                 if (response.ok) {
                     setIsLoggedIn(true);
-                    fetchFavoritesSummary();
-                    fetchGardenStatus();
+                    // 즐겨찾기/정원 상태는 초기 페인트 이후로 지연
+                    const idle = (cb: () => void) =>
+                        "requestIdleCallback" in window
+                            ? (window as any).requestIdleCallback(cb, { timeout: 2000 })
+                            : setTimeout(cb, 500);
+                    idle(() => {
+                        fetchFavoritesSummary();
+                        fetchGardenStatus();
+                    });
                 } else {
                     localStorage.removeItem("authToken");
                     localStorage.removeItem("user");
@@ -62,9 +69,16 @@ const Header = () => {
         const token = localStorage.getItem("authToken");
         setIsLoggedIn(!!token);
         if (token) {
-            fetchFavoritesSummary();
-            fetchGardenStatus();
-            checkLoginStatus();
+            // 초기 렌더 블로킹 방지: 모든 네트워크는 idle에 수행
+            const idle = (cb: () => void) =>
+                "requestIdleCallback" in window
+                    ? (window as any).requestIdleCallback(cb, { timeout: 2000 })
+                    : setTimeout(cb, 500);
+            idle(() => {
+                checkLoginStatus();
+                fetchFavoritesSummary();
+                fetchGardenStatus();
+            });
         }
 
         const handleStorageChange = (e: StorageEvent) => {

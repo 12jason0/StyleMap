@@ -65,8 +65,8 @@ export async function GET(req: NextRequest) {
         // --- API 선택 ---
         const endpoint =
             mode === "walking"
-                ? `https://naveropenapi.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`
-                : `https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving?start=${start}&goal=${goal}&option=trafast`;
+                ? `https://maps.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`
+                : `https://maps.apigw.ntruss.com/map-direction/v1/driving?start=${start}&goal=${goal}&option=trafast`;
 
         console.log("🔵 API 요청:", endpoint);
 
