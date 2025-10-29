@@ -3,6 +3,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { fetchWeekStamps, getLocalTodayKey, postCheckin } from "@/lib/checkinClient";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -48,13 +49,7 @@ export default function Home() {
     const router = useRouter();
     const hasShownCheckinModalRef = useRef(false);
 
-    const getLocalTodayKey = () => {
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-    };
+    // 날짜 키는 공용 유틸을 사용
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -136,34 +131,13 @@ export default function Home() {
     }, []);
 
     const fetchAndSetWeekStamps = async (): Promise<{ stamps: boolean[]; todayChecked: boolean } | null> => {
-        try {
-            const token = localStorage.getItem("authToken");
-            if (!token) return null;
-            const res = await fetch("/api/users/checkins", {
-                cache: "no-store",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) return null;
-            const data = await res.json();
-            const rawStamps: boolean[] | undefined = Array.isArray(data?.weekStamps)
-                ? (data.weekStamps as boolean[])
-                : undefined;
-            const filledCount: number = (() => {
-                if (Array.isArray(rawStamps)) return rawStamps.filter(Boolean).length;
-                const list: { date: string }[] = data?.checkins || [];
-                const total = list.length || 0;
-                return total % 7;
-            })();
-            const stamps: boolean[] = new Array(7).fill(false).map((_, i) => i < filledCount);
-            const todayChecked = Boolean(data?.todayChecked);
-
-            setWeekStamps(stamps);
-            setCycleProgress((stamps.filter(Boolean).length % 7) as number);
-            setAlreadyToday(todayChecked);
-            return { stamps, todayChecked };
-        } catch {
-            return null;
-        }
+        const result = await fetchWeekStamps();
+        if (!result) return null;
+        const { stamps, todayChecked } = result;
+        setWeekStamps(stamps);
+        setCycleProgress((stamps.filter(Boolean).length % 7) as number);
+        setAlreadyToday(todayChecked);
+        return result;
     };
 
     const maybeOpenCheckinModal = async () => {
@@ -485,13 +459,8 @@ export default function Home() {
                                             if (isStamping) return;
                                             setIsStamping(true);
                                             try {
-                                                const token = localStorage.getItem("authToken");
-                                                const res = await fetch("/api/users/checkins", {
-                                                    method: "POST",
-                                                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                                                });
-                                                const data = await res.json();
-                                                if (res.ok) {
+                                                const data = await postCheckin();
+                                                if (data.ok) {
                                                     const prevProgress = cycleProgress || 0;
                                                     const targetIdx = prevProgress === 6 ? 6 : prevProgress;
 

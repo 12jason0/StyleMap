@@ -5,11 +5,14 @@
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import AppInstallQR from "@/components/AppInstallQR";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isEscapeIntroPage = pathname.startsWith("/escape/intro");
+    const isEscapeId = pathname ? /^\/escape\/[^/]+$/.test(pathname) : false;
+    const isCourseStart = pathname ? /^\/courses\/[^/]+\/start$/.test(pathname) : false;
     const [isQrOpen, setIsQrOpen] = useState(false);
 
     return (
@@ -20,13 +23,13 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                     <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/40 to-transparent" />
                     <div className="relative h-full flex items-center">
                         <div className="px-10 max-w-[520px] text-white space-y-6">
-                            {/* 1. 로고 및 앱 이름 */}
-                            <div className="w-40 h-40  flex items-center justify-center font-extrabold">
-                                <div className=" rounded-1xl">
+                            {/* 1. 로고 및 앱 이름 - 자연스러운 느낌으로 수정 */}
+                            <div className="inline-block">
+                                <div className="w-32 h-32 shadow-xl p-4 flex items-center justify-center">
                                     <img
-                                        src="https://stylemap-images.s3.ap-southeast-2.amazonaws.com/logoicon-navy.png"
-                                        alt="Logo"
-                                        className="w-full h-full"
+                                        src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"
+                                        alt="DoNa Logo"
+                                        className="w-full h-full object-contain"
                                     />
                                 </div>
                             </div>
@@ -86,7 +89,7 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                                         setIsQrOpen(true);
                                     }}
                                 >
-                                    <div className="ml-2 px-3 py-4  rounded-lg bg-white/15 border border-white/25 text-xs">
+                                    <div className="ml-2 px-3 py-4 rounded-lg bg-white/15 border border-white/25 text-xs hover:bg-white/25 transition-colors cursor-pointer">
                                         QR 코드
                                     </div>
                                 </a>
@@ -114,6 +117,10 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                     <main className="flex-1 overflow-y-auto overscroll-contain no-scrollbar scrollbar-hide">
                         {children}
                     </main>
+                    {/* Footer를 컨테이너 내부 하단에 배치 (동일 폭) */}
+                    <div className={`${isEscapeId || isCourseStart ? "hidden" : "block"} flex-shrink-0`}>
+                        <Footer />
+                    </div>
                 </div>
             </div>
         </div>

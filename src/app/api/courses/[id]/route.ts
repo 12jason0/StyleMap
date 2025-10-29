@@ -7,10 +7,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } } // ✅ Promise 제거
+    { params }: { params: Promise<{ id: string }> } // ✅ Promise 제거
 ) {
     try {
-        const courseId = Number(params.id);
+        const { id } = await params;
+        const courseId = Number(id);
 
         if (!courseId || isNaN(courseId)) {
             return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });

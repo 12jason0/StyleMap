@@ -12,39 +12,53 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ messages: [] });
         }
 
-        // [수정] 주석에 맞게 category 필터 추가
-        const endingCategories = ["outro", "ending", "epilogue"];
-        const placeOptions = await prisma.placeOption.findMany({
+        // 1) PlaceDialogue의 outro/ending/epilogue를 우선 사용
+        const endingTypes = ["outro", "ending", "epilogue"];
+        const dialogues = await prisma.placeDialogue.findMany({
             where: {
                 storyId,
-                category: {
-                    in: endingCategories, // 'outro', 'ending', 'epilogue' 중 하나
-                },
+                type: { in: endingTypes },
             },
-            select: {
-                id: true,
-                category: true,
-                stories: {
-                    orderBy: { order: "asc" },
-                    select: { dialogue: true, narration: true, speaker: true },
-                },
-            },
+            orderBy: { order: "asc" },
+            select: { message: true, speaker: true, role: true },
         });
 
-        // [수정] placeOptions에서 'stories' 배열들을 하나로 합침
-        // placeOptions가 [ { stories: [...] }, { stories: [...] } ] 형태이므로 flatMap을 사용
-        const allDialogues = placeOptions.flatMap((option) => option.stories);
-
-        // [수정] 'dialogues' 대신 'allDialogues' 변수 사용
-        const messages = (allDialogues || [])
+        let messages = (dialogues || [])
             .map((d: any) => ({
-                // [수정] select한 필드(dialogue, narration)를 사용
-                text: String(d?.dialogue || d?.narration || "").trim(),
-                // [수정] 'role'은 select하지 않았으므로 undefined 또는 d.speaker를 사용
-                role: undefined,
+                text: String(d?.message || "").trim(),
+                role: d?.role ? String(d.role) : undefined,
                 speaker: d?.speaker ? String(d.speaker) : undefined,
             }))
             .filter((m: any) => m.text.length > 0);
+
+        // 2) PlaceDialogue가 비어 있으면 기존 PlaceStory(places.stories) 기반으로 폴백
+        if (messages.length === 0) {
+            const placeOptions = await prisma.placeOption.findMany({
+                where: {
+                    storyId,
+                    category: {
+                        in: endingTypes,
+                    },
+                },
+                select: {
+                    id: true,
+                    category: true,
+                    stories: {
+                        orderBy: { order: "asc" },
+                        select: { dialogue: true, narration: true, speaker: true },
+                    },
+                },
+            });
+
+            const allDialogues = placeOptions.flatMap((option) => option.stories);
+            messages = (allDialogues || [])
+                .map((d: any) => ({
+                    text: String(d?.dialogue || d?.narration || "").trim(),
+                    role: undefined,
+                    speaker: d?.speaker ? String(d.speaker) : undefined,
+                }))
+                .filter((m: any) => m.text.length > 0);
+        }
 
         return NextResponse.json({ messages });
     } catch (e: any) {

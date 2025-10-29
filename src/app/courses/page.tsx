@@ -144,10 +144,10 @@ function CoursesPageInner() {
         <div className="min-h-screen bg-gray-50 ">
             {/* 헤더 */}
             <div className="bg-white shadow-sm">
-                <div className="max-w-[400px] mx-auto px-4 py-5">
+                <div className="max-w-[500px] mx-auto px-4 py-5">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
+                            <h1 className="text-2xl font-bold text-gray-900 font-brand">
                                 {recommended ? "추천 코스" : concept ? `${concept} 코스` : "모든 코스"}
                             </h1>
                             <p className="text-gray-600 mt-2">
@@ -168,7 +168,7 @@ function CoursesPageInner() {
                     {courses.map((course, idx) => (
                         <div
                             key={course.id}
-                            className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all transform hover:-translate-y-1 cursor-pointer block"
+                            className="bg-white rounded-2xl border border-green-100 shadow-sm hover:shadow-md transition-all cursor-pointer block"
                             onClick={async () => {
                                 try {
                                     fetch(`/api/courses/${course.id}/view`, { method: "POST", keepalive: true }).catch(
@@ -179,7 +179,7 @@ function CoursesPageInner() {
                             }}
                         >
                             {/* 이미지 */}
-                            <div className="relative h-32 rounded-t-2xl overflow-hidden">
+                            <div className="relative h-36 rounded-t-2xl overflow-hidden">
                                 {course.imageUrl ? (
                                     <Image
                                         src={course.imageUrl}
@@ -192,7 +192,7 @@ function CoursesPageInner() {
                                 ) : (
                                     <div className="w-full h-full bg-white" />
                                 )}
-                                <div className="absolute top-4 right-4 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                <div className="absolute top-3 right-3 bg-emerald-600 text-white text-xs px-2 py-1 rounded-full font-medium">
                                     {course.concept}
                                 </div>
                             </div>
@@ -202,16 +202,18 @@ function CoursesPageInner() {
                                 <div className="flex items-start justify-between mb-3">
                                     <h3 className="text-lg font-bold text-gray-900 ">{course.title}</h3>
                                 </div>
-                                <div className="flex items-center text-sm text-gray-600 mb-2">
+                                <div className="flex items-center text-sm text-gray-700 mb-2">
                                     <span className="text-yellow-500">★</span>
                                     <span className="ml-1">{course.rating}</span>
                                     <span className="ml-1">({course.reviewCount})</span>
                                 </div>
 
                                 {/* 조회수 */}
-                                <div className="flex items-center text-sm text-gray-500 mb-2">
+                                <div className="flex items-center text-sm text-gray-500 mb-2 gap-2">
                                     <span>👁️</span>
-                                    <span>{(course.viewCount || 0).toLocaleString()}회 조회</span>
+                                    <span className="tabular-nums">
+                                        {(course.viewCount || 0).toLocaleString()}회 조회
+                                    </span>
                                 </div>
 
                                 <p
@@ -243,9 +245,10 @@ function CoursesPageInner() {
                                     </span>
                                     <button
                                         onClick={(e) => handleStartCourse(e, course.id)}
-                                        className="btn-primary rounded-full text-xs px-3 py-1.5 active:scale-95"
+                                        className="rounded-full text-xs px-3 py-1.5 active:scale-95 text-white"
+                                        style={{ backgroundColor: "var(--brand-green)" }}
                                     >
-                                        코스 시작하기
+                                        시작하기
                                     </button>
                                 </div>
                             </div>

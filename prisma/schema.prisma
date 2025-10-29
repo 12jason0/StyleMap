@@ -43,6 +43,8 @@ model User {
   rewards            UserReward[]
   userStoryProgress  UserStoryProgress[]
   waterLogs          WaterLog[]
+  waterStock         Int      @default(0)  // ✅ 현재 보유한 물의 양
+  totalWaterGiven    Int      @default(0)  // ✅ 지금까지 준 누적 물의 횟수 (통계용)
 
   @@index([provider, socialId])
   @@map("users")
@@ -547,6 +549,7 @@ enum RewardType {
 enum RewardUnit {
   coin
   coupon
+  water
 }
 
 enum SpeakerRole {

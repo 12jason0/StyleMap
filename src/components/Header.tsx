@@ -15,6 +15,7 @@ const Header = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [hasFavorites, setHasFavorites] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+    const [gardenUnlocked, setGardenUnlocked] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
     const menuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -26,6 +27,7 @@ const Header = () => {
             if (!token) {
                 setIsLoggedIn(false);
                 setHasFavorites(false);
+                setGardenUnlocked(false);
                 return;
             }
 
@@ -39,11 +41,13 @@ const Header = () => {
                 if (response.ok) {
                     setIsLoggedIn(true);
                     fetchFavoritesSummary();
+                    fetchGardenStatus();
                 } else {
                     localStorage.removeItem("authToken");
                     localStorage.removeItem("user");
                     setIsLoggedIn(false);
                     setHasFavorites(false);
+                    setGardenUnlocked(false);
                 }
             } catch (error) {
                 console.error("토큰 검증 오류:", error);
@@ -51,6 +55,7 @@ const Header = () => {
                 localStorage.removeItem("user");
                 setIsLoggedIn(false);
                 setHasFavorites(false);
+                setGardenUnlocked(false);
             }
         };
 
@@ -58,6 +63,7 @@ const Header = () => {
         setIsLoggedIn(!!token);
         if (token) {
             fetchFavoritesSummary();
+            fetchGardenStatus();
             checkLoginStatus();
         }
 
@@ -73,8 +79,10 @@ const Header = () => {
             setIsLoggedIn(!!token);
             if (token) {
                 fetchFavoritesSummary();
+                fetchGardenStatus();
             } else {
                 setHasFavorites(false);
+                setGardenUnlocked(false);
             }
         };
 
@@ -138,19 +146,48 @@ const Header = () => {
         }
     };
 
+    const fetchGardenStatus = async () => {
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) {
+                setGardenUnlocked(false);
+                return;
+            }
+            const res = await fetch("/api/garden", {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+            });
+            if (res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setGardenUnlocked(Boolean(data?.garden?.isUnlocked));
+            } else {
+                setGardenUnlocked(false);
+            }
+        } catch (e) {
+            console.error("Failed to fetch garden status", e);
+            setGardenUnlocked(false);
+        }
+    };
+
     const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
     const closeMenu = () => setIsMenuOpen(false);
 
-    // 메뉴가 열릴 때 전체 페이지 스크롤을 잠그고, 닫히면 복원
+    // 메뉴가 열릴 때: 페이지 스크롤 잠그되, 드로어 내부는 스크롤 가능하도록 유지
     useEffect(() => {
+        const mainEl = document.querySelector("main") as HTMLElement | null;
+        if (!mainEl) return;
         if (isMenuOpen) {
-            const previousOverflow = document.body.style.overflow;
+            const prevOverflow = document.body.style.overflow;
+            const prevMainOverflow = mainEl.style.overflow;
             document.body.style.overflow = "hidden";
+            mainEl.style.overflow = "hidden"; // 배경 스크롤 잠금
             return () => {
-                document.body.style.overflow = previousOverflow;
+                document.body.style.overflow = prevOverflow;
+                mainEl.style.overflow = prevMainOverflow;
             };
         } else {
             document.body.style.overflow = "";
+            mainEl.style.overflow = "";
         }
     }, [isMenuOpen]);
 
@@ -223,8 +260,7 @@ const Header = () => {
                 <div className="flex justify-between items-center h-16">
                     {/* 로고 */}
                     <Link href="/" className="flex items-center space-x-2" onClick={closeMenu}>
-                        {/* <img src="" alt="dona" className="w-8 h-8 rounded-lg object-contain" /> */}
-                        <span className="text-xl font-bold text-gray-900">두나</span>
+                        <span className="text-xl font-bold text-gray-900">DoNa</span>
                     </Link>
 
                     {/* 모바일 스타일 헤더를 웹에서도 동일하게 사용 */}
@@ -335,13 +371,24 @@ const Header = () => {
                         >
                             숲
                         </Link>
-                        <Link
-                            href="/garden"
-                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            onClick={closeMenu}
-                        >
-                            정원
-                        </Link>
+                        {gardenUnlocked ? (
+                            <Link
+                                href="/garden"
+                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                onClick={closeMenu}
+                            >
+                                정원
+                            </Link>
+                        ) : (
+                            <div
+                                className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-not-allowed flex items-center gap-2"
+                                title="첫 번째 나무를 완성하면 정원이 열려요"
+                                aria-disabled
+                            >
+                                <span>🔒</span>
+                                <span>정원 (잠김)</span>
+                            </div>
+                        )}
                         <Link
                             href="/escape"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
@@ -456,25 +503,28 @@ const Header = () => {
                 </div>
             </div>
 
-            {/* 로그아웃 확인 모달 */}
+            {/* 로그아웃 확인 모달 - 두나 스타일 */}
             {showLogoutConfirm && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-80">
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">로그아웃</h3>
-                        <p className="text-gray-600 mb-6">로그아웃 하시겠습니까?</p>
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-80 animate-fade-in">
+                        <div className="text-center mb-4">
+                            <div className="text-4xl mb-2">🍃</div>
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">잠깐만요!</h3>
+                            <p className="text-gray-600">정말 로그아웃 하시겠어요?</p>
+                        </div>
                         <div className="flex gap-3">
                             <button
                                 onClick={closeLogoutConfirm}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 cursor-pointer"
+                                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:from-green-600 hover:to-emerald-600 transition-all cursor-pointer"
                             >
-                                취소
+                                머물기
                             </button>
                             <button
                                 onClick={() => {
                                     closeLogoutConfirm();
                                     handleLogout();
                                 }}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 cursor-pointer "
+                                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors cursor-pointer"
                             >
                                 로그아웃
                             </button>

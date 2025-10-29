@@ -278,7 +278,7 @@ const Login = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
             <main
-                className="max-w-md mx-auto px-4 pt-9 pb-28 flex items-center"
+                className="max-w-md mx-auto px-4 pt-3 pb-28 flex items-center"
                 style={{ minHeight: "calc(100dvh - 120px)" }}
             >
                 <div className="w-full bg-white rounded-2xl shadow-lg p-6">
@@ -350,7 +350,7 @@ const Login = () => {
                         </p>
                     </div>
 
-                    <div className="mt-6">
+                    <div className="mt-2">
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
                                 <div className="w-full border-t border-gray-300" />

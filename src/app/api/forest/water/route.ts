@@ -39,6 +39,18 @@ export async function POST(request: NextRequest) {
         const amount = getAmountBySource(source, body?.amount);
         const meta = body?.meta && typeof body.meta === "object" ? body.meta : undefined;
 
+        // 🔒 실제 물주기(소비)일 때 재고 확인
+        if (source === "admin") {
+            const user: any = await prisma.user.findUnique({ where: { id: Number(userId) } });
+            const stock = Number((user as any)?.waterStock || 0);
+            if (!user || stock < amount) {
+                return NextResponse.json(
+                    { success: false, error: "INSUFFICIENT_WATER", waterStock: stock },
+                    { status: 400 }
+                );
+            }
+        }
+
         /* -------------------------------------------------------------
     🌱 1️⃣ 현재 유저의 성장 중인 나무 찾기 (없으면 첫 나무 생성)
     ------------------------------------------------------------- */
@@ -118,6 +130,29 @@ export async function POST(request: NextRequest) {
                     completedAt: willComplete ? new Date() : undefined,
                 },
             });
+
+            // 👤 유저 보상/통계 반영
+            try {
+                if (source === "course" || source === "escape" || source === "bonus") {
+                    // 완료 보상: 재고와 누적 증가
+                    await tx.user.update({
+                        where: { id: Number(userId) },
+                        data: {
+                            waterStock: { increment: amount },
+                            totalWaterGiven: { increment: amount },
+                        } as unknown as any,
+                    });
+                } else if (source === "admin") {
+                    // 실제 물주기 소비: 재고 차감 + 누적 증가
+                    await tx.user.update({
+                        where: { id: Number(userId) },
+                        data: {
+                            waterStock: { decrement: amount },
+                            totalWaterGiven: { increment: amount },
+                        } as unknown as any,
+                    });
+                }
+            } catch {}
 
             /* -------------------------------------------------------------
       🌳 3️⃣ 나무 완성 시 정원 언락 + 새 나무 자동 생성

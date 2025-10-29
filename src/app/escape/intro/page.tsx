@@ -718,12 +718,14 @@ function EscapeIntroPageInner() {
         };
     }, [showCollagePreview, framePreviewTemplate]);
 
+    // 회색 프레임을 덮기 위한 오버랩 (퍼센트)
+    const PREVIEW_OVERLAP_PERCENT = 1.5;
+
     const renderedPreviewPhotos = useMemo(() => {
         const { iw, ih, offsetX, offsetY, baseW, baseH } = previewDims;
         if (iw === 0 || ih === 0) return null;
         const BASE_W = baseW || 1080;
         const BASE_H = baseH || 1920;
-        const paddingRatio = 0.08;
         const raw = (framePreviewTemplate as any)?.framesJson || (framePreviewTemplate as any)?.frames_json || [];
         const frames = Array.isArray(raw) ? raw : [];
         const urls = selectedGallery.slice(0, 4);
@@ -734,11 +736,12 @@ function EscapeIntroPageInner() {
             const px = isPercent
                 ? { x: f.x * BASE_W, y: f.y * BASE_H, w: f.w * BASE_W, h: f.h * BASE_H }
                 : { x: f.x, y: f.y, w: f.w, h: f.h };
-            const pad = Math.round(Math.min(px.w, px.h) * paddingRatio);
-            const left = offsetX + (px.x + pad) * sx;
-            const top = offsetY + (px.y + pad) * sy;
-            const width = Math.max(0, (px.w - pad * 2) * sx);
-            const height = Math.max(0, (px.h - pad * 2) * sy);
+            const ovx = (PREVIEW_OVERLAP_PERCENT / 100) * iw;
+            const ovy = (PREVIEW_OVERLAP_PERCENT / 100) * ih;
+            const left = offsetX + px.x * sx - ovx;
+            const top = offsetY + px.y * sy - ovy;
+            const width = Math.max(0, px.w * sx + ovx * 2);
+            const height = Math.max(0, px.h * sy + ovy * 2);
             return (
                 <img
                     key={i}
@@ -753,6 +756,7 @@ function EscapeIntroPageInner() {
                         objectFit: "cover",
                         zIndex: 2,
                         borderRadius: 4,
+                        filter: "sepia(0.3) contrast(0.9) brightness(0.95) saturate(0.8)",
                     }}
                 />
             );
@@ -1264,9 +1268,13 @@ function EscapeIntroPageInner() {
         const canvas = collageCanvasRef.current || document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        // DB에서 템플릿 조회 → 실패 시 로컬 기본 템플릿 사용
+
+        // ✅ 회색 테두리 두께 조정 (픽셀)
+        const FRAME_OVERLAP = 6;
+
+        // DB에서 템플릿 조회
         let bgUrl = "/images/hongdaelatter_template.jpg";
-        let framesPercent: Array<{ x: number; y: number; w: number; h: number }> | null = null;
+        let framesFromDB: Array<{ x: number; y: number; w: number; h: number }> | null = null;
         try {
             const res = await fetch("/api/collages/templates", { cache: "no-store" });
             const data = await res.json();
@@ -1280,13 +1288,13 @@ function EscapeIntroPageInner() {
                 ) || list[0];
             if (t) {
                 if (t.imageUrl) bgUrl = String(t.imageUrl);
-                if (t.framesJson && Array.isArray(t.framesJson)) framesPercent = t.framesJson as any;
+                if (t.framesJson && Array.isArray(t.framesJson)) framesFromDB = t.framesJson as any;
             }
         } catch {}
+
         const loadImage = (src: string) =>
             new Promise<HTMLImageElement>((resolve, reject) => {
                 const img = new Image();
-                // CORS 이미지도 프록시를 통해 우회
                 try {
                     const needProxy = /^https?:\/\//i.test(src) && !src.startsWith(location.origin);
                     const proxied = needProxy
@@ -1306,62 +1314,89 @@ function EscapeIntroPageInner() {
         const [bg, ...photos] = await Promise.all([loadImage(bgUrl), ...urls.map((u) => loadImage(u))]);
         canvas.width = bg.naturalWidth;
         canvas.height = bg.naturalHeight;
+
+        // 배경 먼저 그리기
         ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-        // DB 좌표가 없으면 기본값 사용 (요청된 픽셀 좌표 2x2 프레임)
-        if (!framesPercent) {
-            framesPercent = [
-                { x: 60, y: 230, w: 300, h: 420 }, // TL
-                { x: 410, y: 230, w: 300, h: 420 }, // TR
-                { x: 60, y: 730, w: 300, h: 420 }, // BL
-                { x: 410, y: 730, w: 300, h: 420 }, // BR
-            ];
-        }
-        // frames_json이 퍼센트(0~1)인지 픽셀인지 자동 판별
-        const isPercent = framesPercent.every((f: any) => f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1);
-        const frames = framesPercent.map((f: any) =>
+
+        // DB에서 가져온 좌표 사용 (fallback: 측정된 좌표)
+        let framesData = framesFromDB || [
+            { x: 196, y: 425, w: 340, h: 461 },
+            { x: 574, y: 420, w: 343, h: 470 },
+            { x: 203, y: 923, w: 336, h: 466 },
+            { x: 575, y: 925, w: 338, h: 460 },
+        ];
+
+        // 퍼센트(0~1)인지 픽셀인지 자동 판별
+        const isPercent = framesData.every((f: any) => f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1);
+        const frames = framesData.map((f: any) =>
             isPercent
                 ? {
-                      x: Math.round(f.x * canvas.width),
-                      y: Math.round(f.y * canvas.height),
-                      w: Math.round(f.w * canvas.width),
-                      h: Math.round(f.h * canvas.height),
+                      x: f.x * canvas.width,
+                      y: f.y * canvas.height,
+                      w: f.w * canvas.width,
+                      h: f.h * canvas.height,
                   }
-                : {
-                      x: Math.round(f.x),
-                      y: Math.round(f.y),
-                      w: Math.round(f.w),
-                      h: Math.round(f.h),
-                  }
+                : { x: f.x, y: f.y, w: f.w, h: f.h }
         );
-        // 프레임 안쪽에 딱 맞게 그리고, 경계선 넘지 않도록 클리핑
-        const FRAME_PADDING_RATIO = 0.08; // 8% 여백으로 사용자 사진을 조금 더 작게
-        photos.forEach((img, i) => {
-            const f = frames[i];
-            const pad = Math.round(Math.min(f.w, f.h) * FRAME_PADDING_RATIO);
-            const ix = f.x + pad;
-            const iy = f.y + pad;
-            const iw = f.w - pad * 2;
-            const ih = f.h - pad * 2;
 
-            // 클리핑 사각형 설정 → 프레임 밖으로 삐져나온 픽셀 제거
+        console.log("🎨 Canvas dimensions:", canvas.width, "x", canvas.height);
+        console.log("📐 Original frames:", frames);
+
+        // 각 프레임에 사진 합성 (테두리 여백 적용) + 빈티지 필터
+        photos.forEach((img, i) => {
+            if (!frames[i]) return;
+            const original = frames[i];
+
+            // ✅ 테두리 두께만큼 안쪽으로 조정
+            const f = {
+                x: original.x - FRAME_OVERLAP, // 바깥쪽으로 확장
+                y: original.y - FRAME_OVERLAP,
+                w: original.w + FRAME_OVERLAP * 2,
+                h: original.h + FRAME_OVERLAP * 2,
+            };
+
             ctx.save();
+            // 빈티지 톤 적용
+            ctx.filter = "sepia(0.3) contrast(0.9) brightness(0.95) saturate(0.8)";
+
+            // 프레임 영역만 클리핑
             ctx.beginPath();
-            ctx.rect(ix, iy, iw, ih);
+            ctx.rect(f.x, f.y, f.w, f.h);
             ctx.clip();
 
-            // cover 방식으로 중앙 배치(소스는 전체 사용, 대상에 스케일+클리핑으로 자르기)
-            const scale = Math.max(iw / img.naturalWidth, ih / img.naturalHeight);
-            const dw = Math.round(img.naturalWidth * scale);
-            const dh = Math.round(img.naturalHeight * scale);
-            const dx = Math.round(ix + (iw - dw) / 2);
-            const dy = Math.round(iy + (ih - dh) / 2);
-            ctx.drawImage(img, dx, dy, dw, dh);
+            // object-fit: cover 계산
+            const imgRatio = img.naturalWidth / img.naturalHeight;
+            const frameRatio = f.w / f.h;
+
+            let drawWidth: number;
+            let drawHeight: number;
+            let offsetX: number;
+            let offsetY: number;
+
+            if (imgRatio > frameRatio) {
+                // 이미지가 더 넓음 → 높이 기준
+                drawHeight = f.h;
+                drawWidth = drawHeight * imgRatio;
+                offsetX = f.x - (drawWidth - f.w) / 2;
+                offsetY = f.y;
+            } else {
+                // 이미지가 더 높음 → 너비 기준
+                drawWidth = f.w;
+                drawHeight = drawWidth / imgRatio;
+                offsetX = f.x;
+                offsetY = f.y - (drawHeight - f.h) / 2;
+            }
+
+            ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            // 연한 베이지 오버레이로 종이 느낌 강화
+            ctx.filter = "none";
+            ctx.fillStyle = "rgba(250, 245, 235, 0.15)";
+            ctx.fillRect(f.x, f.y, f.w, f.h);
             ctx.restore();
         });
 
-        // 미리보기 URL 생성 (디버그 용)
         try {
-            const preview = canvas.toDataURL("image/jpeg", 0.92);
+            const preview = canvas.toDataURL("image/jpeg", 0.95);
             setCollagePreviewUrl(preview);
         } catch {}
         collageCanvasRef.current = canvas;
@@ -1373,7 +1408,7 @@ function EscapeIntroPageInner() {
         if (!canvas) return;
         if (canvas.toBlob) {
             canvas.toBlob(
-                (blob) => {
+                async (blob) => {
                     if (!blob) return;
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
@@ -1383,18 +1418,44 @@ function EscapeIntroPageInner() {
                     a.click();
                     a.remove();
                     URL.revokeObjectURL(url);
+                    try {
+                        const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+                        await fetch("/api/forest/water", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                            credentials: "include",
+                            body: JSON.stringify({ source: "escape" }), // 💧 이스케이프 템플릿 완료 보상 +5
+                        });
+                        setEndingStep("badge");
+                    } catch {}
                 },
                 "image/jpeg",
-                0.92
+                0.95
             );
         } else {
             // 폴백: 일부 구형 브라우저
             const a = document.createElement("a");
-            a.href = canvas.toDataURL("image/jpeg", 0.92);
+            a.href = canvas.toDataURL("image/jpeg", 0.95);
             a.download = "hongdae-secret-letter-collage.jpg";
             document.body.appendChild(a);
             a.click();
             a.remove();
+            try {
+                const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+                await fetch("/api/forest/water", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ source: "escape" }),
+                });
+                setEndingStep("badge");
+            } catch {}
         }
     };
 
@@ -1402,8 +1463,18 @@ function EscapeIntroPageInner() {
         await renderCollage();
         const canvas = collageCanvasRef.current;
         if (!canvas) return null;
-        return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92));
+        return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.95));
     };
+
+    // 미리보기 모달이 열리면 다운로드 이미지와 동일한 합성 결과로 미리보기 생성
+    useEffect(() => {
+        if (!showCollagePreview) return;
+        (async () => {
+            try {
+                await renderCollage();
+            } catch {}
+        })();
+    }, [showCollagePreview, selectedGallery, galleryUrls, framePreviewTemplate]);
 
     // 콜라주 자동 저장: 캔버스 → 업로드 → /api/collages 저장
     const autoSaveCollage = async (): Promise<string | null> => {
@@ -2079,137 +2150,145 @@ function EscapeIntroPageInner() {
                             )}
 
                             {flowStep === "placeList" && selectedCategory && !inMission && (
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <button
-                                            onClick={() => {
-                                                // 카테고리 선택 화면으로 복귀
-                                                setSelectedCategory(null);
-                                                setSelectedPlaceId(null);
-                                                setSelectedPlaceIndex(null);
-                                                setSelectedPlaceConfirm(null);
-                                                setMissionUnlocked(false);
-                                                setInSelectedRange(false);
-                                                setFlowStep("category");
-                                            }}
-                                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/85 hover:bg-white text-gray-900 border shadow"
-                                        >
-                                            ← 카테고리로
-                                        </button>
-                                    </div>
-                                    {(() => {
-                                        const all = ((currentChapter.placeOptions || []) as any[]).slice();
-                                        const list = all.filter((p: any) =>
-                                            matchesSelectedCategory(p, selectedCategory)
-                                        );
-                                        return list.map((p: any, idx: number) => (
-                                            <div
-                                                key={p.id}
-                                                className={`p-3 rounded-xl border shadow cursor-pointer ${
-                                                    selectedPlaceConfirm === p.id
-                                                        ? "bg-emerald-50 border-emerald-300"
-                                                        : "bg-white/85 hover:bg-white border-gray-200"
-                                                }`}
+                                <>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <button
                                                 onClick={() => {
-                                                    // 첫 클릭: 상세(주소/시그니처)만 보여주고 선택 대기 + 현재 거리 계산
-                                                    if (selectedPlaceConfirm !== p.id) {
-                                                        setSelectedPlaceConfirm(p.id);
-                                                        setSelectedPlaceIndex(idx);
-                                                        setSelectedPlaceId(Number(p.id) || null);
-                                                        setSelectedPlaceType(
-                                                            (p.type || p.category || "").toString() || null
-                                                        );
-                                                        setInSelectedRange(false);
-                                                        setMissionUnlocked(false);
-                                                        try {
-                                                            if (
-                                                                userLocation &&
-                                                                Number.isFinite(Number(p.latitude)) &&
-                                                                Number.isFinite(Number(p.longitude))
-                                                            ) {
-                                                                const km = distanceKm(
-                                                                    Number(userLocation.lat),
-                                                                    Number(userLocation.lng),
-                                                                    Number(p.latitude),
-                                                                    Number(p.longitude)
-                                                                );
-                                                                if (Number.isFinite(km)) setSelectedDistance(km);
-                                                                else setSelectedDistance(null);
-                                                            } else {
+                                                    // 카테고리 선택 화면으로 복귀
+                                                    setSelectedCategory(null);
+                                                    setSelectedPlaceId(null);
+                                                    setSelectedPlaceIndex(null);
+                                                    setSelectedPlaceConfirm(null);
+                                                    setMissionUnlocked(false);
+                                                    setInSelectedRange(false);
+                                                    setFlowStep("category");
+                                                }}
+                                                className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/85 hover:bg-white text-gray-900 border shadow"
+                                            >
+                                                ← 카테고리로
+                                            </button>
+                                        </div>
+                                        {/* placeList에서는 액션 버튼을 숨깁니다 (갤러리 모달 내부로 이동) */}
+                                    </div>
+                                    {/* 장소 리스트 */}
+                                    <div>
+                                        {(() => {
+                                            const all = ((currentChapter.placeOptions || []) as any[]).slice();
+                                            const list = all.filter((p: any) =>
+                                                matchesSelectedCategory(p, selectedCategory)
+                                            );
+                                            return list.map((p: any, idx: number) => (
+                                                <div
+                                                    key={p.id}
+                                                    className={`p-3 rounded-xl border shadow cursor-pointer ${
+                                                        selectedPlaceConfirm === p.id
+                                                            ? "bg-emerald-50 border-emerald-300"
+                                                            : "bg-white/85 hover:bg-white border-gray-200"
+                                                    }`}
+                                                    onClick={() => {
+                                                        // 첫 클릭: 상세(주소/시그니처)만 보여주고 선택 대기 + 현재 거리 계산
+                                                        if (selectedPlaceConfirm !== p.id) {
+                                                            setSelectedPlaceConfirm(p.id);
+                                                            setSelectedPlaceIndex(idx);
+                                                            setSelectedPlaceId(Number(p.id) || null);
+                                                            setSelectedPlaceType(
+                                                                (p.type || p.category || "").toString() || null
+                                                            );
+                                                            setInSelectedRange(false);
+                                                            setMissionUnlocked(false);
+                                                            try {
+                                                                if (
+                                                                    userLocation &&
+                                                                    Number.isFinite(Number(p.latitude)) &&
+                                                                    Number.isFinite(Number(p.longitude))
+                                                                ) {
+                                                                    const km = distanceKm(
+                                                                        Number(userLocation.lat),
+                                                                        Number(userLocation.lng),
+                                                                        Number(p.latitude),
+                                                                        Number(p.longitude)
+                                                                    );
+                                                                    if (Number.isFinite(km)) setSelectedDistance(km);
+                                                                    else setSelectedDistance(null);
+                                                                } else {
+                                                                    setSelectedDistance(null);
+                                                                }
+                                                            } catch {
                                                                 setSelectedDistance(null);
                                                             }
-                                                        } catch {
-                                                            setSelectedDistance(null);
-                                                        }
-                                                        return;
-                                                    }
-                                                    // 두번째 클릭: 해당 장소로 확정 → 이동 화면 → 도착 후 대화/미션
-                                                    const lines: Array<{ speaker?: string | null; text: string }> =
-                                                        Array.isArray(p.stories) && p.stories.length > 0
-                                                            ? p.stories
-                                                                  .map((s: any) => ({
-                                                                      speaker: s.speaker,
-                                                                      text: s.dialogue || s.narration || "",
-                                                                  }))
-                                                                  .filter(
-                                                                      (d: any) => d.text && d.text.trim().length > 0
-                                                                  )
-                                                            : [];
-
-                                                    // 이동 화면 표시 후 상태 전환
-                                                    setIsMoving(true);
-                                                    setTimeout(() => {
-                                                        setIsMoving(false);
-                                                        if (lines.length === 0) {
-                                                            // 대화가 없더라도 바로 미션 목록을 볼 수 있게 활성화
-                                                            setDialogueQueue([]);
-                                                            setMissionUnlocked(true);
-                                                            setFlowStep("mission");
                                                             return;
                                                         }
-                                                        // 대화를 먼저 보여주고, 미션은 대화 종료 시점에 활성화
-                                                        setDialogueQueue(lines);
-                                                        setFlowStep("dialogue");
-                                                        setMissionUnlocked(false);
-                                                    }, 1500);
-                                                }}
-                                            >
-                                                <div className="font-semibold text-gray-900">{p.name}</div>
-                                                {selectedPlaceConfirm === p.id && (p.address || p.signature) ? (
-                                                    <div className="text-xs text-gray-700 mt-2 space-y-1">
-                                                        {p.address && (
-                                                            <div className="leading-relaxed">{p.address}</div>
-                                                        )}
-                                                        {p.signature && (
-                                                            <div className="inline-flex items-center px-2 py-1 rounded-md bg-amber-100 text-amber-800">
-                                                                {p.signature}
-                                                            </div>
-                                                        )}
-                                                        {/* ✅ 거리 표시 추가 */}
-                                                        {selectedDistance != null && (
+                                                        // 두번째 클릭: 해당 장소로 확정 → 이동 화면 → 도착 후 대화/미션
+                                                        const lines: Array<{ speaker?: string | null; text: string }> =
+                                                            Array.isArray(p.stories) && p.stories.length > 0
+                                                                ? p.stories
+                                                                      .map((s: any) => ({
+                                                                          speaker: s.speaker,
+                                                                          text: s.dialogue || s.narration || "",
+                                                                      }))
+                                                                      .filter(
+                                                                          (d: any) => d.text && d.text.trim().length > 0
+                                                                      )
+                                                                : [];
+
+                                                        // 이동 화면 표시 후 상태 전환
+                                                        setIsMoving(true);
+                                                        setTimeout(() => {
+                                                            setIsMoving(false);
+                                                            if (lines.length === 0) {
+                                                                // 대화가 없더라도 바로 미션 목록을 볼 수 있게 활성화
+                                                                setDialogueQueue([]);
+                                                                setMissionUnlocked(true);
+                                                                setFlowStep("mission");
+                                                                return;
+                                                            }
+                                                            // 대화를 먼저 보여주고, 미션은 대화 종료 시점에 활성화
+                                                            setDialogueQueue(lines);
+                                                            setFlowStep("dialogue");
+                                                            setMissionUnlocked(false);
+                                                        }, 1500);
+                                                    }}
+                                                >
+                                                    <div className="font-semibold text-gray-900">{p.name}</div>
+                                                    {selectedPlaceConfirm === p.id && (p.address || p.signature) ? (
+                                                        <div className="text-xs text-gray-700 mt-2 space-y-1">
+                                                            {p.address && (
+                                                                <div className="leading-relaxed">{p.address}</div>
+                                                            )}
+                                                            {p.signature && (
+                                                                <div className="inline-flex items-center px-2 py-1 rounded-md bg-amber-100 text-amber-800">
+                                                                    {p.signature}
+                                                                </div>
+                                                            )}
+                                                            {/* ✅ 거리 표시 추가 */}
+                                                            {selectedDistance != null && (
+                                                                <div className="text-[11px] text-gray-500">
+                                                                    📍 현재 위치에서 약{" "}
+                                                                    <span className="font-medium text-gray-800">
+                                                                        {selectedDistance < 1
+                                                                            ? `${Math.round(selectedDistance * 1000)}m`
+                                                                            : `${selectedDistance.toFixed(1)}km`}
+                                                                    </span>{" "}
+                                                                    거리
+                                                                </div>
+                                                            )}
                                                             <div className="text-[11px] text-gray-500">
-                                                                📍 현재 위치에서 약{" "}
-                                                                <span className="font-medium text-gray-800">
-                                                                    {selectedDistance < 1
-                                                                        ? `${Math.round(selectedDistance * 1000)}m`
-                                                                        : `${selectedDistance.toFixed(1)}km`}
-                                                                </span>{" "}
-                                                                거리
+                                                                한 번 더 클릭하면 이 장소로 진행합니다
                                                             </div>
-                                                        )}
-                                                        <div className="text-[11px] text-gray-500">
-                                                            한 번 더 클릭하면 이 장소로 진행합니다
                                                         </div>
-                                                    </div>
-                                                ) : (
-                                                    p.address && (
-                                                        <div className="text-xs text-gray-600 mt-0.5">{p.address}</div>
-                                                    )
-                                                )}
-                                            </div>
-                                        ));
-                                    })()}
-                                </div>
+                                                    ) : (
+                                                        p.address && (
+                                                            <div className="text-xs text-gray-600 mt-0.5">
+                                                                {p.address}
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </div>
+                                            ));
+                                        })()}
+                                    </div>
+                                </>
                             )}
 
                             {flowStep === "dialogue" && !inMission && (
@@ -2406,154 +2485,119 @@ function EscapeIntroPageInner() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex flex-col items-center justify-between mt-1 pt-1">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => setGalleryPage((p) => Math.max(0, p - 1))}
-                                                className="px-3 py-1.5 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                            >
-                                                이전 장
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    setGalleryPage((p) =>
-                                                        (p + 1) * 9 < galleryUrls.length ? p + 1 : p
-                                                    )
-                                                }
-                                                className="px-3 py-1.5 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                            >
-                                                다음 장
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => setEndingStep("epilogue")}
-                                                className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                            >
-                                                이전
-                                            </button>
-                                            <button
-                                                onClick={handleDownloadCollage}
-                                                disabled={selectedGallery.length !== 4}
-                                                className="px-4 py-2 rounded-lg bg-amber-600 text-white disabled:opacity-50"
-                                            >
-                                                템플릿 이미지 다운로드
-                                            </button>
-                                            <button
-                                                onClick={async () => {
-                                                    if (selectedGallery.length !== 4) return;
-                                                    try {
-                                                        // 템플릿 조회 (미리보기는 캔버스 대신 FrameRenderer 사용)
-                                                        let bgUrl = "/images/hongdaelatter_template.jpg";
-                                                        let frames: Array<{
-                                                            x: number;
-                                                            y: number;
-                                                            w: number;
-                                                            h: number;
-                                                        }> | null = null;
+                                    {/* 페이지네이션 + 액션 버튼들 (모달 하단) */}
+                                    <div className="mt-2 pt-2 border-t border-gray-200">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => setGalleryPage((p) => Math.max(0, p - 1))}
+                                                    className="px-3 py-2 rounded-lg text-green-700 hover:bg-green-50 transition-all duration-200 font-medium border border-green-300"
+                                                    style={{ backgroundColor: "rgba(153, 192, 142, 0.2)" }}
+                                                >
+                                                    이전 장
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        setGalleryPage((p) =>
+                                                            (p + 1) * 9 < galleryUrls.length ? p + 1 : p
+                                                        )
+                                                    }
+                                                    className="px-3 py-2 rounded-lg text-green-700 hover:bg-green-50 transition-all duration-200 font-medium border border-green-300"
+                                                    style={{ backgroundColor: "rgba(153, 192, 142, 0.2)" }}
+                                                >
+                                                    다음 장
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={handleDownloadCollage}
+                                                    disabled={selectedGallery.length !== 4}
+                                                    className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md"
+                                                    style={{ backgroundColor: "#99c08e" }}
+                                                >
+                                                    템플릿 이미지 다운로드
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (selectedGallery.length !== 4) return;
                                                         try {
-                                                            const res = await fetch("/api/collages/templates", {
-                                                                cache: "no-store",
-                                                            });
-                                                            const data = await res.json();
-                                                            const list = Array.isArray(data?.templates)
-                                                                ? data.templates
-                                                                : [];
-                                                            const t =
-                                                                list.find(
-                                                                    (it: any) =>
-                                                                        String(it?.name || "")
-                                                                            .toLowerCase()
-                                                                            .includes("hongdae") ||
-                                                                        String(it?.imageUrl || "").includes(
-                                                                            "hongdaelatter_template"
-                                                                        )
-                                                                ) || list[0];
-                                                            if (t) {
-                                                                if (t.imageUrl) bgUrl = String(t.imageUrl);
-                                                                if (t.framesJson && Array.isArray(t.framesJson))
-                                                                    frames = t.framesJson as any;
+                                                            let bgUrl = "/images/hongdaelatter_template.jpg";
+                                                            let frames: Array<{
+                                                                x: number;
+                                                                y: number;
+                                                                w: number;
+                                                                h: number;
+                                                            }> | null = null;
+                                                            try {
+                                                                const res = await fetch("/api/collages/templates", {
+                                                                    cache: "no-store",
+                                                                });
+                                                                const data = await res.json();
+                                                                const list = Array.isArray(data?.templates)
+                                                                    ? data.templates
+                                                                    : [];
+                                                                const t =
+                                                                    list.find(
+                                                                        (it: any) =>
+                                                                            String(it?.name || "")
+                                                                                .toLowerCase()
+                                                                                .includes("hongdae") ||
+                                                                            String(it?.imageUrl || "").includes(
+                                                                                "hongdaelatter_template"
+                                                                            )
+                                                                    ) || list[0];
+                                                                if (t) {
+                                                                    if (t.imageUrl) bgUrl = String(t.imageUrl);
+                                                                    if (t.framesJson && Array.isArray(t.framesJson))
+                                                                        frames = t.framesJson as any;
+                                                                }
+                                                            } catch {}
+                                                            if (!frames) {
+                                                                frames = [
+                                                                    { x: 60, y: 230, w: 300, h: 420 },
+                                                                    { x: 410, y: 230, w: 300, h: 420 },
+                                                                    { x: 60, y: 730, w: 300, h: 420 },
+                                                                    { x: 410, y: 730, w: 300, h: 420 },
+                                                                ];
                                                             }
+                                                            setFramePreviewTemplate({
+                                                                imageUrl: bgUrl,
+                                                                framesJson: frames,
+                                                                width: 800,
+                                                                height: 1200,
+                                                            } as any);
+                                                            setShowCollagePreview(true);
                                                         } catch {}
-                                                        if (!frames) {
-                                                            frames = [
-                                                                { x: 60, y: 230, w: 300, h: 420 },
-                                                                { x: 410, y: 230, w: 300, h: 420 },
-                                                                { x: 60, y: 730, w: 300, h: 420 },
-                                                                { x: 410, y: 730, w: 300, h: 420 },
-                                                            ];
-                                                        }
-
-                                                        // 배경 원본 사이즈를 알 수 없으므로, 미리보기 컨테이너에서 scale 처리
-                                                        setFramePreviewTemplate({
-                                                            imageUrl: bgUrl,
-                                                            framesJson: frames,
-                                                            width: 800,
-                                                            height: 1200,
-                                                        } as any);
-                                                        setShowCollagePreview(true);
-                                                    } catch {}
-                                                }}
-                                                disabled={selectedGallery.length !== 4}
-                                                className="px-4 py-2 rounded-lg bg-black text-white disabled:opacity-50"
-                                            >
-                                                템플릿 미리보기
-                                            </button>
-                                            <button
-                                                onClick={handleShareToInstagram}
-                                                disabled={selectedGallery.length !== 4}
-                                                className="px-4 py-2 rounded-lg bg-pink-600 text-white disabled:opacity-50"
-                                            >
-                                                인스타 스토리 올리기
-                                            </button>
+                                                    }}
+                                                    disabled={selectedGallery.length !== 4}
+                                                    className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md"
+                                                    style={{ backgroundColor: "#7da871" }}
+                                                >
+                                                    템플릿 미리보기
+                                                </button>
+                                                <button
+                                                    onClick={handleShareToInstagram}
+                                                    disabled={selectedGallery.length !== 4}
+                                                    className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md bg-gradient-to-r from-green-500 to-green-600"
+                                                >
+                                                    인스타 스토리 올리기
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : flowStep === "done" && endingStep === "badge" ? (
-                            <div className="fixed inset-0 z-[2000] bg-black/40 flex items-center justify-center p-4">
-                                <div className="rounded-2xl bg-white/90 backdrop-blur p-5 border shadow max-w-md w-full text-center">
-                                    <h3 className="text-xl font-bold text-gray-800 mb-3">보상 배지</h3>
-                                    {badge ? (
-                                        <div className="flex flex-col items-center gap-3">
-                                            {badge.image_url ? (
-                                                <img
-                                                    src={badge.image_url as any}
-                                                    alt={badge.name}
-                                                    className="w-28 h-28 object-cover rounded-full border mx-auto"
-                                                />
-                                            ) : null}
-                                            <div className="text-gray-900 font-semibold">{badge.name}</div>
-                                            {badge.description ? (
-                                                <div className="text-sm text-gray-600 whitespace-pre-wrap">
-                                                    {badge.description}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    ) : (
-                                        <div className="text-gray-600">배지 정보를 불러오는 중이에요.</div>
-                                    )}
-                                    <div className="mt-5 flex justify-center gap-2">
-                                        <button
-                                            onClick={() => setEndingStep("gallery")}
-                                            className="px-4 py-2 rounded-lg bg-gray-200 text-gray-800 hover:bg-gray-300"
-                                        >
-                                            템플릿 다시 보기
-                                        </button>
-                                        <button
-                                            onClick={handleCloseBook}
-                                            className="px-4 py-2 rounded-lg bg-black text-white"
-                                        >
-                                            완료
-                                        </button>
                                     </div>
                                 </div>
                             </div>
                         ) : selectedPlaceId && missionUnlocked && flowStep !== "done" ? (
                             <div
                                 className={`rounded-2xl bg-white/85 backdrop-blur p-4 border shadow transition-opacity duration-500 ${
-                                    flowStep === "walk" || letterGateActive ? "opacity-0" : "opacity-100"
-                                } ${noteOpenAnim && flowStep === "mission" ? "animate-[noteOpen_300ms_ease-out]" : ""}`}
+                                    (flowStep as unknown as string) === "walk" || letterGateActive
+                                        ? "opacity-0"
+                                        : "opacity-100"
+                                } ${
+                                    noteOpenAnim && (flowStep as unknown as string) === "mission"
+                                        ? "animate-[noteOpen_300ms_ease-out]"
+                                        : ""
+                                }`}
                             >
                                 <div className="mb-2 flex items-center justify-between">
                                     <button
@@ -2705,25 +2749,17 @@ function EscapeIntroPageInner() {
                                 className="w-full flex-1 flex items-center justify-center overflow-hidden"
                                 style={{ cursor: measureMode ? "crosshair" : undefined }}
                             >
-                                {framePreviewTemplate ? (
-                                    <div className="w-full flex justify-center">
-                                        <div style={{ width: "100%", maxWidth: 360 }}>
-                                            <div style={{ aspectRatio: "9 / 16", width: "100%" }}>
-                                                <FrameRenderer
-                                                    template={framePreviewTemplate as any}
-                                                    photos={selectedGallery.slice(0, 4)}
-                                                    style={{ width: "100%", height: "100%" }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : collagePreviewUrl ? (
+                                {collagePreviewUrl ? (
                                     <img
-                                        src={collagePreviewUrl}
+                                        src={collagePreviewUrl || undefined}
                                         alt="collage-preview"
                                         className="max-h-[72vh] w-full h-auto object-contain rounded"
                                     />
-                                ) : null}
+                                ) : (
+                                    <div className="flex items-center justify-center w-full h-[60vh]">
+                                        <div className="animate-pulse text-gray-500">이미지 생성 중...</div>
+                                    </div>
+                                )}
                             </div>
                             <div className="mt-4 flex justify-end gap-2">
                                 <button

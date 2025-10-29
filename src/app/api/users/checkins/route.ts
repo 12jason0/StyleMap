@@ -170,13 +170,27 @@ export async function POST(request: NextRequest) {
         );
 
         let awarded = false;
-        // 7개 달성 시 쿠폰 3개 지급 (사이클 기준) — 당일 중복 보상 방지
+        // 7개 달성 시 쿠폰 3개 + 물 주기 2개 지급 — 당일 중복 보상 방지
         if (effectiveStreak === 7 && !hasRewardedToday) {
             await (prisma as any).$transaction([
+                // 쿠폰 보상 기록
                 (prisma as any).userReward.create({
                     data: { userId, type: "checkin", amount: 3, unit: "coupon" as any },
                 }),
-                (prisma as any).user.update({ where: { id: userId }, data: { couponCount: { increment: 3 } } }),
+                // 물 주기 보상 기록
+                (prisma as any).userReward.create({
+                    data: { userId, type: "checkin", amount: 2, unit: "water" as any },
+                }),
+                // 유저 데이터 업데이트 (쿠폰 3 + 물 2)
+                (prisma as any).user.update({
+                    where: { id: userId },
+                    data: {
+                        couponCount: { increment: 3 },
+                        waterStock: { increment: 2 },
+                        totalWaterGiven: { increment: 2 },
+                    },
+                }),
+                // 체크인 보상 완료 표시
                 (prisma as any).userCheckin.update({ where: { id: created.id }, data: { rewarded: true } }),
             ]);
             awarded = true;

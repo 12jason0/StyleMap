@@ -103,6 +103,13 @@ export default function NaverMapComponent({
         const naver = (window as any).naver;
         if (!naver?.maps || !mapRef.current) return;
 
+        console.log("=== NaverMap 렌더링 시작 ===");
+        console.log("📦 Props 확인:");
+        console.log("  - drawPath:", drawPath);
+        console.log("  - userLocation:", userLocation);
+        console.log("  - places:", places);
+        console.log("  - selectedPlace:", selectedPlace);
+
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
         if (polylineRef.current) {
@@ -124,17 +131,27 @@ export default function NaverMapComponent({
             markersRef.current.push(me);
             bounds.extend(userPos);
             didExtend = true;
+            console.log("✅ 사용자 마커 생성:", {
+                lat: userLocation.lat,
+                lng: userLocation.lng,
+            });
         }
 
         // 장소 마커
         const valid: Place[] = (places || []).filter((p) => isValidLatLng(p?.latitude, p?.longitude)) as Place[];
-        valid.forEach((p) => {
+        console.log("📍 유효한 장소:", valid.length, "개");
+
+        valid.forEach((p, idx) => {
             const pos = new naver.maps.LatLng(Number(p.latitude), Number(p.longitude));
             const marker = new naver.maps.Marker({ position: pos, map, title: p.name });
             naver.maps.Event.addListener(marker, "click", () => onPlaceClick(p));
             markersRef.current.push(marker);
             bounds.extend(pos);
             didExtend = true;
+            console.log(`  [${idx}] ${p.name}:`, {
+                lat: p.latitude,
+                lng: p.longitude,
+            });
         });
 
         if (didExtend) {
@@ -143,67 +160,126 @@ export default function NaverMapComponent({
 
         // 경로 그리기
         const buildRoute = async () => {
-            if (!drawPath) return;
-            const mode = routeMode === "driving" ? "driving" : "walking";
-            const isDriving = mode === "driving";
+            if (!drawPath) {
+                console.log("⚠️ drawPath가 false - 경로 그리기 건너뜀");
+                return;
+            }
 
-            // ✅ Case 1: start 페이지 (현재 위치 + 장소 1개) - 도로(운전) 경로만 사용
+            console.log("🚀 경로 그리기 시작");
+
+            // ✅ Case 1: start 페이지 (현재 위치 + 장소 1개)
             if (userPos && valid.length === 1) {
                 const uLng = Number(userLocation?.lng ?? 0);
                 const uLat = Number(userLocation?.lat ?? 0);
-                const dist = distanceMeters(uLat, uLng, Number(valid[0].latitude), Number(valid[0].longitude));
-                const tooFar = isDriving ? dist > 50_000 : dist > 5_000;
-                if (tooFar) {
-                    return; // 너무 멀면 지도 상 경로 생략 (건물 관통 방지)
+
+                console.log("📍 Case 1: 사용자 위치 → 장소 1개");
+                console.log("  출발:", { lat: uLat, lng: uLng });
+                console.log("  도착:", { name: valid[0].name, lat: valid[0].latitude, lng: valid[0].longitude });
+
+                // 🔴 같은 좌표 체크
+                if (Math.abs(uLat - valid[0].latitude) < 0.00001 && Math.abs(uLng - valid[0].longitude) < 0.00001) {
+                    console.error("❌ 출발지와 도착지가 동일합니다!");
+                    return;
                 }
-                const fetchDrivingPath = async () => {
+
+                const fetchPath = async () => {
                     const coords = `${uLng},${uLat};${valid[0].longitude},${valid[0].latitude}`;
-                    const res = await fetch(`/api/directions?coords=${encodeURIComponent(coords)}&mode=driving`);
-                    if (!res.ok) return null as any[] | null;
-                    const data = await res.json();
-                    return Array.isArray(data?.coordinates) && data.coordinates.length > 0 ? data.coordinates : null;
+                    console.log("🌐 API 요청 좌표:", coords);
+
+                    // 도보 우선 시도
+                    try {
+                        const url = `/api/directions?coords=${encodeURIComponent(coords)}&mode=walking`;
+                        const res1 = await fetch(url);
+                        if (res1.ok) {
+                            const data = await res1.json();
+                            console.log("🚶 도보 응답:", data);
+                            if (Array.isArray(data?.coordinates) && data.coordinates.length > 0) {
+                                return data.coordinates;
+                            }
+                        }
+                    } catch (error) {
+                        console.error("도보 경로 요청 실패:", error);
+                    }
+
+                    // 도보 실패 시 운전 경로 시도
+                    try {
+                        const url = `/api/directions?coords=${encodeURIComponent(coords)}&mode=driving`;
+                        const res2 = await fetch(url);
+                        if (res2.ok) {
+                            const data = await res2.json();
+                            console.log("🚗 운전 응답:", data);
+                            if (Array.isArray(data?.coordinates) && data.coordinates.length > 0) {
+                                return data.coordinates;
+                            }
+                        }
+                    } catch (error) {
+                        console.error("운전 경로 요청 실패:", error);
+                    }
+
+                    return null;
                 };
+
                 try {
-                    const coordsPath = await fetchDrivingPath();
-                    if (!coordsPath) return; // 끝까지 실패하면 라인 미표시
-                    const latlngs = coordsPath.map(([lng, lat]: [number, number]) => new naver.maps.LatLng(lat, lng));
-                    polylineRef.current = new naver.maps.Polyline({
-                        map,
-                        path: latlngs,
-                        strokeWeight: 4,
-                        strokeColor: "#1D4ED8", // blue-700
-                        strokeOpacity: 0.9,
-                    });
-                } catch {}
+                    const coordsPath = await fetchPath();
+
+                    if (coordsPath && coordsPath.length > 0) {
+                        const latlngs = coordsPath.map(
+                            ([lng, lat]: [number, number]) => new naver.maps.LatLng(lat, lng)
+                        );
+
+                        console.log("✅ Polyline 생성:", latlngs.length, "개 포인트");
+                        polylineRef.current = new naver.maps.Polyline({
+                            map,
+                            path: latlngs,
+                            strokeWeight: 4,
+                            strokeColor: "#1D4ED8",
+                            strokeOpacity: 0.9,
+                        });
+                    } else {
+                        console.warn("⚠️ 경로 데이터가 없습니다");
+                    }
+                } catch (error) {
+                    console.error("❌ 경로 생성 중 에러:", error);
+                }
                 return;
             }
 
             // ✅ Case 2: courses/[id] (장소 여러 개 연결)
             if (valid.length >= 2) {
+                console.log("📍 Case 2: 장소 여러 개 연결", valid.length);
                 const allLatLngs: any[] = [];
+
                 const tryFetchSegment = async (
                     start: { latitude: number; longitude: number },
                     end: { latitude: number; longitude: number },
                     primary: "walking" | "driving"
                 ): Promise<Array<[number, number]> | null> => {
                     const coords = `${start.longitude},${start.latitude};${end.longitude},${end.latitude}`;
+                    console.log(`🌐 세그먼트 요청 (${primary}):`, coords);
                     try {
-                        // 1차도보/운전 시도
                         const r1 = await fetch(`/api/directions?coords=${encodeURIComponent(coords)}&mode=${primary}`);
                         if (r1.ok) {
                             const d1 = await r1.json();
-                            if (Array.isArray(d1?.coordinates) && d1.coordinates.length > 0) return d1.coordinates;
+                            if (Array.isArray(d1?.coordinates) && d1.coordinates.length > 0) {
+                                console.log(`✅ ${primary} 경로 성공:`, d1.coordinates.length, "포인트");
+                                return d1.coordinates;
+                            }
                         }
-                        // 2차 반대 모드 재시도
+
                         const secondary = primary === "walking" ? "driving" : "walking";
                         const r2 = await fetch(
                             `/api/directions?coords=${encodeURIComponent(coords)}&mode=${secondary}`
                         );
                         if (r2.ok) {
                             const d2 = await r2.json();
-                            if (Array.isArray(d2?.coordinates) && d2.coordinates.length > 0) return d2.coordinates;
+                            if (Array.isArray(d2?.coordinates) && d2.coordinates.length > 0) {
+                                console.log(`✅ ${secondary} 경로 성공:`, d2.coordinates.length, "포인트");
+                                return d2.coordinates;
+                            }
                         }
-                    } catch {}
+                    } catch (error) {
+                        console.error("세그먼트 요청 실패:", error);
+                    }
                     return null;
                 };
 
@@ -211,8 +287,10 @@ export default function NaverMapComponent({
                     const a = valid[i];
                     const b = valid[i + 1];
                     const d = distanceMeters(a.latitude, a.longitude, b.latitude, b.longitude);
-                    // 1.5km 이하는 보행 우선, 그 외는 운전 우선
                     const primary: "walking" | "driving" = d <= 1_500 ? "walking" : "driving";
+
+                    console.log(`🔗 세그먼트 ${i}:`, a.name, "→", b.name, `(${d.toFixed(0)}m, ${primary})`);
+
                     const coordsPath = await tryFetchSegment(a as any, b as any, primary);
                     if (coordsPath && coordsPath.length > 0) {
                         let segment = coordsPath.map(([lng, lat]) => new naver.maps.LatLng(lat, lng));
@@ -221,30 +299,25 @@ export default function NaverMapComponent({
                     }
                 }
 
+                console.log("📊 전체 경로 포인트:", allLatLngs.length);
                 if (allLatLngs.length > 1) {
                     polylineRef.current = new naver.maps.Polyline({
                         map,
                         path: allLatLngs,
                         strokeWeight: 4,
-                        strokeColor: "#1D4ED8", // blue-700
+                        strokeColor: "#1D4ED8",
                         strokeOpacity: 0.9,
                     });
-                }
-                // 경로가 전혀 없으면 마커를 잇는 보정선(연한 파랑, 점선) 표시 옵션
-                else if (valid.length >= 2) {
-                    const fallback = valid.map((p) => new naver.maps.LatLng(Number(p.latitude), Number(p.longitude)));
-                    polylineRef.current = new naver.maps.Polyline({
-                        map,
-                        path: fallback,
-                        strokeWeight: 3,
-                        strokeColor: "#60A5FA", // blue-400
-                        strokeOpacity: 0.8,
-                    });
+                    console.log("✅ Polyline 생성 완료");
+                } else {
+                    console.warn("⚠️ 경로 포인트가 부족합니다");
                 }
             }
         };
 
-        buildRoute();
+        buildRoute().catch((error) => {
+            console.error("❌ buildRoute 에러:", error);
+        });
     }, [places, userLocation, selectedPlace, drawPath, routeMode]);
 
     return <div ref={containerRef} className={className} style={{ ...style, width: "100%", height: "100%" }} />;

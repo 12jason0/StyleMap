@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { fetchWeekStamps, postCheckin } from "@/lib/checkinClient";
 import {
     Sparkles,
     MapPin,
@@ -224,39 +225,9 @@ const AIRecommender = () => {
         if (!isLoggedIn) return;
         const fetchCheckins = async () => {
             try {
-                const token = localStorage.getItem("authToken");
-                if (!token) return;
-                const res = await fetch("/api/users/checkins", { headers: { Authorization: `Bearer ${token}` } });
-                if (!res.ok) return;
-
-                const data = await res.json();
-                const list: Array<{ date: string }> = data.success ? data.checkins || [] : [];
-
-                const now = new Date();
-                const day = now.getDay();
-                const mondayOffset = (day + 6) % 7;
-                const monday = new Date(now);
-                monday.setHours(0, 0, 0, 0);
-                monday.setDate(now.getDate() - mondayOffset);
-
-                const stamps = new Array(7).fill(false) as boolean[];
-                for (const c of list) {
-                    const d = new Date(c.date);
-                    for (let i = 0; i < 7; i++) {
-                        const dt = new Date(monday);
-                        dt.setDate(monday.getDate() + i);
-                        if (
-                            d.getFullYear() === dt.getFullYear() &&
-                            d.getMonth() === dt.getMonth() &&
-                            d.getDate() === dt.getDate()
-                        ) {
-                            stamps[i] = true;
-                        }
-                    }
-                }
-                setWeekStamps(stamps);
-
-                // 메인 첫 진입에서만 모달을 띄우므로 여기서는 자동 오픈하지 않음
+                const res = await fetchWeekStamps();
+                if (!res) return;
+                setWeekStamps(res.stamps);
             } catch (error) {
                 console.error("출석 정보 조회 오류:", error);
             }
@@ -268,14 +239,8 @@ const AIRecommender = () => {
     // 출석 체크
     const doHomeCheckin = async () => {
         try {
-            const token = localStorage.getItem("authToken");
-            if (!token) return;
-            const res = await fetch("/api/users/checkins", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            if (res.ok && data?.success) {
+            const result = await postCheckin();
+            if (result.ok && result.success) {
                 await fetchUserData();
                 const now = new Date();
                 const day = now.getDay();
@@ -283,13 +248,13 @@ const AIRecommender = () => {
                 setWeekStamps((prev) => prev.map((v, i) => (i === idx ? true : v)));
                 setAttendanceModalOpen(false);
 
-                if (data.awarded) {
-                    alert(`출석 7회 달성! 쿠폰 ${data.rewardAmount || 1}개가 지급되었습니다.`);
+                if (result.awarded) {
+                    alert(`출석 7회 달성! 쿠폰 ${result.rewardAmount || 1}개가 지급되었습니다.`);
                 } else {
                     alert("출석 체크 완료!");
                 }
             } else {
-                alert(data.message || "출석 체크에 실패했습니다.");
+                alert("출석 체크에 실패했습니다.");
             }
         } catch (error) {
             console.error("출석 체크 API 오류:", error);

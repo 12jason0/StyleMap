@@ -58,7 +58,6 @@ function GuidePageInner() {
     const [course, setCourse] = useState<Course | null>(null);
     const [loading, setLoading] = useState(true);
     const [currentStep, setCurrentStep] = useState(0); // 현재 진행 단계 (인덱스)
-    const [showPanel, setShowPanel] = useState(true); // 지도 위 패널 표시/숨김
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [showCongrats, setShowCongrats] = useState(false);
     const [showReview, setShowReview] = useState(false);
@@ -132,27 +131,19 @@ function GuidePageInner() {
 
     // 지도 경로용 장소 배열 (현재 위치 -> 현재 장소)
     const mapPlaces = useMemo(() => {
-        if (!currentPlace)
-            return [] as Array<{ id: number; name: string; latitude: number; longitude: number; address?: string }>;
-        const dest = {
-            id: currentPlace.id,
-            name: currentPlace.name,
-            latitude: currentPlace.latitude,
-            longitude: currentPlace.longitude,
-            address: currentPlace.address,
-        };
-        if (userLocation) {
-            const origin = {
-                id: -1,
-                name: "현재 위치",
-                latitude: userLocation.lat,
-                longitude: userLocation.lng,
-                address: "",
-            };
-            return [origin, dest];
-        }
-        return [dest];
-    }, [currentPlace, userLocation]);
+        if (!currentPlace) return [];
+
+        // 🟢 목적지만 반환 (userLocation 체크 제거)
+        return [
+            {
+                id: currentPlace.id,
+                name: currentPlace.name,
+                latitude: currentPlace.latitude,
+                longitude: currentPlace.longitude,
+                address: currentPlace.address,
+            },
+        ];
+    }, [currentPlace]);
 
     // 다음/이전 장소로 이동하는 함수
     const goToNextStep = () => {
@@ -184,6 +175,17 @@ function GuidePageInner() {
                 credentials: "include",
                 body: JSON.stringify({ courseId: Number(courseId), title: course?.title }),
             });
+            try {
+                await fetch("/api/forest/water", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ source: "course" }), // 💧 코스 완료 보상 +3
+                });
+            } catch {}
         } catch {}
     }
 
@@ -201,80 +203,79 @@ function GuidePageInner() {
                     routeMode="driving"
                 />
 
-                {/* 패널 토글 버튼 - 헤더 아래 여백 확보 */}
+                {/* 닫기 버튼: 코스 상세로 이동 */}
                 <button
-                    onClick={() => setShowPanel((v) => !v)}
-                    className="absolute left-4 z-20 px-3 py-2 rounded-lg bg-black/60 text-white backdrop-blur hover:bg-black/70 hover:cursor-pointer"
-                    style={{ top: 72 }}
+                    onClick={() => router.push(`/courses/${courseId}`)}
+                    className="absolute right-4 top-4 z-20 w-9 h-9 rounded-full bg-black/60 text-white text-lg leading-none flex items-center justify-center backdrop-blur hover:bg-black/70 hover:cursor-pointer"
+                    aria-label="닫기"
+                    title="닫기"
                 >
-                    {showPanel ? "숨기기" : "보이기"}
+                    ×
                 </button>
 
-                {/* 지도 위 하단 모달 패널 */}
-                {showPanel && (
-                    <div className="absolute inset-x-0 bottom-10 md:10 md:bottom-6 z-10 px-4 pt-[env(safe-area-inset-bottom)] ">
-                        <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-xl border p-4">
-                            <div className="mb-3">
-                                <h2 className="text-xl font-bold">{currentPlace.name}</h2>
-                                <p className="text-sm text-gray-500">{currentPlace.address}</p>
-                                {currentPlace.notes && (
-                                    <p className="text-sm text-blue-700 bg-blue-50 p-2 rounded-md mt-2">
-                                        💡 팁: {currentPlace.notes}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={goToPrevStep}
-                                    disabled={currentStep === 0}
-                                    className="px-4 py-2 text-base rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 hover:cursor-pointer"
-                                >
-                                    ← 이전
-                                </button>
+                {/* 지도 위 하단 모달 패널 (항상 표시) */}
+                <div className="absolute inset-x-0 bottom-10 md:10 md:bottom-6 z-10 px-4 pt-[env(safe-area-inset-bottom)] ">
+                    <div className="w-full max-w-sm sm:max-w-md mx-auto bg-white/95 backdrop-blur rounded-2xl shadow-xl border p-4">
+                        <div className="mb-3">
+                            <h2 className="text-xl font-bold">{currentPlace.name}</h2>
+                            <p className="text-sm text-gray-500">{currentPlace.address}</p>
+                            {currentPlace.notes && (
+                                <p className="text-sm text-blue-700 bg-blue-50 p-2 rounded-md mt-2">
+                                    💡 팁: {currentPlace.notes}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={goToPrevStep}
+                                disabled={currentStep === 0}
+                                className="px-4 py-2 text-base rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 hover:cursor-pointer"
+                            >
+                                ← 이전
+                            </button>
 
+                            <button
+                                onClick={() => {
+                                    const name = currentPlace.name;
+                                    const lat = currentPlace.latitude;
+                                    const lng = currentPlace.longitude;
+                                    const base = `https://map.naver.com/v5/directions`;
+                                    if (userLocation) {
+                                        const url = `${base}/${userLocation.lng},${
+                                            userLocation.lat
+                                        },내 위치,,/${lng},${lat},${encodeURIComponent(name)},,WALKING`;
+                                        window.open(url, "_blank");
+                                    } else {
+                                        const url = `${base}/${lng},${lat},${encodeURIComponent(name)},,WALKING`;
+                                        window.open(url, "_blank");
+                                    }
+                                }}
+                                className="flex-1 text-center px-4 py-3 text-base rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-500 hover:cursor-pointer"
+                            >
+                                길찾기
+                            </button>
+
+                            {isLastStep ? (
                                 <button
-                                    onClick={() => {
-                                        const name = currentPlace.name;
-                                        const lat = currentPlace.latitude;
-                                        const lng = currentPlace.longitude;
-                                        const base = `https://map.naver.com/v5/directions`;
-                                        if (userLocation) {
-                                            const url = `${base}/${userLocation.lng},${
-                                                userLocation.lat
-                                            },내 위치,,/${lng},${lat},${encodeURIComponent(name)},,WALKING`;
-                                            window.open(url, "_blank");
-                                        } else {
-                                            const url = `${base}/${lng},${lat},${encodeURIComponent(name)},,WALKING`;
-                                            window.open(url, "_blank");
-                                        }
+                                    onClick={async () => {
+                                        await markCompleted();
+                                        setShowCongrats(true);
                                     }}
-                                    className="flex-1 text-center px-4 py-3 text-base rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-500 hover:cursor-pointer"
+                                    className="px-4 py-2 text-base rounded-lg bg-green-500 text-white hover:bg-green-600 hover:cursor-pointer"
                                 >
-                                    길찾기
+                                    코스 완료!
                                 </button>
-
-                                {isLastStep ? (
-                                    <button
-                                        onClick={async () => {
-                                            await markCompleted();
-                                            setShowCongrats(true);
-                                        }}
-                                        className="px-4 py-2 text-base rounded-lg bg-green-500 text-white hover:bg-green-600 hover:cursor-pointer"
-                                    >
-                                        코스 완료!
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={goToNextStep}
-                                        className="px-4 py-2 text-base rounded-lg bg-blue-600 text-white hover:bg-blue-700 hover:cursor-pointer"
-                                    >
-                                        다음 →
-                                    </button>
-                                )}
-                            </div>
+                            ) : (
+                                <button
+                                    onClick={goToNextStep}
+                                    className="px-4 py-2 text-base rounded-lg bg-blue-600 text-white hover:bg-blue-700 hover:cursor-pointer"
+                                >
+                                    다음 →
+                                </button>
+                            )}
                         </div>
                     </div>
-                )}
+                </div>
             </div>
             {/* 완료 축하 모달 */}
             {showCongrats && (

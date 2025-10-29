@@ -210,11 +210,11 @@ const Signup = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 text-black">
-            <main className="max-w-md mx-auto px-4 py-8 pt-10">
-                <div className="bg-white rounded-2xl shadow-md p-8">
+        <div className="min-h-screen bg-gradient-to-br from-green-50 via-[var(--brand-cream)] to-white text-black">
+            <main className="max-w-sm mx-auto px-4 py-8 pt-10">
+                <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-8">
                     <div className="text-center">
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">회원가입</h1>
+                        <h1 className="text-3xl font-bold text-gray-900 mb-2 font-brand">회원가입</h1>
                         <p className="text-gray-600">StyleMap과 함께 여행을 시작하세요</p>
                     </div>
 
@@ -229,7 +229,7 @@ const Signup = () => {
                             type="button"
                             onClick={() => handleSocialSignup("kakao")}
                             disabled={loading}
-                            className="w-full flex items-center justify-center px-4 py-3 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-medium"
+                            className="w-full flex items-center justify-center px-4 py-3 bg-yellow-400 text-black rounded-lg hover:bg-yellow-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-semibold"
                         >
                             <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M12 3c5.799 0 10.5 3.402 10.5 7.5 0 4.098-4.701 7.5-10.5 7.5-.955 0-1.886-.1-2.777-.282L3.234 21l1.781-3.13C3.69 16.56 1.5 14.165 1.5 10.5 1.5 6.402 6.201 3 12 3z" />
@@ -257,7 +257,7 @@ const Signup = () => {
                                 value={formData.nickname}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                             />
                         </div>
                         <div>
@@ -271,7 +271,7 @@ const Signup = () => {
                                 value={formData.email}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                             />
                         </div>
                         <div>
@@ -285,7 +285,7 @@ const Signup = () => {
                                 value={formData.password}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                             />
                         </div>
                         <div>
@@ -299,13 +299,13 @@ const Signup = () => {
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
                                 required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                             />
                         </div>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                            className="w-full bg-emerald-600 text-white py-2.5 rounded-lg font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                         >
                             {loading ? "가입하는 중..." : "이메일로 회원가입"}
                         </button>
@@ -314,7 +314,7 @@ const Signup = () => {
                     <div className="mt-6 text-center text-sm">
                         <p className="text-gray-500">
                             이미 계정이 있으신가요?{" "}
-                            <Link href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">
+                            <Link href="/login" className="font-semibold text-emerald-600 hover:text-emerald-700">
                                 로그인
                             </Link>
                         </p>

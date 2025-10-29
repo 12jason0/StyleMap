@@ -3,21 +3,29 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 
 export default function Footer() {
+    const pathname = usePathname();
+    const isActive = (href: string) => pathname === href || pathname?.startsWith(href + "/");
     return (
         <footer
-            className="fixed bottom-0 left-0 right-0 z-40"
-            style={{ backgroundColor: "#ffffff", borderTop: "2px solid rgba(153,192,142,0.5)" }}
+            className="w-full"
+            style={{
+                backgroundColor: "#ffffff",
+                borderTop: "2px solid rgba(153,192,142,0.5)",
+                paddingBottom: "calc(8px + env(safe-area-inset-bottom))",
+                backdropFilter: "saturate(180%) blur(8px)",
+            }}
         >
-            <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="max-w-7xl mx-auto px-4 py-2">
                 <nav className="flex items-center justify-around">
                     <a
                         href="/"
                         aria-label="메인"
                         title="메인"
-                        className="p-2 rounded-md hover:bg-green-50"
-                        style={{ color: "#99c08e" }}
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/") ? "#7aa06f" : "#99c08e" }}
                     >
                         <svg
                             width="28"
@@ -38,8 +46,8 @@ export default function Footer() {
                         href="/mypage"
                         aria-label="마이페이지"
                         title="마이페이지"
-                        className="p-2 rounded-md hover:bg-green-50"
-                        style={{ color: "#99c08e" }}
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/mypage") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/mypage") ? "#7aa06f" : "#99c08e" }}
                     >
                         <svg
                             width="28"
@@ -59,8 +67,8 @@ export default function Footer() {
                         href="/forest"
                         aria-label="나무"
                         title="나무"
-                        className="p-2 rounded-md hover:bg-green-50"
-                        style={{ color: "#99c08e" }}
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/forest") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/forest") ? "#7aa06f" : "#99c08e" }}
                     >
                         <svg
                             width="28"
@@ -82,8 +90,8 @@ export default function Footer() {
                         href="/courses"
                         aria-label="코스"
                         title="코스"
-                        className="p-2 rounded-md hover:bg-green-50"
-                        style={{ color: "#99c08e" }}
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/courses") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/courses") ? "#7aa06f" : "#99c08e" }}
                     >
                         <svg
                             width="28"
@@ -104,8 +112,8 @@ export default function Footer() {
                         href="/escape"
                         aria-label="Escape"
                         title="Escape"
-                        className="p-2 rounded-md hover:bg-green-50"
-                        style={{ color: "#99c08e" }}
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/escape") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/escape") ? "#7aa06f" : "#99c08e" }}
                     >
                         <svg
                             width="28"

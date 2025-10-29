@@ -553,10 +553,10 @@ export default function CourseDetailPage() {
                                         🔥 인기 코스
                                     </span>
                                 )}
-                                <span className="px-4 py-1.5 bg-blue-500 text-white text-sm font-bold rounded-full">
+                                <span className="px-4 py-1.5 bg-emerald-600 text-white text-sm font-bold rounded-full">
                                     {courseData.concept}
                                 </span>
-                                <span className="px-4 py-1.5 bg-purple-500 text-white text-sm font-bold rounded-full">
+                                <span className="px-4 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-full">
                                     {courseData.courseType}
                                 </span>
                             </div>
@@ -723,7 +723,10 @@ export default function CourseDetailPage() {
                                                                             coursePlace.place.latitude,
                                                                             coursePlace.place.longitude
                                                                         )}
-                                                                        className="hover:cursor-pointer bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-600 transition-colors"
+                                                                        className="hover:cursor-pointer text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                                                                        style={{
+                                                                            backgroundColor: "var(--brand-green)",
+                                                                        }}
                                                                     >
                                                                         길찾기
                                                                     </button>
@@ -831,17 +834,19 @@ export default function CourseDetailPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => router.push(`/courses/${courseId}/start`)}
-                                                    className={`hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 bg-blue-600 text-white hover:bg-blue-700`}
+                                                    className="hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 text-white"
+                                                    style={{ backgroundColor: "var(--brand-green)" }}
                                                 >
                                                     🚀 코스 시작하기
                                                 </button>
                                                 <button
                                                     onClick={handleSaveCourse}
-                                                    className={`hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 ${
-                                                        isSaved
-                                                            ? "bg-red-500 text-white hover:bg-red-600"
-                                                            : "bg-pink-500 text-white hover:bg-pink-600"
-                                                    }`}
+                                                    className="hover:cursor-pointer w-full py-3 font-bold rounded-lg transition-all duration-300 transform hover:scale-105 text-white"
+                                                    style={{
+                                                        backgroundColor: isSaved
+                                                            ? "var(--brand-green-dark)"
+                                                            : "var(--brand-green)",
+                                                    }}
                                                     aria-label={isSaved ? "찜 해제하기" : "찜하기"}
                                                 >
                                                     {isSaved ? "💖 찜 완료" : "🤍 찜하기"}
@@ -908,9 +913,8 @@ export default function CourseDetailPage() {
                     <div className="flex gap-3">
                         <button
                             onClick={handleSaveCourse}
-                            className={`flex-1 py-3 font-bold rounded-lg transition-all duration-300 ${
-                                isSaved ? "bg-red-500 text-white" : "bg-pink-500 text-white"
-                            }`}
+                            className="flex-1 py-3 font-bold rounded-lg transition-all duration-300 text-white"
+                            style={{ backgroundColor: isSaved ? "var(--brand-green-dark)" : "var(--brand-green)" }}
                         >
                             {isSaved ? "💖 찜 완료" : "🤍 찜하기"}
                         </button>
