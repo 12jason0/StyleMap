@@ -107,24 +107,39 @@ export default function NaverMapComponent({
                 return;
             }
 
-            // ✅ 신규 Maps 방식
-            const clientId =
-                typeof process !== "undefined"
-                    ? process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID
-                    : (window as any).__NEXT_PUBLIC_NAVER_MAP_CLIENT_ID__;
+            // ✅ 안전하게 환경 변수 접근
+            let clientId: string | undefined;
+            try {
+                if (typeof process !== "undefined" && process.env) {
+                    clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
+                }
+            } catch (error) {
+                console.warn("환경 변수 접근 실패:", error);
+                clientId = undefined;
+            }
 
+            // ✅ 신규 NCP Maps API - ncpClientId 사용 (ncpKeyId가 아님!)
             const src = clientId
-                ? `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
+                ? `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${encodeURIComponent(
                       clientId
                   )}&submodules=geocoder`
-                : `https://oapi.map.naver.com/openapi/v3/maps.js`;
+                : `https://oapi.map.naver.com/openapi/v3/maps.js?submodules=geocoder`;
+
+            console.log("📍 네이버 지도 로드:", clientId ? "✅ Client ID 있음" : "⚠️ Client ID 없음");
 
             const script = document.createElement("script");
             script.id = "naver-maps-script";
             script.src = src;
             script.async = true;
             script.defer = true;
-            script.onload = () => resolve();
+            script.onload = () => {
+                console.log("✅ 네이버 지도 스크립트 로드 완료");
+                resolve();
+            };
+            script.onerror = (error) => {
+                console.error("❌ 네이버 지도 스크립트 로드 실패:", error);
+                resolve(); // 에러가 나도 Promise를 resolve하여 앱이 멈추지 않도록
+            };
             document.head.appendChild(script);
         });
     };
