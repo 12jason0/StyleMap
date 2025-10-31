@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import FrameRenderer from "@/components/FrameRenderer";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamicImport from "next/dynamic";
@@ -765,6 +766,14 @@ function EscapeIntroPageInner() {
 
     // --- 미리보기 측정 모드 (contentBounds 추출용) ---
     const [measureMode, setMeasureMode] = useState<boolean>(false);
+
+    // 포털: 변환(transform) 조상 영향 없이 전역(body)에 모달을 렌더링
+    const ClientPortal = ({ children }: { children: React.ReactNode }) => {
+        const [mounted, setMounted] = useState(false);
+        useEffect(() => setMounted(true), []);
+        if (!mounted) return null;
+        return createPortal(children as any, document.body);
+    };
     const [measurePoints, setMeasurePoints] = useState<Array<{ x: number; y: number }>>([]);
     const measureOverlay = useMemo(() => {
         const { iw, ih, offsetX, offsetY, baseW, baseH } = previewDims;
@@ -1083,6 +1092,21 @@ function EscapeIntroPageInner() {
         return () => clearTimeout(animTimer);
     }, []);
 
+    // 이미 완료한 유저는 접근 제한 → 마이페이지 사건 파일로 이동
+    useEffect(() => {
+        if (!storyId || !Number.isFinite(Number(storyId))) return;
+        (async () => {
+            try {
+                const res = await fetch(`/api/escape/complete?storyId=${storyId}`, { cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data?.completed) {
+                    setToast("이미 완료한 스토리입니다. 마이페이지로 이동합니다.");
+                    setTimeout(() => router.push("/mypage?tab=casefiles"), 600);
+                }
+            } catch {}
+        })();
+    }, [storyId, router]);
+
     const currentChapter = chapters[currentChapterIdx];
     // 엔딩 라벨 조건 추가했던 보조 상태 제거 (원복)
 
@@ -1263,13 +1287,20 @@ function EscapeIntroPageInner() {
         const urls = (
             Array.isArray(selectedGallery) && selectedGallery.length > 0 ? selectedGallery : galleryUrls || []
         ).slice(0, 4);
-        if (urls.length === 0) return;
-        if (urls.length !== 4) return;
+
+        if (urls.length !== 4) {
+            console.warn("템플릿 합성에는 정확히 4장의 사진이 필요합니다");
+            setToast("4장의 사진을 선택해주세요");
+            return;
+        }
+
         const canvas = collageCanvasRef.current || document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+        if (!ctx) {
+            console.error("Canvas context를 생성할 수 없습니다");
+            return;
+        }
 
-        // ✅ 회색 테두리 두께 조정 (픽셀)
         const FRAME_OVERLAP = 6;
 
         // DB에서 템플릿 조회
@@ -1286,120 +1317,137 @@ function EscapeIntroPageInner() {
                             .toLowerCase()
                             .includes("hongdae") || String(it?.imageUrl || "").includes("hongdaelatter_template")
                 ) || list[0];
+
             if (t) {
                 if (t.imageUrl) bgUrl = String(t.imageUrl);
                 if (t.framesJson && Array.isArray(t.framesJson)) framesFromDB = t.framesJson as any;
             }
-        } catch {}
+        } catch (err) {
+            console.warn("템플릿 조회 실패, 기본값 사용:", err);
+        }
 
-        const loadImage = (src: string) =>
-            new Promise<HTMLImageElement>((resolve, reject) => {
+        // ✅ CORS 안전한 이미지 로딩 (타임아웃 포함)
+        const loadImageSafe = (src: string): Promise<HTMLImageElement> => {
+            return new Promise((resolve, reject) => {
                 const img = new Image();
-                try {
-                    const needProxy = /^https?:\/\//i.test(src) && !src.startsWith(location.origin);
-                    const proxied = needProxy
-                        ? `${location.origin}/api/image-proxy?url=${encodeURIComponent(src)}`
-                        : src;
-                    img.crossOrigin = "anonymous";
-                    img.onload = () => resolve(img);
-                    img.onerror = reject;
-                    img.src = proxied;
-                } catch {
-                    img.onload = () => resolve(img);
-                    img.onerror = reject;
-                    img.src = src;
-                }
+                img.crossOrigin = "anonymous";
+
+                const isExternal = /^https?:\/\//i.test(src) && !src.startsWith(location.origin);
+                const finalSrc = isExternal ? `/api/image-proxy?url=${encodeURIComponent(src)}` : src;
+
+                const timeout = setTimeout(() => {
+                    img.src = "";
+                    reject(new Error(`이미지 로딩 타임아웃: ${src.slice(0, 50)}...`));
+                }, 15000);
+
+                img.onload = () => {
+                    clearTimeout(timeout);
+                    console.log("✅ 이미지 로드 성공:", finalSrc.slice(0, 80));
+                    resolve(img);
+                };
+
+                img.onerror = () => {
+                    clearTimeout(timeout);
+                    console.error("❌ 이미지 로드 실패:", finalSrc);
+                    reject(new Error(`이미지 로드 실패: ${src.slice(0, 50)}...`));
+                };
+
+                img.src = finalSrc;
             });
-
-        const [bg, ...photos] = await Promise.all([loadImage(bgUrl), ...urls.map((u) => loadImage(u))]);
-        canvas.width = bg.naturalWidth;
-        canvas.height = bg.naturalHeight;
-
-        // 배경 먼저 그리기
-        ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
-
-        // DB에서 가져온 좌표 사용 (fallback: 측정된 좌표)
-        let framesData = framesFromDB || [
-            { x: 196, y: 425, w: 340, h: 461 },
-            { x: 574, y: 420, w: 343, h: 470 },
-            { x: 203, y: 923, w: 336, h: 466 },
-            { x: 575, y: 925, w: 338, h: 460 },
-        ];
-
-        // 퍼센트(0~1)인지 픽셀인지 자동 판별
-        const isPercent = framesData.every((f: any) => f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1);
-        const frames = framesData.map((f: any) =>
-            isPercent
-                ? {
-                      x: f.x * canvas.width,
-                      y: f.y * canvas.height,
-                      w: f.w * canvas.width,
-                      h: f.h * canvas.height,
-                  }
-                : { x: f.x, y: f.y, w: f.w, h: f.h }
-        );
-
-        console.log("🎨 Canvas dimensions:", canvas.width, "x", canvas.height);
-        console.log("📐 Original frames:", frames);
-
-        // 각 프레임에 사진 합성 (테두리 여백 적용) + 빈티지 필터
-        photos.forEach((img, i) => {
-            if (!frames[i]) return;
-            const original = frames[i];
-
-            // ✅ 테두리 두께만큼 안쪽으로 조정
-            const f = {
-                x: original.x - FRAME_OVERLAP, // 바깥쪽으로 확장
-                y: original.y - FRAME_OVERLAP,
-                w: original.w + FRAME_OVERLAP * 2,
-                h: original.h + FRAME_OVERLAP * 2,
-            };
-
-            ctx.save();
-            // 빈티지 톤 적용
-            ctx.filter = "sepia(0.3) contrast(0.9) brightness(0.95) saturate(0.8)";
-
-            // 프레임 영역만 클리핑
-            ctx.beginPath();
-            ctx.rect(f.x, f.y, f.w, f.h);
-            ctx.clip();
-
-            // object-fit: cover 계산
-            const imgRatio = img.naturalWidth / img.naturalHeight;
-            const frameRatio = f.w / f.h;
-
-            let drawWidth: number;
-            let drawHeight: number;
-            let offsetX: number;
-            let offsetY: number;
-
-            if (imgRatio > frameRatio) {
-                // 이미지가 더 넓음 → 높이 기준
-                drawHeight = f.h;
-                drawWidth = drawHeight * imgRatio;
-                offsetX = f.x - (drawWidth - f.w) / 2;
-                offsetY = f.y;
-            } else {
-                // 이미지가 더 높음 → 너비 기준
-                drawWidth = f.w;
-                drawHeight = drawWidth / imgRatio;
-                offsetX = f.x;
-                offsetY = f.y - (drawHeight - f.h) / 2;
-            }
-
-            ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-            // 연한 베이지 오버레이로 종이 느낌 강화
-            ctx.filter = "none";
-            ctx.fillStyle = "rgba(250, 245, 235, 0.15)";
-            ctx.fillRect(f.x, f.y, f.w, f.h);
-            ctx.restore();
-        });
+        };
 
         try {
-            const preview = canvas.toDataURL("image/jpeg", 0.95);
+            console.log("🎨 템플릿 합성 시작...");
+            console.log("📦 배경 템플릿:", bgUrl);
+            console.log("📸 사용자 사진:", urls.length, "장");
+
+            const [bg, ...photos] = await Promise.all([
+                loadImageSafe(bgUrl),
+                ...urls.map((u, i) => {
+                    console.log(`📥 사진 ${i + 1} 로딩 중:`, u.slice(0, 80));
+                    return loadImageSafe(u);
+                }),
+            ]);
+
+            console.log("✅ 모든 이미지 로드 완료");
+
+            canvas.width = bg.naturalWidth;
+            canvas.height = bg.naturalHeight;
+            console.log("📐 캔버스 크기:", canvas.width, "x", canvas.height);
+
+            // 배경 그리기
+            ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+
+            // 프레임 좌표
+            let framesData = framesFromDB || [
+                { x: 196, y: 425, w: 340, h: 461 },
+                { x: 574, y: 420, w: 343, h: 470 },
+                { x: 203, y: 923, w: 336, h: 466 },
+                { x: 575, y: 925, w: 338, h: 460 },
+            ];
+            const isPercent = framesData.every((f: any) => f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1);
+            const frames = framesData.map((f: any) =>
+                isPercent
+                    ? { x: f.x * canvas.width, y: f.y * canvas.height, w: f.w * canvas.width, h: f.h * canvas.height }
+                    : { x: f.x, y: f.y, w: f.w, h: f.h }
+            );
+            console.log("📍 프레임 좌표:", frames);
+
+            // 각 프레임 합성
+            photos.forEach((img, i) => {
+                if (!frames[i]) {
+                    console.warn(`⚠️ 프레임 ${i}가 없습니다`);
+                    return;
+                }
+
+                const original = frames[i];
+                const f = {
+                    x: original.x - FRAME_OVERLAP,
+                    y: original.y - FRAME_OVERLAP,
+                    w: original.w + FRAME_OVERLAP * 2,
+                    h: original.h + FRAME_OVERLAP * 2,
+                };
+
+                ctx.save();
+                ctx.filter = "sepia(0.3) contrast(0.9) brightness(0.95) saturate(0.8)";
+                ctx.beginPath();
+                ctx.rect(f.x, f.y, f.w, f.h);
+                ctx.clip();
+
+                const imgRatio = img.naturalWidth / img.naturalHeight;
+                const frameRatio = f.w / f.h;
+                let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
+                if (imgRatio > frameRatio) {
+                    drawHeight = f.h;
+                    drawWidth = drawHeight * imgRatio;
+                    offsetX = f.x - (drawWidth - f.w) / 2;
+                    offsetY = f.y;
+                } else {
+                    drawWidth = f.w;
+                    drawHeight = drawWidth / imgRatio;
+                    offsetX = f.x;
+                    offsetY = f.y - (drawHeight - f.h) / 2;
+                }
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+                ctx.filter = "none";
+                ctx.fillStyle = "rgba(250, 245, 235, 0.15)";
+                ctx.fillRect(f.x, f.y, f.w, f.h);
+                ctx.restore();
+
+                console.log(`✅ 사진 ${i + 1} 합성 완료`);
+            });
+
+            const preview = canvas.toDataURL("image/jpeg", 0.93);
             setCollagePreviewUrl(preview);
-        } catch {}
-        collageCanvasRef.current = canvas;
+            collageCanvasRef.current = canvas;
+            console.log("🎉 템플릿 합성 완료!");
+            console.log("📊 결과 이미지 크기:", Math.round(preview.length / 1024), "KB");
+        } catch (error: any) {
+            console.error("❌ 템플릿 합성 실패:", error);
+            setToast(`이미지 합성 실패: ${error.message || "알 수 없는 오류"}`);
+            throw error;
+        }
     };
 
     const handleDownloadCollage = async () => {
@@ -1460,10 +1508,55 @@ function EscapeIntroPageInner() {
     };
 
     const getCollageBlob = async (): Promise<Blob | null> => {
-        await renderCollage();
-        const canvas = collageCanvasRef.current;
-        if (!canvas) return null;
-        return await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.95));
+        try {
+            await renderCollage();
+            const canvas = collageCanvasRef.current;
+            if (!canvas) {
+                console.error("캔버스를 찾을 수 없습니다");
+                return null;
+            }
+            return await new Promise<Blob | null>((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error("Blob 생성 타임아웃")), 10000);
+                canvas.toBlob(
+                    (blob) => {
+                        clearTimeout(timeout);
+                        if (blob) {
+                            console.log("✅ Blob 생성 완료:", Math.round(blob.size / 1024), "KB");
+                            resolve(blob);
+                        } else {
+                            console.error("❌ Blob 생성 실패");
+                            reject(new Error("Blob 생성 실패"));
+                        }
+                    },
+                    "image/jpeg",
+                    0.93
+                );
+            });
+        } catch (error) {
+            console.error("getCollageBlob 오류:", error);
+            return null;
+        }
+    };
+
+    // 템플릿 배경 이미지 URL 해석 (DB 템플릿 우선, 없으면 기본값)
+    const resolveTemplateBackgroundUrl = async (): Promise<string> => {
+        let bgUrl = "/images/hongdaelatter_template.jpg";
+        try {
+            const res = await fetch("/api/collages/templates", { cache: "no-store" });
+            const data = await res.json();
+            const list = Array.isArray(data?.templates) ? data.templates : [];
+            const t =
+                list.find(
+                    (it: any) =>
+                        String(it?.name || "")
+                            .toLowerCase()
+                            .includes("hongdae") || String(it?.imageUrl || "").includes("hongdaelatter_template")
+                ) || list[0];
+            if (t) {
+                if (t.imageUrl) bgUrl = String(t.imageUrl);
+            }
+        } catch {}
+        return bgUrl;
     };
 
     // 미리보기 모달이 열리면 다운로드 이미지와 동일한 합성 결과로 미리보기 생성
@@ -1502,59 +1595,229 @@ function EscapeIntroPageInner() {
         }
     };
 
-    const handleShareToInstagram = async () => {
+    // 공유/저장 후 배지 지급과 완료 기록 저장
+    const awardBadgeAndComplete = async () => {
         try {
-            const blob = await getCollageBlob();
-            if (!blob) return;
-            const file = new File([blob], "collage.jpg", { type: "image/jpeg" });
-            const canShareFiles = (navigator as any)?.canShare && (navigator as any).canShare({ files: [file] });
-            if ((navigator as any)?.share && canShareFiles) {
-                await (navigator as any).share({ files: [file], title: story?.title || "Stylemap", text: "#Stylemap" });
-            } else {
-                setToast("브라우저에서 직접 공유가 제한됩니다. 이미지를 다운로드해 인스타 앱에서 업로드해 주세요.");
-                await handleDownloadCollage();
-            }
-        } catch (e) {
-            setToast("공유 중 오류가 발생했습니다.");
+            // 배지 조회 → 지급
+            try {
+                const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
+                const bd = await br.json();
+                if (br.ok && bd?.badge && bd.badge.id) {
+                    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+                    await fetch("/api/users/badges", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({ badgeId: bd.badge.id }),
+                    }).catch(() => {});
+                    setBadge(bd.badge);
+                }
+            } catch {}
+
+            // 템플릿 자동 저장 → 완료 기록 저장 (마이페이지 사건 파일에 반영)
+            try {
+                try {
+                    await autoSaveCollage();
+                } catch {}
+                const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+                await fetch("/api/escape/complete", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ storyId }),
+                }).catch(() => {});
+            } catch {}
+        } catch {
+        } finally {
+            // 서버 오류가 있어도 배지 단계로 이동하여 사용자 흐름 유지
+            setEndingStep("badge");
         }
     };
 
-    const handleSaveToMyPage = async () => {
+    const handleShareToInstagram = async () => {
         try {
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // 1단계: 콜라주 이미지 생성
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            setToast("템플릿을 생성하는 중...");
+
+            // getCollageBlob()는 4장의 사진을 템플릿과 합성
             const blob = await getCollageBlob();
-            if (!blob) return;
-            const form = new FormData();
-            form.append("photos", new File([blob], "collage.jpg", { type: "image/jpeg" }));
-            const up = await fetch("/api/upload", { method: "POST", body: form, credentials: "include" });
-            if (!up.ok) throw new Error(await up.text());
-            const ur = await up.json();
-            const url: string | undefined = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
-            if (!url) throw new Error("업로드 URL 생성 실패");
-
-            // 유저 콜라주로 저장
-            try {
-                await fetch("/api/collages", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ storyId, collageUrl: url, templateId: null }),
-                });
-            } catch {}
-
-            // 완료 처리와 동일하게 제출 기록에도 반영(마이페이지 사진 갤러리 호환)
-            const last = (chapters || [])
-                .slice()
-                .sort((a: any, b: any) => Number(a.chapter_number || 0) - Number(b.chapter_number || 0))
-                .pop();
-            const chapterId = last?.id || currentChapter?.id;
-            if (chapterId) {
-                await submitMission({ chapterId, missionType: "PHOTO", isCorrect: true, photoUrls: [url] });
+            if (!blob) {
+                setToast("이미지 생성에 실패했습니다");
+                return;
             }
 
-            setToast("마이페이지에 저장되었습니다.");
-            setGalleryUrls((prev) => (prev.includes(url) ? prev : [...prev, url]));
-        } catch (e) {
-            setToast("저장 중 오류가 발생했습니다.");
+            // 파일명: 지역명 + -template.jpg
+            const regionNameRaw = String((story as any)?.region || (story as any)?.title || "stylemap");
+            const regionSlug = regionNameRaw
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, "-")
+                .replace(/[^a-z0-9가-힣_-]/g, "");
+            const downloadName = `${regionSlug || "stylemap"}-template.jpg`;
+
+            // Blob을 File 객체로 변환 (Web Share API용)
+            const file = new File([blob], downloadName, { type: "image/jpeg" });
+
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // 2단계: Web Share API 시도 (최고의 방법!)
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            const navAny = navigator as any;
+
+            try {
+                // 브라우저가 파일 공유를 지원하는지 확인
+                const canShareFiles = navAny?.canShare?.({ files: [file] });
+
+                if (navAny?.share && canShareFiles) {
+                    // 브라우저 공유 시트 표시
+                    await navAny.share({
+                        files: [file],
+                        title: "DoNa",
+                    });
+
+                    setToast("✅ 공유 완료!");
+
+                    // 💧 물방울 보상 지급
+                    try {
+                        const token = localStorage.getItem("authToken");
+                        await fetch("/api/forest/water", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                            },
+                            credentials: "include",
+                            body: JSON.stringify({ source: "escape" }),
+                        });
+                    } catch {}
+
+                    // 배지 지급 + 사건 완료 저장
+                    await awardBadgeAndComplete();
+
+                    return; // ✅ 성공! 종료
+                }
+            } catch (shareError: any) {
+                // 사용자가 공유를 취소한 경우
+                if (shareError?.name === "AbortError") {
+                    setToast("공유가 취소되었습니다");
+                    return;
+                }
+                // 다른 오류는 무시하고 다음 단계로
+            }
+
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // 3단계: 폴백 - 플랫폼별 다운로드
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const isInApp = /Instagram|KAKAOTALK|NAVER|FBAN|FBAV|Line|Whale/i.test(navigator.userAgent);
+
+            if (isIOS) {
+                // ━━━ iOS: base64 data URL을 HTML로 감싸서 표시 (길게 눌러 저장 가능) ━━━
+                const base64: string = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(String(reader.result));
+                    reader.onerror = () => reject(new Error("iOS base64 변환 실패"));
+                    reader.readAsDataURL(blob);
+                });
+
+                const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8" />
+<title>이미지 저장</title>
+<style>
+  body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+  img{max-width:100%;height:auto;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);margin:16px}
+  .guide{color:#fff;text-align:center;max-width:420px;padding:16px 20px;background:rgba(255,255,255,.08);border-radius:12px}
+</style>
+</head>
+<body>
+  <img src="${base64}" alt="image" />
+  <div class="guide">이미지를 길게 눌러 "사진에 저장"을 선택하세요.</div>
+  <a href="instagram://story-camera" style="margin-top:14px;color:#fff;text-decoration:underline;">Instagram 열기</a>
+</body>
+</html>`;
+
+                const newWin = window.open("about:blank", "_blank");
+                if (newWin) {
+                    newWin.document.open();
+                    newWin.document.write(html);
+                    newWin.document.close();
+                } else {
+                    document.open();
+                    document.write(html);
+                    document.close();
+                }
+
+                setToast("이미지를 길게 눌러 '사진에 저장'을 선택하세요");
+
+                // iOS에서도 인스타 이동 전에 완료 처리(사용자 복귀 신뢰 어려움 → 사전 처리)
+                await awardBadgeAndComplete();
+            } else if (isMobile) {
+                // ━━━ Android: 다운로드 폴더에 저장 ━━━
+                const url = URL.createObjectURL(blob);
+                if (isInApp) {
+                    // 인앱 브라우저는 다운로드가 막히는 경우가 많아 새 탭으로 직접 열기
+                    window.open(url, "_blank");
+                } else {
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = downloadName;
+                    a.rel = "noopener";
+                    a.target = "_blank";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+
+                setToast("✅ 이미지가 다운로드되었습니다!");
+
+                // ⏱️ 1.5초 대기 (파일 시스템 동기화)
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+
+                    // 안내 메시지 표시
+                    const wantsToOpenInstagram = confirm(
+                        "📱 이미지가 다운로드되었습니다!\n\n" +
+                            "Instagram 앱을 열어서\n" +
+                            "다운로드한 사진을 스토리에 올려주세요.\n\n" +
+                            "확인을 누르면 Instagram 앱이 열립니다."
+                    );
+
+                    if (wantsToOpenInstagram) {
+                        window.location.href = "instagram://story-camera";
+                    }
+                }, 1500); // ⚠️ 중요: 충분한 대기 시간!
+
+                // Android도 사전 완료 처리
+                await awardBadgeAndComplete();
+            } else {
+                // ━━━ 데스크톱: 일반 다운로드 ━━━
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = downloadName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                setToast("✅ 이미지가 다운로드되었습니다!");
+
+                await awardBadgeAndComplete();
+            }
+        } catch (error: any) {
+            console.error("Instagram 공유 오류:", error);
+            setToast("오류가 발생했습니다. 다시 시도해주세요");
         }
     };
 
@@ -2445,6 +2708,77 @@ function EscapeIntroPageInner() {
                         </div>
 
                         {/* 우: 엔딩 아웃트로 → 갤러리 */}
+                        {flowStep === "done" && endingStep === "badge" && (
+                            <ClientPortal>
+                                <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm animate-fade-in">
+                                    {/* ✅ 중앙 정렬 컨테이너 */}
+                                    <div className="min-h-screen flex items-center justify-center p-4">
+                                        <div
+                                            className="relative w-[92vw] max-w-[480px] bg-white rounded-2xl shadow-2xl overflow-hidden"
+                                            style={{
+                                                animation: "scaleIn 0.3s ease-out",
+                                            }}
+                                        >
+                                            {/* 배경 그라디언트 */}
+                                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-amber-50 opacity-60" />
+
+                                            {/* 컨텐츠 */}
+                                            <div className="relative p-8 flex flex-col items-center text-center">
+                                                {/* 축하 효과 */}
+                                                <div className="text-6xl mb-4 animate-bounce">🎉</div>
+
+                                                <h3 className="text-2xl font-bold text-gray-900 mb-6">배지 획득!</h3>
+
+                                                {/* 배지 이미지 */}
+                                                {badge?.image_url ? (
+                                                    <div className="relative mb-6">
+                                                        <div className="absolute inset-0 bg-gradient-to-r from-yellow-200 to-amber-300 rounded-full blur-xl opacity-50 animate-pulse" />
+                                                        <img
+                                                            src={badge?.image_url}
+                                                            alt={badge?.name || "badge"}
+                                                            className="relative w-32 h-32 object-contain drop-shadow-2xl"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="relative mb-6">
+                                                        <div className="absolute inset-0 bg-gradient-to-r from-yellow-200 to-amber-300 rounded-full blur-xl opacity-50 animate-pulse" />
+                                                        <div className="relative w-32 h-32 rounded-full bg-gradient-to-br from-yellow-100 to-amber-200 flex items-center justify-center text-6xl shadow-2xl">
+                                                            🏅
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* 배지 정보 */}
+                                                <h4 className="text-xl font-semibold text-gray-900 mb-2">
+                                                    {badge?.name || "완료 배지"}
+                                                </h4>
+
+                                                {badge?.description && (
+                                                    <p className="text-gray-600 mb-8 leading-relaxed max-w-sm">
+                                                        {badge?.description}
+                                                    </p>
+                                                )}
+
+                                                {/* 버튼 */}
+                                                <div className="w-full max-w-sm">
+                                                    <button
+                                                        onClick={() => {
+                                                            try {
+                                                                window.location.href = "/mypage?tab=casefiles";
+                                                            } catch {}
+                                                        }}
+                                                        className="w-full px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 transition-all font-medium shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                                                    >
+                                                        마이페이지로 가기
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </ClientPortal>
+                        )}
+
                         {flowStep === "done" && endingStep === "gallery" ? (
                             <div className="fixed inset-0 z-[2000] bg-black/40 flex items-end md:items-center justify-center p-2">
                                 <div className="w-[92vw] max-w-[520px] sm:max-w-[640px] max-h-[76vh] md:max-h-[86vh] rounded-2xl bg-white/85 backdrop-blur p-3 border shadow overflow-hidden flex flex-col">

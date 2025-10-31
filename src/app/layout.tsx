@@ -62,6 +62,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     crossOrigin="anonymous"
                 />
                 <link rel="dns-prefetch" href="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com" />
+                {/* 성능: 네이버 지도/라우팅 도메인 preconnect */}
+                <link rel="preconnect" href="https://oapi.map.naver.com" crossOrigin="anonymous" />
+                <link rel="dns-prefetch" href="https://oapi.map.naver.com" />
+                <link rel="preconnect" href="https://naveropenapi.apigw.ntruss.com" crossOrigin="anonymous" />
+                <link rel="dns-prefetch" href="https://naveropenapi.apigw.ntruss.com" />
             </head>
             <body
                 className={`${inter.variable} antialiased h-screen overflow-hidden flex flex-col typography-smooth`}

@@ -8,6 +8,7 @@ export interface Place {
     imageUrl?: string;
     description?: string;
     iconUrl?: string; // 커스텀 마커 아이콘 (고대 룬 등)
+    orderIndex?: number; // 타임라인 순서를 지도에 표시
 }
 
 export interface UserLocation {

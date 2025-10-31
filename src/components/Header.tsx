@@ -464,6 +464,13 @@ const Header = () => {
                                 개인정보 처리방침
                             </Link>
                             <Link
+                                href="/data-deletion"
+                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+                                onClick={closeMenu}
+                            >
+                                사용자 데이터 삭제 안내
+                            </Link>
+                            <Link
                                 href="/terms"
                                 className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
                                 onClick={closeMenu}

@@ -4,10 +4,14 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffectOnce } from "react-use";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 
-import ReviewModal from "@/components/ReviewModal";
-import NaverMap from "@/components/NaverMap";
 import { Place as MapPlace, UserLocation } from "@/types/map";
+const ReviewModal = dynamic(() => import("@/components/ReviewModal"), { ssr: false, loading: () => null });
+const NaverMap = dynamic(() => import("@/components/NaverMap"), {
+    ssr: false,
+    loading: () => <div className="w-full h-64 bg-gray-100" />,
+});
 
 // --- 타입 정의 ---
 interface Place {
@@ -219,7 +223,7 @@ export default function CourseDetailPage() {
         []
     );
 
-    // 타임라인 장소 클릭 핸들러
+    // 타임라인 장소 클릭 핸들러 (지도만 연동, 모달은 열지 않음)
     const handleTimelinePlaceClick = (coursePlace: CoursePlace) => {
         setSelectedPlace({
             id: coursePlace.place.id,
@@ -228,6 +232,20 @@ export default function CourseDetailPage() {
             longitude: coursePlace.place.longitude,
             address: coursePlace.place.address,
             imageUrl: coursePlace.place.imageUrl, // ✅ snake_case
+            description: coursePlace.place.description,
+        });
+    };
+
+    // 장소 상세보기 버튼 클릭 (모달 오픈)
+    const handlePlaceDetailClick = (coursePlace: CoursePlace, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSelectedPlace({
+            id: coursePlace.place.id,
+            name: coursePlace.place.name,
+            latitude: coursePlace.place.latitude,
+            longitude: coursePlace.place.longitude,
+            address: coursePlace.place.address,
+            imageUrl: coursePlace.place.imageUrl,
             description: coursePlace.place.description,
         });
         setShowPlaceModal(true);
@@ -535,12 +553,13 @@ export default function CourseDetailPage() {
                 {/* Hero Section */}
                 <section className="relative h-[300px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
-                        <img
-                            src={heroImageUrl}
+                        <Image
+                            src={heroImageUrl || "/images/placeholder.png"}
                             alt={courseData.title}
-                            className="object-cover w-full h-full"
-                            loading="eager"
-                            decoding="async"
+                            fill
+                            priority
+                            sizes="(max-width: 600px) 100vw, 600px"
+                            className="object-cover"
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
@@ -639,6 +658,7 @@ export default function CourseDetailPage() {
                                                         address: cp.place.address,
                                                         imageUrl: cp.place.imageUrl, // ✅ snake_case
                                                         description: cp.place.description,
+                                                        orderIndex: cp.order_index,
                                                     }))}
                                                     userLocation={null}
                                                     selectedPlace={selectedPlace}
@@ -663,91 +683,113 @@ export default function CourseDetailPage() {
                                         <div className="absolute left-4 md:left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 to-pink-500"></div>
 
                                         {sortedCoursePlaces.length > 0 ? (
-                                            sortedCoursePlaces.map((coursePlace, idx) => (
-                                                <div key={coursePlace.id} className="relative mb-6 md:mb-8">
-                                                    <div className="absolute -left-7 md:-left-8 top-6 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white shadow-lg"></div>
-                                                    <div className="absolute -left-10 md:-left-12 top-4 w-8 h-8 bg-indigo-500 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-lg">
-                                                        {coursePlace.order_index}
-                                                    </div>
-
-                                                    {/* 장소 카드 */}
-                                                    <div
-                                                        className=" hover:cursor-pointer bg-gray-50 rounded-xl p-3 md:p-6 border border-gray-200 hover:shadow-md transition-shadow "
-                                                        onClick={() => handleTimelinePlaceClick(coursePlace)}
-                                                    >
-                                                        <div className="flex flex-col sm:flex-row gap-4">
-                                                            {/* 좌: 이미지 / 우: 주요 정보 */}
-                                                            <div className="w-full sm:w-36 flex-shrink-0">
-                                                                <div className="relative h-32 sm:h-24 bg-gray-200 rounded-lg overflow-hidden">
-                                                                    <span className="absolute top-1 right-1 z-10 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                                                                        {coursePlace.place.category || "기타"}
-                                                                    </span>
-                                                                    {coursePlace.place.imageUrl ? (
-                                                                        <img
-                                                                            src={coursePlace.place.imageUrl}
-                                                                            alt={coursePlace.place.name}
-                                                                            className="object-cover w-full h-full"
-                                                                            loading={idx === 0 ? "eager" : "lazy"}
-                                                                            decoding="async"
-                                                                        />
-                                                                    ) : null}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <h3 className="text-base md:text-lg font-bold text-gray-800 mb-1">
-                                                                    {coursePlace.place.name}
-                                                                </h3>
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <div className="flex flex-col items-center leading-none">
-                                                                        <span className="text-pink-500">📍</span>
-                                                                    </div>
-                                                                    <span className="text-sm md:text-base text-gray-700 font-medium line-clamp-1">
-                                                                        {coursePlace.place.address}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                                    <span className="text-sm text-gray-600">
-                                                                        💰 {coursePlace.place.avg_cost_range}
-                                                                    </span>
-                                                                    <span className="text-sm text-gray-600">
-                                                                        ⏱ {coursePlace.estimated_duration}분
-                                                                    </span>
-                                                                    <span className="text-sm text-gray-600">
-                                                                        🕒 {coursePlace.recommended_time}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                                    <button
-                                                                        onClick={createNavigationHandler(
-                                                                            coursePlace.place.name,
-                                                                            coursePlace.place.latitude,
-                                                                            coursePlace.place.longitude
-                                                                        )}
-                                                                        className="hover:cursor-pointer text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                                                                        style={{
-                                                                            backgroundColor: "var(--brand-green)",
-                                                                        }}
-                                                                    >
-                                                                        길찾기
-                                                                    </button>
-                                                                    {coursePlace.place.opening_hours && (
-                                                                        <span className="text-xs text-gray-500">
-                                                                            🕘 {coursePlace.place.opening_hours}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                            sortedCoursePlaces.map((coursePlace, idx) => {
+                                                const isSelected = selectedPlace?.id === coursePlace.place.id;
+                                                return (
+                                                    <div key={coursePlace.id} className="relative mb-6 md:mb-8">
+                                                        {/* 순서 번호 - 선택 시 강조 */}
+                                                        <div
+                                                            className={`absolute -left-10 md:-left-12 top-4 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shadow-lg transition-all duration-300 ${
+                                                                isSelected
+                                                                    ? "bg-blue-600 text-white scale-125 ring-4 ring-blue-200"
+                                                                    : "bg-indigo-500 text-white"
+                                                            }`}
+                                                        >
+                                                            {coursePlace.order_index}
                                                         </div>
-                                                        {coursePlace.notes && (
-                                                            <div className="mt-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
-                                                                <p className="text-sm text-blue-800">
-                                                                    💡 <strong>팁:</strong> {coursePlace.notes}
-                                                                </p>
+
+                                                        {/* 장소 카드 - 선택 시 배경색 변경 */}
+                                                        <div
+                                                            className={`cursor-pointer rounded-xl p-3 md:p-6 transition-all duration-300 ${
+                                                                isSelected
+                                                                    ? "bg-blue-50 border-2 border-blue-500 shadow-lg scale-102"
+                                                                    : "bg-gray-50 border border-gray-200 hover:shadow-md"
+                                                            }`}
+                                                            onClick={() => handleTimelinePlaceClick(coursePlace)}
+                                                        >
+                                                            <div className="flex flex-col sm:flex-row gap-4">
+                                                                {/* 좌: 이미지 / 우: 주요 정보 */}
+                                                                <div className="w-full sm:w-36 flex-shrink-0">
+                                                                    <div className="relative h-32 sm:h-24 bg-gray-200 rounded-lg overflow-hidden">
+                                                                        <span className="absolute top-1 right-1 z-10 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                                                                            {coursePlace.place.category || "기타"}
+                                                                        </span>
+                                                                        {coursePlace.place.imageUrl ? (
+                                                                            <img
+                                                                                src={coursePlace.place.imageUrl}
+                                                                                alt={coursePlace.place.name}
+                                                                                className="object-cover w-full h-full"
+                                                                                loading={idx === 0 ? "eager" : "lazy"}
+                                                                                decoding="async"
+                                                                            />
+                                                                        ) : null}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <h3 className="text-base md:text-lg font-bold text-gray-800 mb-1">
+                                                                        {coursePlace.place.name}
+                                                                    </h3>
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <div className="flex flex-col items-center leading-none">
+                                                                            <span className="text-pink-500">📍</span>
+                                                                        </div>
+                                                                        <span className="text-sm md:text-base text-gray-700 font-medium line-clamp-1">
+                                                                            {coursePlace.place.address}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                                        <span className="text-sm text-gray-600">
+                                                                            💰 {coursePlace.place.avg_cost_range}
+                                                                        </span>
+                                                                        <span className="text-sm text-gray-600">
+                                                                            ⏱ {coursePlace.estimated_duration}분
+                                                                        </span>
+                                                                        <span className="text-sm text-gray-600">
+                                                                            🕒 {coursePlace.recommended_time}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                                        {/* 상세보기 버튼 */}
+                                                                        <button
+                                                                            onClick={(e) =>
+                                                                                handlePlaceDetailClick(coursePlace, e)
+                                                                            }
+                                                                            className="cursor-pointer bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors hover:bg-blue-700"
+                                                                        >
+                                                                            상세보기
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={createNavigationHandler(
+                                                                                coursePlace.place.name,
+                                                                                coursePlace.place.latitude,
+                                                                                coursePlace.place.longitude
+                                                                            )}
+                                                                            className="hover:cursor-pointer text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                                                                            style={{
+                                                                                backgroundColor: "var(--brand-green)",
+                                                                            }}
+                                                                        >
+                                                                            길찾기
+                                                                        </button>
+                                                                        {coursePlace.place.opening_hours && (
+                                                                            <span className="text-xs text-gray-500">
+                                                                                🕘 {coursePlace.place.opening_hours}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        )}
+                                                            {coursePlace.notes && (
+                                                                <div className="mt-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                                                                    <p className="text-sm text-blue-800">
+                                                                        💡 <strong>팁:</strong> {coursePlace.notes}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))
+                                                );
+                                            })
                                         ) : (
                                             <div className="text-center py-8 text-gray-500">
                                                 <div className="text-4xl mb-4">📍</div>

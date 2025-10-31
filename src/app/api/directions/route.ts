@@ -4,7 +4,7 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const coords = searchParams.get("coords"); // "lng,lat;lng,lat"
-        const mode = (searchParams.get("mode") || "driving").toLowerCase();
+        let mode = (searchParams.get("mode") || "driving").toLowerCase();
 
         if (!coords) {
             return NextResponse.json({ error: "coords are required" }, { status: 400 });
@@ -53,6 +53,21 @@ export async function GET(req: NextRequest) {
             return points;
         };
 
+        // ✅ 도보 모드인데 거리가 15km 이상이면 운전 모드로 변경
+        if (mode === "walking" && distance > 15000) {
+            console.warn("⚠️ 도보 거리가 너무 멀어 운전 모드로 변경:", distance.toFixed(0), "m");
+            mode = "driving";
+        }
+        // // ✅ 거리가 50m 이하면 API 호출 없이 바로 직선 반환
+        // if (distance < 50) {
+        //     console.warn("⚠️ 거리가 너무 가까움 (", distance.toFixed(0), "m) - 직선 경로 반환");
+        //     return NextResponse.json({
+        //         coordinates: createFallbackPath(),
+        //         fallback: true,
+        //         reason: "TOO_CLOSE",
+        //     });
+        // }
+
         // API 키가 없으면 바로 직선 반환
         if (!clientId || !clientSecret) {
             console.warn("⚠️ API 키 없음 - 직선 경로로 대체");
@@ -95,93 +110,138 @@ export async function GET(req: NextRequest) {
                 });
             }
 
-            // API 응답에 route가 없으면 직선 폴백
-            if (!data?.route) {
-                console.error("❌ API 응답에 route 객체가 없음");
-                console.warn("⚠️ route 없음 - 직선 경로로 대체");
+            // API 응답에 route가 없으면 (짧은 거리 포함)
+            if (!data?.route || data.route === null) {
+                console.warn("⚠️ route 없음 - 짧은 거리지만 API 스타일로 보정");
+
+                const expandShortPath = (): Array<[number, number]> => {
+                    // 직선 대신 '가짜 돌아가는 경로' 생성
+                    const midLng = (startLng + goalLng) / 2;
+                    const midLat = (startLat + goalLat) / 2;
+
+                    const deltaLng = (goalLng - startLng) * 0.002; // 좌우로 살짝 넓힘
+                    const deltaLat = (goalLat - startLat) * 0.002; // 위아래로 살짝 넓힘
+
+                    // 약간 꺾인 5점 경로 생성
+                    return [
+                        [startLng, startLat],
+                        [midLng - deltaLng, midLat + deltaLat],
+                        [midLng, midLat + deltaLat * 2],
+                        [midLng + deltaLng, midLat + deltaLat],
+                        [goalLng, goalLat],
+                    ];
+                };
+
+                // distance가 짧으면 ‘확장 경로’, 아니면 기본 폴백
+                const coordinates = distance < 50 ? expandShortPath() : createFallbackPath();
+
                 return NextResponse.json({
-                    coordinates: createFallbackPath(),
+                    coordinates,
                     fallback: true,
-                    error: "NO_ROUTE_IN_RESPONSE",
+                    reason: "SHORT_DISTANCE_FAKE_ROUTE",
                 });
             }
 
             // --- 경로 추출 (모드별로 다른 구조 처리) ---
             let path: Array<[number, number]> | undefined = undefined;
 
-            if (mode === "walking") {
-                // Walking API 구조: { route: { trafast: [[lng, lat], ...] } }
-                const route = data.route;
-                console.log("🚶 Walking route 키들:", Object.keys(route));
+            const route = data.route;
+            console.log("🔍 route 객체 키들:", Object.keys(route));
 
-                if (Array.isArray(route.trafast)) {
-                    path = route.trafast;
-                    console.log("✅ Walking 경로 찾음 (trafast):", path?.length ?? 0);
-                } else if (Array.isArray(route.traoptimal)) {
-                    path = route.traoptimal;
-                    console.log("✅ Walking 경로 찾음 (traoptimal):", path?.length ?? 0);
-                } else {
-                    console.error("❌ Walking API 경로 형식 불일치:", route);
+            // ✅ 수정: Walking과 Driving 모두 동일한 구조 처리
+            // 응답 구조: { route: { traoptimal/trafast: [{ path: [[lng,lat], ...], summary: {...} }] } }
+
+            if (mode === "walking") {
+                console.log("🚶 Walking 모드 - 경로 탐색 중...");
+
+                // traoptimal 우선 확인
+                if (Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
+                    const routePath = route.traoptimal[0]?.path;
+                    if (Array.isArray(routePath) && routePath.length > 0) {
+                        path = routePath;
+                        console.log("✅ Walking 경로 찾음 (traoptimal):", path.length, "포인트");
+                    }
+                }
+
+                // trafast 백업
+                if (!path && Array.isArray(route.trafast) && route.trafast.length > 0) {
+                    const routePath = route.trafast[0]?.path;
+                    if (Array.isArray(routePath) && routePath.length > 0) {
+                        path = routePath;
+                        console.log("✅ Walking 경로 찾음 (trafast):", path.length, "포인트");
+                    }
                 }
             } else {
-                // Driving API 구조: { route: { trafast: [{ path: [[lng, lat], ...] }] } }
-                const route = data.route;
-                console.log("🚗 Driving route 키들:", Object.keys(route));
+                console.log("🚗 Driving 모드 - 경로 탐색 중...");
 
-                const preferKeys = ["trafast", "traoptimal", "tracomfort"];
+                // trafast 우선 확인
+                if (Array.isArray(route.trafast) && route.trafast.length > 0) {
+                    const routePath = route.trafast[0]?.path;
+                    if (Array.isArray(routePath) && routePath.length > 0) {
+                        path = routePath;
+                        console.log("✅ Driving 경로 찾음 (trafast):", path.length, "포인트");
+                    }
+                }
 
-                for (const k of preferKeys) {
-                    const routeArray = route[k];
-                    if (Array.isArray(routeArray) && routeArray.length > 0) {
-                        const p = routeArray[0]?.path;
-                        if (Array.isArray(p)) {
-                            path = p;
-                            console.log(`✅ Driving 경로 찾음 (${k}):`, path?.length ?? 0);
+                // traoptimal 백업
+                if (!path && Array.isArray(route.traoptimal) && route.traoptimal.length > 0) {
+                    const routePath = route.traoptimal[0]?.path;
+                    if (Array.isArray(routePath) && routePath.length > 0) {
+                        path = routePath;
+                        console.log("✅ Driving 경로 찾음 (traoptimal):", path.length, "포인트");
+                    }
+                }
+
+                // tracomfort 백업
+                if (!path && Array.isArray(route.tracomfort) && route.tracomfort.length > 0) {
+                    const routePath = route.tracomfort[0]?.path;
+                    if (Array.isArray(routePath) && routePath.length > 0) {
+                        path = routePath;
+                        console.log("✅ Driving 경로 찾음 (tracomfort):", path.length, "포인트");
+                    }
+                }
+            }
+
+            // 백업: 모든 키를 순회하며 경로 찾기
+            if (!path) {
+                console.log("🔍 백업 경로 탐색 시작...");
+                for (const key of Object.keys(route)) {
+                    console.log(`  - 키 "${key}" 확인 중...`);
+
+                    const routeData = route[key];
+
+                    // 배열인지 확인
+                    if (Array.isArray(routeData) && routeData.length > 0) {
+                        const firstItem = routeData[0];
+
+                        // path 속성이 있는지 확인
+                        if (firstItem?.path && Array.isArray(firstItem.path) && firstItem.path.length > 0) {
+                            path = firstItem.path;
+                            console.log(`✅ 백업 경로 찾음 (${key}[0].path):`, firstItem.path.length, "포인트");
+                            break;
+                        }
+
+                        // 직접 좌표 배열인지 확인
+                        if (Array.isArray(firstItem) && firstItem.length === 2 && typeof firstItem[0] === "number") {
+                            path = routeData;
+                            console.log(`✅ 백업 경로 찾음 (${key} 직접):`, routeData.length, "포인트");
                             break;
                         }
                     }
                 }
-
-                if (!path) {
-                    console.error("❌ Driving API 경로 형식 불일치:", route);
-                }
-            }
-
-            // 백업: 혹시 다른 구조일 경우
-            if (!path) {
-                console.log("🔍 백업 경로 탐색 시작...");
-                try {
-                    const route = data.route;
-                    for (const k of Object.keys(route)) {
-                        console.log(`  - 키 "${k}" 확인 중...`);
-                        // 배열 직접 체크
-                        if (Array.isArray(route[k]) && route[k].length > 0) {
-                            const firstItem = route[k][0];
-                            // 좌표 배열인지 확인
-                            if (Array.isArray(firstItem) && firstItem.length === 2) {
-                                path = route[k];
-                                console.log(`✅ 백업 경로 찾음 (${k}):`, path?.length ?? 0);
-                                break;
-                            }
-                            // path 속성이 있는지 확인
-                            if (firstItem?.path && Array.isArray(firstItem.path)) {
-                                path = firstItem.path;
-                                console.log(`✅ 백업 경로 찾음 (${k}.path):`, path?.length ?? 0);
-                                break;
-                            }
-                        }
-                    }
-                } catch (e) {
-                    console.error("백업 경로 탐색 실패:", e);
-                }
             }
 
             // 🟢 경로를 찾았으면 반환, 못 찾았으면 직선 폴백
-            if (Array.isArray(path) && path.length > 0) {
+            if (path && Array.isArray(path) && path.length > 0) {
                 console.log("✅ 최종 반환 경로:", path.length, "포인트");
-                return NextResponse.json({ coordinates: path });
+                return NextResponse.json({
+                    coordinates: path,
+                    summary: route.traoptimal?.[0]?.summary || route.trafast?.[0]?.summary,
+                });
             } else {
                 console.error("❌ 경로를 찾을 수 없음 - 직선 경로로 대체");
+                console.log("📦 전체 route 구조:", JSON.stringify(route, null, 2));
+                console.log("📦 전체 data 구조:", JSON.stringify(data, null, 2));
                 return NextResponse.json({
                     coordinates: createFallbackPath(),
                     fallback: true,
