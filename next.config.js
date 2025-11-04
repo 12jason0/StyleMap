@@ -28,6 +28,8 @@ const nextConfig = {
                                 "https://oapi.map.naver.com",
                                 "https://openapi.map.naver.com",
                                 "https://ssl.pstatic.net",
+                                "https://nrbe.pstatic.net", // ✅ 추가
+                                "https://*.pstatic.net", // ✅ 추가 (모든 pstatic.net 서브도메인 허용)
                                 "https://www.googletagmanager.com",
                                 "https://www.google-analytics.com",
                                 ...(isDev ? ["http://oapi.map.naver.com", "http://nrbe.map.naver.net"] : []),
@@ -45,6 +47,8 @@ const nextConfig = {
                                 "'self'",
                                 "https://vercel.live", // ✅ 추가
                                 "https://*.vercel.live", // ✅ 추가
+                                "https://nrbe.pstatic.net", // ✅ 추가
+                                "https://*.pstatic.net", // ✅ 추가
                                 "https://oapi.map.naver.com",
                                 "https://openapi.map.naver.com",
                                 "https://naveropenapi.apigw.ntruss.com",
