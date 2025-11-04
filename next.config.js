@@ -15,6 +15,70 @@ const nextConfig = {
                     { key: "X-Content-Type-Options", value: "nosniff" },
                     { key: "Referrer-Policy", value: "origin-when-cross-origin" },
                     { key: "X-XSS-Protection", value: "1; mode=block" },
+                    {
+                        key: "Content-Security-Policy",
+                        value: (() => {
+                            const isDev = process.env.NODE_ENV !== "production";
+                            const scriptSrc = [
+                                "'self'",
+                                "'unsafe-inline'",
+                                ...(isDev ? ["'unsafe-eval'"] : []),
+                                "https://oapi.map.naver.com",
+                                "https://openapi.map.naver.com",
+                                "https://ssl.pstatic.net",
+                                "https://www.googletagmanager.com",
+                                "https://www.google-analytics.com",
+                                // 개발 환경에서 네이버 지도 HTTP 엔드포인트 허용 (로컬 테스트 보조)
+                                ...(isDev ? ["http://oapi.map.naver.com", "http://nrbe.map.naver.net"] : []),
+                            ].join(" ");
+                            const styleSrc = [
+                                "'self'",
+                                "'unsafe-inline'",
+                                "https://ssl.pstatic.net",
+                                "https://cdn.jsdelivr.net",
+                            ].join(" ");
+                            // 이미지: HTTPS 전체 허용 + data/blob (운영 중 외부 CDN 이미지 다수 사용 시 필요)
+                            const imgSrc = [
+                                "'self'",
+                                "data:",
+                                "blob:",
+                                "https:",
+                                // 개발 환경에서만 http 이미지 허용
+                                ...(isDev ? ["http:"] : []),
+                            ].join(" ");
+                            const connectSrc = [
+                                "'self'",
+                                "https://oapi.map.naver.com",
+                                "https://openapi.map.naver.com",
+                                "https://naveropenapi.apigw.ntruss.com",
+                                "https://kr-col-ext.nelo.navercorp.com",
+                                "https://www.google-analytics.com",
+                                "https://www.googletagmanager.com",
+                                "https://analytics.google.com",
+                                "https://stats.g.doubleclick.net",
+                                "https://region1.google-analytics.com",
+                                // 개발 환경에서 네이버 지도 HTTP/HTTPS 보조 엔드포인트 허용
+                                ...(isDev
+                                    ? [
+                                          "http://oapi.map.naver.com",
+                                          "http://nrbe.map.naver.net",
+                                          "https://nrbe.map.naver.net",
+                                      ]
+                                    : []),
+                            ].join(" ");
+                            const fontSrc = ["'self'", "data:", "https://cdn.jsdelivr.net"].join(" ");
+                            const frameSrc = ["'self'", "https://www.googletagmanager.com"].join(" ");
+                            return (
+                                `default-src 'self'; ` +
+                                `script-src ${scriptSrc}; ` +
+                                `style-src ${styleSrc}; ` +
+                                `img-src ${imgSrc}; ` +
+                                `connect-src ${connectSrc}; ` +
+                                `font-src ${fontSrc}; ` +
+                                `frame-src ${frameSrc};`
+                            );
+                        })(),
+                    },
                 ],
             },
         ];

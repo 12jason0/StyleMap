@@ -104,9 +104,7 @@ export async function GET(request: NextRequest) {
         });
 
         const now = new Date();
-        const streak = computeEffectiveStreak(checkins, now);
-
-        // 오늘 출석 여부
+        // 오늘 출석 여부 및 오늘 제외한 과거 도장 배열 생성
         const todayStart = startOfDay(new Date(now));
         const todayEnd = new Date(todayStart);
         todayEnd.setDate(todayEnd.getDate() + 1);
@@ -115,9 +113,13 @@ export async function GET(request: NextRequest) {
             return d >= todayStart && d < todayEnd;
         });
 
-        // 보상일 기준 7칸 사이클 도장 배열 (요구사항에 맞춰 weekStamps 명칭 유지)
-        const weekStamps = buildCycleStamps(checkins, now);
-        const weekCount = weekStamps.filter(Boolean).length;
+        // 오늘 제외한 과거 출석만으로 유효 스트릭 계산
+        const checkinsExcludingToday = checkins.filter((c: { date: Date }) => new Date(c.date) < todayStart);
+        const streak = computeEffectiveStreak(checkinsExcludingToday, now);
+
+        // 1번 칸부터 순서대로 채우는 단순 배열 생성
+        const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, streak)));
+        const weekCount = Math.min(7, Math.max(0, streak));
 
         return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps });
     } catch (e) {
@@ -148,7 +150,9 @@ export async function POST(request: NextRequest) {
                 take: 120,
             });
             const streak = computeEffectiveStreak(recent, now);
-            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak });
+            const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, streak)));
+            const weekCount = Math.min(7, Math.max(0, streak));
+            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak, weekStamps, weekCount });
         }
 
         const created = await (prisma as any).userCheckin.create({ data: { userId, date: now, rewarded: false } });
@@ -160,10 +164,9 @@ export async function POST(request: NextRequest) {
             take: 120,
         });
         const effectiveStreak = computeEffectiveStreak(recent, now);
-
-        // 보상일 기준 7칸 사이클 도장 배열 및 카운트
-        const weekStamps = buildCycleStamps(recent, now);
-        const weekCount = weekStamps.filter(Boolean).length;
+        // 1번 칸부터 순서대로 채우는 배열 및 카운트 (오늘 포함)
+        const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, effectiveStreak)));
+        const weekCount = Math.min(7, Math.max(0, effectiveStreak));
         const todayStart = startOfDay(now);
         const hasRewardedToday = recent.some(
             (c: { date: Date; rewarded?: boolean }) => c.rewarded === true && isSameDay(new Date(c.date), todayStart)

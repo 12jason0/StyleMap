@@ -35,6 +35,9 @@ export async function postCheckin(): Promise<{
     awarded: boolean;
     rewardAmount: number;
     success: boolean;
+    alreadyChecked: boolean;
+    weekStamps?: boolean[];
+    weekCount?: number;
 }> {
     try {
         const token = localStorage.getItem("authToken");
@@ -49,9 +52,12 @@ export async function postCheckin(): Promise<{
             awarded: Boolean(data?.awarded),
             rewardAmount: Number(data?.rewardAmount || 0),
             success: Boolean(data?.success ?? res.ok),
+            alreadyChecked: Boolean(data?.alreadyChecked),
+            weekStamps: Array.isArray(data?.weekStamps) ? (data.weekStamps as boolean[]) : undefined,
+            weekCount: Number.isFinite(Number(data?.weekCount)) ? Number(data.weekCount) : undefined,
         };
     } catch {
-        return { ok: false, awarded: false, rewardAmount: 0, success: false };
+        return { ok: false, awarded: false, rewardAmount: 0, success: false, alreadyChecked: false };
     }
 }
 

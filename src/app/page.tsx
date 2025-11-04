@@ -165,10 +165,26 @@ export default function Home() {
     };
 
     useEffect(() => {
-        const token = localStorage.getItem("authToken");
-        if (token) {
-            maybeOpenCheckinModal();
-        }
+        const initAuth = async () => {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+            try {
+                const res = await fetch("/api/users/profile", {
+                    credentials: "include",
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                if (res.ok) {
+                    setTimeout(() => {
+                        maybeOpenCheckinModal();
+                    }, 800);
+                } else if (res.status === 401) {
+                    localStorage.removeItem("authToken");
+                }
+            } catch {
+                localStorage.removeItem("authToken");
+            }
+        };
+        initAuth();
     }, []);
 
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -460,40 +476,47 @@ export default function Home() {
                                             setIsStamping(true);
                                             try {
                                                 const data = await postCheckin();
-                                                if (data.ok) {
-                                                    const prevProgress = cycleProgress || 0;
-                                                    const targetIdx = prevProgress === 6 ? 6 : prevProgress;
+                                                if (!data.ok) {
+                                                    setIsStamping(false);
+                                                    return;
+                                                }
+                                                // 이미 오늘 출석한 경우: 서버 배열로 동기화하고 종료
+                                                if (data.alreadyChecked) {
+                                                    if (Array.isArray(data.weekStamps)) setWeekStamps(data.weekStamps as boolean[]);
+                                                    if (typeof data.weekCount === "number") setCycleProgress(((data.weekCount as number) % 7) as number);
+                                                    setAlreadyToday(true);
+                                                    setIsStamping(false);
+                                                    setStampCompleted(true);
+                                                    return;
+                                                }
+                                                // 애니메이션: 현재 채워진 개수 기준 다음 칸에 도장
+                                                const filled = weekStamps.filter(Boolean).length;
+                                                const targetIdx = Math.min(6, filled);
 
-                                                    setAnimStamps([false, false, false, false, false, false, false]);
+                                                setAnimStamps([false, false, false, false, false, false, false]);
+                                                setTimeout(() => {
+                                                    setAnimStamps((_) => {
+                                                        const next = [false, false, false, false, false, false, false];
+                                                        next[targetIdx] = true;
+                                                        return next;
+                                                    });
                                                     setTimeout(() => {
-                                                        setAnimStamps((_) => {
-                                                            const next = [
-                                                                false,
-                                                                false,
-                                                                false,
-                                                                false,
-                                                                false,
-                                                                false,
-                                                                false,
-                                                            ];
-                                                            next[targetIdx] = true;
-                                                            return next;
-                                                        });
-                                                        setTimeout(() => {
+                                                        if (Array.isArray(data.weekStamps)) {
+                                                            setWeekStamps(data.weekStamps as boolean[]);
+                                                            if (typeof data.weekCount === "number") setCycleProgress(((data.weekCount as number) % 7) as number);
+                                                        } else {
                                                             setWeekStamps((prev) => {
                                                                 const next = [...prev];
                                                                 next[targetIdx] = true;
                                                                 return next;
                                                             });
-                                                            setCycleProgress(((prevProgress + 1) % 7) as number);
-                                                            setAnimStamps(null);
-                                                            setIsStamping(false);
-                                                            setStampCompleted(true);
-                                                        }, 300);
-                                                    }, 120);
-                                                } else {
-                                                    setIsStamping(false);
-                                                }
+                                                            setCycleProgress((((filled + 1) % 7) as number));
+                                                        }
+                                                        setAnimStamps(null);
+                                                        setIsStamping(false);
+                                                        setStampCompleted(true);
+                                                    }, 800);
+                                                }, 50);
                                             } catch {
                                                 setIsStamping(false);
                                             }

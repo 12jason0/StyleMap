@@ -256,7 +256,6 @@ const Header = () => {
         window.dispatchEvent(new CustomEvent("authTokenChange"));
         closeMenu();
         router.push("/");
-        alert("로그아웃되었습니다.");
     };
 
     const openLogoutConfirm = () => {
