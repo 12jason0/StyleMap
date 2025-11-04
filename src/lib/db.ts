@@ -7,10 +7,18 @@ declare global {
     var __prisma: PrismaClient | undefined;
 }
 
+// ✅ PRISMA_DATABASE_URL (Accelerate)를 우선 사용
+const databaseUrl = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL;
+
 export const prisma: PrismaClient =
     global.__prisma ??
     new PrismaClient({
         log: process.env.NODE_ENV === "production" ? ["error"] : ["query", "error", "warn"],
+        datasources: {
+            db: {
+                url: databaseUrl,
+            },
+        },
     });
 
 if (!global.__prisma) {
