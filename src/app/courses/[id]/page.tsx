@@ -715,12 +715,14 @@ export default function CourseDetailPage() {
                                                                             {coursePlace.place.category || "기타"}
                                                                         </span>
                                                                         {coursePlace.place.imageUrl ? (
-                                                                            <img
+                                                                            <Image
                                                                                 src={coursePlace.place.imageUrl}
                                                                                 alt={coursePlace.place.name}
-                                                                                className="object-cover w-full h-full"
-                                                                                loading={idx === 0 ? "eager" : "lazy"}
-                                                                                decoding="async"
+                                                                                fill
+                                                                                sizes="(max-width: 640px) 100vw, 144px"
+                                                                                className="object-cover"
+                                                                                priority={idx === 0}
+                                                                                quality={60}
                                                                             />
                                                                         ) : null}
                                                                     </div>
@@ -1063,12 +1065,13 @@ export default function CourseDetailPage() {
                         </div>
                         {selectedPlace.imageUrl ? (
                             <div className="w-full max-h-64 md:max-h-96 bg-gray-100 overflow-hidden flex items-center justify-center">
-                                <img
+                                <Image
                                     src={selectedPlace.imageUrl}
                                     alt={selectedPlace.name}
-                                    className="w-full h-auto object-contain"
-                                    loading="eager"
-                                    decoding="async"
+                                    fill
+                                    sizes="100vw"
+                                    className="object-contain"
+                                    quality={60}
                                 />
                             </div>
                         ) : // <div className="w-full h-32 md:h-48 bg-gray-100" />＼
