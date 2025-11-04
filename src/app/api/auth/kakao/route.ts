@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // 1. 이 GET 함수가 로그인 시작을 위해 필요합니다! (추가)
 // ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 export async function GET(request: NextRequest) {
-    const KAKAO_CLIENT_ID = process.env.KAKAO_CLIENT_ID;
+    const KAKAO_CLIENT_ID = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
 
     if (!KAKAO_CLIENT_ID) {
         console.error("KAKAO_CLIENT_ID가 설정되지 않았습니다.");
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "카카오 인증 코드가 필요합니다." }, { status: 400 });
         }
 
-        const kakaoClientId = process.env.KAKAO_CLIENT_ID;
+        const kakaoClientId = process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID;
         if (!kakaoClientId) {
             console.error("KAKAO_CLIENT_ID 환경 변수가 설정되지 않았습니다.");
             return NextResponse.json({ error: "서버 설정 오류: 카카오 클라이언트 ID가 없습니다." }, { status: 500 });
