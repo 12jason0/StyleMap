@@ -13,6 +13,12 @@ export default function NaverMapComponent({
     drawPath,
     routeMode = "walking", // 기본을 walking으로 고정
     center,
+    numberedMarkers,
+    nearFallbackStorageKey,
+    suppressNearFallback,
+    onNearFallbackShown,
+    showControls = true,
+    showPlaceOverlay = true,
 }: MapProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<any>(null);
@@ -22,6 +28,26 @@ export default function NaverMapComponent({
     const routeCacheRef = useRef<Map<string, Array<[number, number]>>>(new Map());
     const prevRouteKeyRef = useRef<string | null>(null);
     const [mapReady, setMapReady] = useState(false);
+    const [showNearFallback, setShowNearFallback] = useState(false);
+    const [isLocating, setIsLocating] = useState(false);
+    const [currentHeading, setCurrentHeading] = useState<number | null>(null);
+    const shownFallbackRef = useRef(false);
+
+    const triggerNearFallback = () => {
+        if (suppressNearFallback) return;
+        try {
+            if (nearFallbackStorageKey && typeof window !== "undefined") {
+                if (sessionStorage.getItem(nearFallbackStorageKey)) return;
+                sessionStorage.setItem(nearFallbackStorageKey, "1");
+            }
+        } catch {}
+        if (shownFallbackRef.current) return;
+        shownFallbackRef.current = true;
+        setShowNearFallback(true);
+        try {
+            onNearFallbackShown?.();
+        } catch {}
+    };
 
     const isFiniteNum = (v: any) => Number.isFinite(Number(v));
     const isValidLatLng = (lat?: any, lng?: any) => isFiniteNum(lat) && isFiniteNum(lng);
@@ -53,45 +79,82 @@ export default function NaverMapComponent({
         return { lat: 37.5665, lng: 126.978 };
     };
 
-    // 마커 콘텐츠 생성기 (선택 상태와 순서 배지 표시)
-    const createMarkerContent = (orderIndex?: number, isSelected: boolean = false): string => {
-        const size = isSelected ? 40 : 32;
-        const fontSize = isSelected ? 16 : 12;
-        const borderWidth = isSelected ? 3 : 2;
-        const bgColor = isSelected ? "var(--brand-green-dark, #0F766E)" : "var(--brand-green, #10B981)";
-        const zIndex = isSelected ? 1000 : 1;
+    // 나침반 감지 (선택사항)
+    useEffect(() => {
+        if (typeof window === "undefined" || !("DeviceOrientationEvent" in window)) return;
+        const handleOrientation = (event: DeviceOrientationEvent) => {
+            if (event.alpha !== null) setCurrentHeading(event.alpha);
+        };
+        window.addEventListener("deviceorientation", handleOrientation);
+        return () => window.removeEventListener("deviceorientation", handleOrientation);
+    }, []);
 
-        return `
-            <div style="
-                position: relative;
-                width: ${size}px;
-                height: ${size}px;
-                z-index: ${zIndex};
-            ">
-                <div style="
-                    position: relative;
-                    background: ${bgColor};
-                    color: white;
-                    width: 100%;
-                    height: 100%;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: bold;
-                    font-size: ${fontSize}px;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                    border: ${borderWidth}px solid white;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    transition: all 0.3s ease;
-                ">
-                    ${orderIndex || "📍"}
-                </div>
-            </div>
-        `;
+    // 현재 위치로 이동
+    const handleGoToMyLocation = () => {
+        if (!mapRef.current || !userLocation) return;
+        if (!isValidLatLng(userLocation.lat, userLocation.lng)) return;
+        setIsLocating(true);
+        const naver = (window as any).naver;
+        const targetPos = new naver.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng));
+        try {
+            mapRef.current.panTo(targetPos, { duration: 500, easing: "easeOutCubic" });
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                try {
+                    (navigator as any).vibrate?.(50);
+                } catch {}
+            }
+        } catch (e) {
+            console.error("위치 이동 실패:", e);
+        } finally {
+            setTimeout(() => setIsLocating(false), 500);
+        }
     };
 
-    // (애니메이션 제거)
+    const handleZoomIn = () => {
+        if (!mapRef.current) return;
+        try {
+            const currentZoom = mapRef.current.getZoom();
+            mapRef.current.setZoom(currentZoom + 1, true);
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                try {
+                    (navigator as any).vibrate?.(30);
+                } catch {}
+            }
+        } catch (e) {
+            console.error("줌 인 실패:", e);
+        }
+    };
+
+    const handleZoomOut = () => {
+        if (!mapRef.current) return;
+        try {
+            const currentZoom = mapRef.current.getZoom();
+            mapRef.current.setZoom(currentZoom - 1, true);
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                try {
+                    (navigator as any).vibrate?.(30);
+                } catch {}
+            }
+        } catch (e) {
+            console.error("줌 아웃 실패:", e);
+        }
+    };
+
+    const handleResetHeading = () => {
+        if (!mapRef.current) return;
+        try {
+            mapRef.current.setOptions({ bearing: 0 });
+            if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+                try {
+                    (navigator as any).vibrate?.(30);
+                } catch {}
+            }
+        } catch (e) {
+            console.error("방향 리셋 실패:", e);
+        }
+    };
+
+    // 커스텀 HTML 마커 생성 로직 제거 (기본 마커 사용)
 
     // 네이버 지도 스크립트 로더
     const loadNaverMapsScript = (): Promise<void> => {
@@ -128,77 +191,82 @@ export default function NaverMapComponent({
                 return;
             }
 
-            // Client ID 가져오기
-            const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
-
-            console.log("🔐 환경 변수 체크:");
-            console.log("  - Client ID 존재:", !!clientId);
-            console.log("  - Client ID 길이:", clientId?.length);
-            console.log("  - Client ID 값:", clientId); // 개발 중에만 사용, 배포 시 제거
+            // Client ID 가져오기 (여러 키 이름 지원)
+            const clientId =
+                process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
+                process.env.NEXT_PUBLIC_NAVER_MAP_API_KEY_ID ||
+                process.env.NEXT_PUBLIC_NAVER_CLIENT_ID ||
+                "";
 
             if (!clientId) {
-                console.error("❌ NEXT_PUBLIC_NAVER_MAP_CLIENT_ID가 설정되지 않았습니다!");
+                console.error("❌ Naver Maps Client ID 환경 변수가 설정되지 않았습니다.");
                 reject(new Error("Client ID missing"));
                 return;
             }
 
-            // ✅ 신규 Maps API URL 형식 (ncpKeyId 사용)
-            const src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(
-                clientId
-            )}&submodules=geocoder`;
-            console.log("📍 로드할 URL:", src);
+            // 최신 가이드(ncpKeyId) 우선, 구버전(ncpClientId) 폴백
+            const tryParams = ["ncpKeyId", "ncpClientId"] as const;
 
-            const script = document.createElement("script");
-            script.id = "naver-maps-script";
-            script.src = src;
-            script.async = true;
-            script.defer = true;
+            const loadWithParam = (param: (typeof tryParams)[number]) =>
+                new Promise<void>((res, rej) => {
+                    try {
+                        const prev = document.getElementById("naver-maps-script");
+                        prev?.parentElement?.removeChild(prev);
+                    } catch {}
 
-            script.onload = async () => {
-                console.log("✅ 스크립트 onload 트리거됨");
+                    const authFailHandler = () => {
+                        (window as any).navermap_authFailure = undefined;
+                        rej(new Error("AUTH_FAILURE"));
+                    };
+                    (window as any).navermap_authFailure = authFailHandler;
 
-                // SDK 초기화 대기
-                try {
-                    let retries = 0;
-                    const maxRetries = 50; // 5초
+                    const script = document.createElement("script");
+                    script.id = "naver-maps-script";
+                    // oapi 도메인을 공식 가이드로 사용
+                    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?${param}=${encodeURIComponent(
+                        clientId
+                    )}`;
+                    script.async = true;
+                    script.defer = true;
 
-                    while (retries < maxRetries) {
-                        if ((window as any).naver?.maps?.LatLng) {
-                            console.log("✅✅✅ naver.maps.LatLng 사용 가능!");
-                            return resolve();
+                    script.onload = async () => {
+                        try {
+                            let retries = 0;
+                            const maxRetries = 50;
+                            while (retries < maxRetries) {
+                                if ((window as any).naver?.maps?.LatLng) {
+                                    (window as any).navermap_authFailure = undefined;
+                                    return res();
+                                }
+                                await new Promise((r) => setTimeout(r, 100));
+                                retries++;
+                            }
+                            (window as any).navermap_authFailure = undefined;
+                            rej(new Error("SDK_TIMEOUT"));
+                        } catch (e) {
+                            (window as any).navermap_authFailure = undefined;
+                            rej(e as any);
                         }
+                    };
+                    script.onerror = (e) => {
+                        (window as any).navermap_authFailure = undefined;
+                        rej(e as any);
+                    };
 
-                        if (retries % 10 === 0) {
-                            console.log(`⏳ SDK 초기화 대기 중... (${retries}/${maxRetries})`);
-                        }
+                    document.head.appendChild(script);
+                });
 
-                        await new Promise((r) => setTimeout(r, 100));
-                        retries++;
+            (async () => {
+                for (const p of tryParams) {
+                    try {
+                        await loadWithParam(p);
+                        return resolve();
+                    } catch (e) {
+                        console.warn("지도 스크립트 로드 재시도:", p, e);
                     }
-
-                    console.error("❌ SDK 초기화 타임아웃");
-                    console.error("window.naver:", (window as any).naver);
-                    reject(new Error("Naver Maps SDK initialization timeout"));
-                } catch (error) {
-                    console.error("❌ SDK 초기화 중 에러:", error);
-                    reject(error);
                 }
-            };
-
-            script.onerror = (error) => {
-                console.error("❌❌❌ 스크립트 로드 실패!");
-                console.error("  - Error:", error);
-                console.error("  - Script src:", script.src);
-                console.error("  - Client ID:", clientId);
-                console.error("\n🔧 해결 방법:");
-                console.error("  1. 네이버 클라우드 플랫폼 콘솔 접속");
-                console.error("  2. AI·NAVER API > Maps > Application 설정");
-                console.error("  3. Web 서비스 URL에 'http://localhost:3000' 추가");
-                reject(error);
-            };
-
-            document.head.appendChild(script);
-            console.log("📜 스크립트 태그가 DOM에 추가됨");
+                reject(new Error("Naver Maps SDK load failed (all params)"));
+            })();
         });
     };
 
@@ -206,17 +274,29 @@ export default function NaverMapComponent({
     useEffect(() => {
         let cancelled = false;
         (async () => {
-            if (!(window as any).naver?.maps) {
-                await loadNaverMapsScript();
+            try {
+                if (!(window as any).naver?.maps) {
+                    await loadNaverMapsScript();
+                }
+            } catch (e) {
+                console.error("Naver Maps SDK 로드 실패:", e);
             }
             if (cancelled || !(window as any).naver?.maps || !containerRef.current) return;
             const naver = (window as any).naver;
             const c = center ?? pickCenter();
-            mapRef.current = new naver.maps.Map(containerRef.current, {
-                center: new naver.maps.LatLng(c.lat, c.lng),
-                zoom: 15,
-            });
-            setMapReady(true);
+            try {
+                mapRef.current = new naver.maps.Map(containerRef.current, {
+                    center: new naver.maps.LatLng(c.lat, c.lng),
+                    zoom: 15,
+                    zoomControl: false,
+                    mapTypeControl: false,
+                    scaleControl: false,
+                    logoControl: false,
+                });
+                setMapReady(true);
+            } catch (e) {
+                console.error("지도 인스턴스 생성 실패:", e);
+            }
         })();
         return () => {
             cancelled = true;
@@ -237,6 +317,13 @@ export default function NaverMapComponent({
 
         markersRef.current.forEach((m) => m.setMap(null));
         markersRef.current = [];
+        // 이전 경로 제거 (전 장소의 경로가 남지 않도록)
+        if (polylineRef.current) {
+            try {
+                polylineRef.current.setMap(null);
+            } catch {}
+            polylineRef.current = null;
+        }
 
         const map = mapRef.current;
         const bounds = new naver.maps.LatLngBounds();
@@ -260,21 +347,40 @@ export default function NaverMapComponent({
         const valid: Place[] = (places || []).filter((p) => isValidLatLng(p?.latitude, p?.longitude)) as Place[];
         console.log("📍 유효한 장소:", valid.length, "개");
 
+        const createNumberContent = (orderIndex: number) => {
+            const size = 36;
+            const numberBox = 20;
+            return `
+                <div style="position: relative; width: ${size}px; height: ${size + 10}px;">
+                    <div style="
+                        width: ${size}px; height: ${size}px; background: var(--brand-green, #10B981);
+                        border: 2px solid white; border-radius: 50%;
+                        display: flex; align-items: center; justify-content: center;
+                        color: white; font-weight: bold; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+                    ">${orderIndex}</div>
+                    <div style="position:absolute;left:50%;bottom:0;transform:translate(-50%,0);width:0;height:0;
+                        border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--brand-green, #10B981);"></div>
+                </div>`;
+        };
+
         valid.forEach((p, idx) => {
             const pos = new naver.maps.LatLng(Number(p.latitude), Number(p.longitude));
             const isSelected = selectedPlace?.id === p.id;
             const orderIndex = (p as any).orderIndex ?? idx + 1;
 
-            const marker = new naver.maps.Marker({
+            const markerInit: any = {
                 position: pos,
                 map,
                 title: p.name,
-                icon: {
-                    content: createMarkerContent(orderIndex, isSelected),
-                    anchor: new naver.maps.Point(isSelected ? 20 : 16, isSelected ? 20 : 16),
-                },
                 zIndex: isSelected ? 1000 : 100,
-            });
+            };
+            if (numberedMarkers && Number.isFinite(orderIndex)) {
+                markerInit.icon = {
+                    content: createNumberContent(Number(orderIndex)),
+                    anchor: new naver.maps.Point(18, 46),
+                };
+            }
+            const marker = new naver.maps.Marker(markerInit);
 
             naver.maps.Event.addListener(marker, "click", () => {
                 onPlaceClick(p);
@@ -292,6 +398,7 @@ export default function NaverMapComponent({
                 lat: p.latitude,
                 lng: p.longitude,
                 selected: isSelected,
+                category: p.category,
             });
         });
 
@@ -318,9 +425,12 @@ export default function NaverMapComponent({
                 console.error("❌ Naver Maps API가 아직 로드되지 않았습니다");
                 return;
             }
-            if (routeUnchanged) {
-                console.log("⏭ 경로 키 변경 없음 - 재계산 건너뜀");
+            if (routeUnchanged && polylineRef.current) {
+                console.log("⏭ 경로 키 변경 없음 - 기존 경로 유지");
                 return;
+            }
+            if (routeUnchanged && !polylineRef.current) {
+                console.log("🔁 경로 키 동일하지만 기존 경로 없음 → 강제 재계산");
             }
             if (!drawPath) {
                 console.log("⚠️ drawPath가 false - 경로 그리기 건너뜀");
@@ -368,6 +478,9 @@ export default function NaverMapComponent({
                         if (res1.ok) {
                             const data = await res1.json();
                             console.log("🚶 도보 응답:", data);
+                            if (data?.fallback && String(data?.reason || "").includes("TOO_CLOSE")) {
+                                triggerNearFallback();
+                            }
                             if (Array.isArray(data?.coordinates) && data.coordinates.length > 0) {
                                 const simplified = samplePath(data.coordinates);
                                 routeCacheRef.current.set(ck, simplified);
@@ -388,6 +501,9 @@ export default function NaverMapComponent({
                         if (res2.ok) {
                             const data = await res2.json();
                             console.log("🚗 운전 응답:", data);
+                            if (data?.fallback && String(data?.reason || "").includes("TOO_CLOSE")) {
+                                triggerNearFallback();
+                            }
                             if (Array.isArray(data?.coordinates) && data.coordinates.length > 0) {
                                 const simplified = samplePath(data.coordinates);
                                 routeCacheRef.current.set(ck, simplified);
@@ -414,11 +530,30 @@ export default function NaverMapComponent({
                             map,
                             path: latlngs,
                             strokeWeight: 4,
-                            strokeColor: "var(--brand-green, #10B981)",
-                            strokeOpacity: 0.9,
+                            strokeColor: "var(--brand-green-dark, #5f8d57)",
+                            strokeOpacity: 0.95,
+                            strokeStyle: "solid",
+                            strokeLineCap: "round",
+                            strokeLineJoin: "round",
                         });
                     } else {
-                        console.warn("⚠️ 경로 데이터가 없습니다");
+                        console.warn("⚠️ 경로 데이터가 없습니다 - 직선 폴백 사용");
+                        const fallback = [
+                            [uLng, uLat],
+                            [valid[0].longitude, valid[0].latitude],
+                        ] as Array<[number, number]>;
+                        const latlngs = fallback.map(([lng, lat]) => new naver.maps.LatLng(lat, lng));
+                        polylineRef.current = new naver.maps.Polyline({
+                            map,
+                            path: latlngs,
+                            strokeWeight: 4,
+                            strokeColor: "var(--brand-green-dark, #5f8d57)",
+                            strokeOpacity: 0.95,
+                            strokeStyle: "solid",
+                            strokeLineCap: "round",
+                            strokeLineJoin: "round",
+                        });
+                        triggerNearFallback();
                     }
                 } catch (error) {
                     console.error("❌ 경로 생성 중 에러:", error);
@@ -463,6 +598,14 @@ export default function NaverMapComponent({
                                 console.log(`✅ ${primary} 경로 성공:`, simplified.length, "포인트");
                                 return simplified;
                             }
+                            if (
+                                d1?.fallback &&
+                                String(d1?.reason || "").includes("TOO_CLOSE") &&
+                                !shownFallbackRef.current
+                            ) {
+                                shownFallbackRef.current = true;
+                                setShowNearFallback(true);
+                            }
                         }
 
                         const secondary = primary === "walking" ? "driving" : "walking";
@@ -481,11 +624,24 @@ export default function NaverMapComponent({
                                 console.log(`✅ ${secondary} 경로 성공:`, simplified.length, "포인트");
                                 return simplified;
                             }
+                            if (
+                                d2?.fallback &&
+                                String(d2?.reason || "").includes("TOO_CLOSE") &&
+                                !shownFallbackRef.current
+                            ) {
+                                shownFallbackRef.current = true;
+                                setShowNearFallback(true);
+                            }
                         }
                     } catch (error) {
                         console.error("세그먼트 요청 실패:", error);
                     }
-                    return null;
+                    // 최종 실패 시 직선 폴백 제공
+                    triggerNearFallback();
+                    return [
+                        [start.longitude, start.latitude],
+                        [end.longitude, end.latitude],
+                    ];
                 };
 
                 // 병렬로 모든 세그먼트 요청
@@ -494,7 +650,13 @@ export default function NaverMapComponent({
                     const a = valid[i];
                     const b = valid[i + 1];
                     const d = distanceMeters(a.latitude, a.longitude, b.latitude, b.longitude);
-                    const primary: "walking" | "driving" = d <= 1_500 ? "walking" : "driving";
+                    // 요청: 도보 우선. 실패 시 운전으로 자동 백업은 tryFetchSegment 내부에서 수행됨
+                    const primary: "walking" | "driving" =
+                        routeMode === "walking" || routeMode === "foot"
+                            ? "walking"
+                            : d <= 1_500
+                            ? "walking"
+                            : "driving";
                     console.log(`🔗 세그먼트 ${i}:`, a.name, "→", b.name, `(${d.toFixed(0)}m, ${primary})`);
                     tasks.push(tryFetchSegment(a as any, b as any, primary));
                 }
@@ -502,13 +664,13 @@ export default function NaverMapComponent({
                 results.forEach((coordsPath, idx) => {
                     if (coordsPath && coordsPath.length > 0) {
                         try {
-                            if (!(window as any).naver?.maps?.LatLng) {
-                                console.error("❌ naver.maps.LatLng를 사용할 수 없습니다");
-                                return;
+                            // ✅ 컴포넌트 상단에서 선언한 naver 변수 사용
+                            const naverSdk = (window as any).naver;
+                            if (!naverSdk?.maps?.LatLng) {
+                                console.warn("⚠️ 네이버 SDK 대기 중... 건너뜀");
+                                return; // 에러 대신 조용히 건너뜀
                             }
-                            let segment = coordsPath.map(
-                                ([lng, lat]) => new (window as any).naver.maps.LatLng(lat, lng)
-                            );
+                            let segment = coordsPath.map(([lng, lat]) => new naverSdk.maps.LatLng(lat, lng));
                             if (allLatLngs.length > 0) segment.shift();
                             allLatLngs.push(...segment);
                         } catch (error) {
@@ -523,8 +685,11 @@ export default function NaverMapComponent({
                         map,
                         path: allLatLngs,
                         strokeWeight: 4,
-                        strokeColor: "var(--brand-green, #10B981)",
-                        strokeOpacity: 0.9,
+                        strokeColor: "var(--brand-green-dark, #5f8d57)",
+                        strokeOpacity: 0.95,
+                        strokeStyle: "solid",
+                        strokeLineCap: "round",
+                        strokeLineJoin: "round",
                     });
                     console.log("✅ Polyline 생성 완료");
                 } else {
@@ -551,5 +716,184 @@ export default function NaverMapComponent({
         } catch {}
     }, [selectedPlace]);
 
-    return <div ref={containerRef} className={className} style={{ ...style, width: "100%", height: "100%" }} />;
+    return (
+        <div
+            ref={containerRef}
+            className={className}
+            style={{ ...style, width: "100%", height: "100%", position: "relative" }}
+        >
+            {mapReady && showControls && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "80px",
+                        right: "16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px",
+                        zIndex: 100,
+                    }}
+                >
+                    {userLocation && (
+                        <button
+                            onClick={handleGoToMyLocation}
+                            disabled={isLocating}
+                            aria-label="현재 위치로 이동"
+                            style={{
+                                width: "48px",
+                                height: "48px",
+                                borderRadius: "50%",
+                                border: "none",
+                                backgroundColor: "white",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                cursor: isLocating ? "default" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transition: "all 0.2s ease",
+                                opacity: isLocating ? 0.7 : 1,
+                            }}
+                        >
+                            <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                style={{ animation: isLocating ? "spin 1s linear infinite" : "none" }}
+                            >
+                                <circle cx="12" cy="12" r="3" fill="#10B981" />
+                                <circle cx="12" cy="12" r="8" stroke="#10B981" strokeWidth="2" fill="none" />
+                            </svg>
+                        </button>
+                    )}
+                    {currentHeading !== null && (
+                        <button
+                            onClick={handleResetHeading}
+                            aria-label="북쪽으로 회전"
+                            style={{
+                                width: "48px",
+                                height: "48px",
+                                borderRadius: "50%",
+                                border: "none",
+                                backgroundColor: "white",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transition: "all 0.2s ease",
+                            }}
+                        >
+                            <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                style={{ transform: `rotate(${currentHeading}deg)`, transition: "transform 0.3s ease" }}
+                            >
+                                <path d="M12 2L15 10H9L12 2Z" fill="#EF4444" />
+                                <path d="M12 22L9 14H15L12 22Z" fill="#6B7280" />
+                            </svg>
+                        </button>
+                    )}
+                    <div
+                        style={{
+                            backgroundColor: "white",
+                            borderRadius: "24px",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                            overflow: "hidden",
+                        }}
+                    >
+                        <button
+                            onClick={handleZoomIn}
+                            aria-label="확대"
+                            style={{
+                                width: "48px",
+                                height: "48px",
+                                border: "none",
+                                borderBottom: "1px solid #E5E7EB",
+                                backgroundColor: "transparent",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "24px",
+                                fontWeight: 400,
+                                color: "#374151",
+                                transition: "all 0.2s ease",
+                            }}
+                        >
+                            +
+                        </button>
+                        <button
+                            onClick={handleZoomOut}
+                            aria-label="축소"
+                            style={{
+                                width: "48px",
+                                height: "48px",
+                                border: "none",
+                                backgroundColor: "transparent",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "24px",
+                                fontWeight: 400,
+                                color: "#374151",
+                                transition: "all 0.2s ease",
+                            }}
+                        >
+                            −
+                        </button>
+                    </div>
+                </div>
+            )}
+            {showNearFallback && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-50">
+                    <div className="bg-white/90 rounded-2xl p-5 text-center shadow-md w-[250px]">
+                        <p className="text-gray-800 text-sm mb-3 leading-relaxed">
+                            일부 지점은 도보 경로 정보가 없어
+                            <br />
+                            직선으로 표시됩니다.
+                            <br />
+                            양해 부탁드립니다.
+                        </p>
+                        <button
+                            className="px-4 py-1.5 bg-[#99C08E] text-white text-sm rounded-lg"
+                            onClick={() => setShowNearFallback(false)}
+                        >
+                            확인
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {selectedPlace && showPlaceOverlay && (
+                <div
+                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-4 z-40"
+                    style={{ maxWidth: 360 }}
+                >
+                    <div className="pointer-events-auto bg-white/95 backdrop-blur rounded-xl shadow-lg border border-gray-200 px-4 py-3">
+                        <div className="font-semibold text-gray-900 text-sm line-clamp-1">{selectedPlace.name}</div>
+                        {selectedPlace.address && (
+                            <div className="text-xs text-gray-600 line-clamp-1">{selectedPlace.address}</div>
+                        )}
+                    </div>
+                </div>
+            )}
+            <style jsx>{`
+                @keyframes spin {
+                    from {
+                        transform: rotate(0deg);
+                    }
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+                button:active {
+                    transform: scale(0.95);
+                }
+            `}</style>
+        </div>
+    );
 }

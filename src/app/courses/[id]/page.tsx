@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffectOnce } from "react-use";
 import Image from "next/image";
@@ -178,6 +178,7 @@ export default function CourseDetailPage() {
 
     const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
     const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+    const mapSectionRef = useRef<HTMLDivElement | null>(null);
     // 상세 진입 즉시 view 상호작용 기록
     useEffect(() => {
         try {
@@ -234,6 +235,14 @@ export default function CourseDetailPage() {
             imageUrl: coursePlace.place.imageUrl, // ✅ snake_case
             description: coursePlace.place.description,
         });
+        try {
+            const el = mapSectionRef.current;
+            if (el) {
+                const rect = el.getBoundingClientRect();
+                const top = (window.scrollY || window.pageYOffset) + rect.top - 80; // 헤더 높이 보정
+                window.scrollTo({ top, behavior: "smooth" });
+            }
+        } catch {}
     };
 
     // 장소 상세보기 버튼 클릭 (모달 오픈)
@@ -646,7 +655,7 @@ export default function CourseDetailPage() {
                                 {/* 타임라인 + 지도 섹션 */}
                                 <div className="bg-white rounded-2xl shadow-lg p-4 md:p-8">
                                     {/* 지도 섹션 */}
-                                    <div className="mb-8 rounded-2xl overflow-hidden shadow-lg">
+                                    <div className="mb-8 rounded-2xl overflow-hidden shadow-lg" ref={mapSectionRef}>
                                         <div className="relative">
                                             {sortedCoursePlaces.length > 0 ? (
                                                 <NaverMap
@@ -664,9 +673,12 @@ export default function CourseDetailPage() {
                                                     selectedPlace={selectedPlace}
                                                     onPlaceClick={setSelectedPlace}
                                                     drawPath={true}
+                                                    numberedMarkers={true}
                                                     routeMode="walking"
                                                     className="w-full h-64 rounded-2xl"
                                                     style={{ minHeight: "260px" }}
+                                                    showControls={false}
+                                                    showPlaceOverlay={false}
                                                 />
                                             ) : (
                                                 <div className="w-full h-80 bg-gray-100 rounded-2xl flex items-center justify-center">
@@ -1064,7 +1076,7 @@ export default function CourseDetailPage() {
                             <p className="text-sm text-gray-500 mt-1">{selectedPlace.address}</p>
                         </div>
                         {selectedPlace.imageUrl ? (
-                            <div className="w-full max-h-64 md:max-h-96 bg-gray-100 overflow-hidden flex items-center justify-center">
+                            <div className="w-full h-64 md:h-96 bg-gray-100 overflow-hidden flex items-center justify-center relative">
                                 <Image
                                     src={selectedPlace.imageUrl}
                                     alt={selectedPlace.name}
@@ -1074,8 +1086,9 @@ export default function CourseDetailPage() {
                                     quality={60}
                                 />
                             </div>
-                        ) : // <div className="w-full h-32 md:h-48 bg-gray-100" />＼
-                        null}
+                        ) : (
+                            <div className="w-full h-40 md:h-56 bg-gray-200" />
+                        )}
                         <div className="p-4">
                             <p className="text-gray-700 text-sm whitespace-pre-line">
                                 {selectedPlace.description || "설명이 없습니다."}

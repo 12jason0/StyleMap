@@ -68,78 +68,70 @@ export async function GET(req: NextRequest) {
         //     });
         // }
 
-        // API 키가 없으면 바로 직선 반환
+        // API 키가 없으면 직선 폴백 대신 경로 없음 반환 (건물 통과 방지)
         if (!clientId || !clientSecret) {
-            console.warn("⚠️ API 키 없음 - 직선 경로로 대체");
-            return NextResponse.json({
-                coordinates: createFallbackPath(),
-                fallback: true,
-            });
+            console.warn("⚠️ API 키 없음 - 경로 생략 (직선 폴백 사용 안 함)");
+            return NextResponse.json({ coordinates: [], fallback: true, error: "NO_API_KEYS" });
         }
-
         // --- API 선택 ---
         const endpoint =
             mode === "walking"
-                ? `https://maps.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`
-                : `https://maps.apigw.ntruss.com/map-direction/v1/driving?start=${start}&goal=${goal}&option=trafast`;
+                ? `https://naveropenapi.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`
+                : `https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving?start=${start}&goal=${goal}&option=trafast`;
 
         console.log("🔵 API 요청:", endpoint);
 
         try {
-            const response = await fetch(endpoint, {
-                headers: {
-                    "X-NCP-APIGW-API-KEY-ID": clientId,
-                    "X-NCP-APIGW-API-KEY": clientSecret,
-                },
-                cache: "no-store",
-            });
+            const doFetch = async (ep: string) =>
+                await fetch(ep, {
+                    headers: {
+                        "X-NCP-APIGW-API-KEY-ID": clientId,
+                        "X-NCP-APIGW-API-KEY": clientSecret,
+                    },
+                    cache: "no-store",
+                });
+            let response = await doFetch(endpoint);
+            let data = await response.json().catch(() => ({}));
 
-            const data = await response.json().catch(() => ({}));
+            // 운전 경로에서 권한 문제(403 / errorCode 230 등)면 도보로 한 번 더 시도
+            if (!response.ok && mode === "driving") {
+                const errCode = (data?.error?.errorCode || data?.errorCode) as string | undefined;
+                if (response.status === 403 || errCode === "230") {
+                    const walkingEp = `https://naveropenapi.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`;
+                    console.warn("🚶 Driving 권한 오류 → Walking으로 재시도");
+                    response = await doFetch(walkingEp);
+                    data = await response.json().catch(() => ({}));
+                    mode = "walking";
+                }
+            }
 
             console.log("🔵 API 응답 상태:", response.status);
             console.log("🔵 API 응답 데이터:", JSON.stringify(data, null, 2));
 
-            // 🟢 404나 다른 에러 시 직선 폴백
+            // 🟢 에러(3xx/4xx/5xx) 시 직선 폴백 대신 경로 생략
             if (!response.ok) {
                 console.error("❌ Naver API 에러:", data);
-                console.warn("⚠️ API 실패 - 직선 경로로 대체");
-                return NextResponse.json({
-                    coordinates: createFallbackPath(),
-                    fallback: true,
-                    error: data?.message,
-                });
+                return NextResponse.json({ coordinates: [], fallback: true, error: data?.message || response.status });
             }
 
             // API 응답에 route가 없으면 (짧은 거리 포함)
             if (!data?.route || data.route === null) {
-                console.warn("⚠️ route 없음 - 짧은 거리지만 API 스타일로 보정");
-
-                const expandShortPath = (): Array<[number, number]> => {
-                    // 직선 대신 '가짜 돌아가는 경로' 생성
-                    const midLng = (startLng + goalLng) / 2;
-                    const midLat = (startLat + goalLat) / 2;
-
-                    const deltaLng = (goalLng - startLng) * 0.002; // 좌우로 살짝 넓힘
-                    const deltaLat = (goalLat - startLat) * 0.002; // 위아래로 살짝 넓힘
-
-                    // 약간 꺾인 5점 경로 생성
-                    return [
-                        [startLng, startLat],
-                        [midLng - deltaLng, midLat + deltaLat],
-                        [midLng, midLat + deltaLat * 2],
-                        [midLng + deltaLng, midLat + deltaLat],
-                        [goalLng, goalLat],
-                    ];
-                };
-
-                // distance가 짧으면 ‘확장 경로’, 아니면 기본 폴백
-                const coordinates = distance < 50 ? expandShortPath() : createFallbackPath();
-
-                return NextResponse.json({
-                    coordinates,
-                    fallback: true,
-                    reason: "SHORT_DISTANCE_FAKE_ROUTE",
-                });
+                if (mode !== "walking") {
+                    const walkingEp = `https://naveropenapi.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`;
+                    console.warn("🚶 route 없음 → Walking으로 재시도");
+                    const r = await doFetch(walkingEp);
+                    const d = await r.json().catch(() => ({}));
+                    if (r.ok && d?.route) {
+                        data = d;
+                        mode = "walking";
+                    } else {
+                        console.warn("⚠️ Walking 재시도 실패 - 경로 생략");
+                        return NextResponse.json({ coordinates: [], fallback: true, reason: "NO_ROUTE" });
+                    }
+                } else {
+                    console.warn("⚠️ route 없음 - 경로 생략");
+                    return NextResponse.json({ coordinates: [], fallback: true, reason: "NO_ROUTE" });
+                }
             }
 
             // --- 경로 추출 (모드별로 다른 구조 처리) ---
@@ -231,31 +223,24 @@ export async function GET(req: NextRequest) {
                 }
             }
 
-            // 🟢 경로를 찾았으면 반환, 못 찾았으면 직선 폴백
-            if (path && Array.isArray(path) && path.length > 0) {
+            // 🟢 경로를 찾았으면 반환, 너무 짧거나 없으면 직선 폴백
+            if (path && Array.isArray(path) && path.length > 2) {
                 console.log("✅ 최종 반환 경로:", path.length, "포인트");
                 return NextResponse.json({
                     coordinates: path,
                     summary: route.traoptimal?.[0]?.summary || route.trafast?.[0]?.summary,
                 });
-            } else {
-                console.error("❌ 경로를 찾을 수 없음 - 직선 경로로 대체");
-                console.log("📦 전체 route 구조:", JSON.stringify(route, null, 2));
-                console.log("📦 전체 data 구조:", JSON.stringify(data, null, 2));
-                return NextResponse.json({
-                    coordinates: createFallbackPath(),
-                    fallback: true,
-                    error: "NO_PATH",
-                });
             }
-        } catch (fetchError: any) {
-            console.error("❌ API 요청 실패:", fetchError);
-            console.warn("⚠️ API 요청 실패 - 직선 경로로 대체");
+
+            console.warn("⚠️ 경로 포인트가 부족합니다 — 직선 폴백으로 대체");
             return NextResponse.json({
                 coordinates: createFallbackPath(),
                 fallback: true,
-                error: fetchError.message,
+                reason: "TOO_CLOSE_OR_NO_ROUTE",
             });
+        } catch (fetchError: any) {
+            console.error("❌ API 요청 실패:", fetchError);
+            return NextResponse.json({ coordinates: [], fallback: true, error: fetchError.message });
         }
     } catch (error: any) {
         console.error("❌ Directions API error:", error);

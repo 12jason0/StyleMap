@@ -29,6 +29,17 @@ export interface MapProps {
     ancientStyle?: boolean; // 고대 유물 스타일 오버레이
     highlightPlaceId?: number; // 강조 효과를 줄 place id
     center?: UserLocation; // 초기 중심점(옵션)
+    numberedMarkers?: boolean; // 순번 뱃지를 핀에 표시
+    // 근거리 직선 폴백 안내 모달을 세션 전역 1회만 띄우기 위한 키 (예: start-fallback-코스ID)
+    nearFallbackStorageKey?: string;
+    // 외부에서 모달 노출을 막고 싶을 때
+    suppressNearFallback?: boolean;
+    // 모달이 처음 표시될 때 알림용 콜백
+    onNearFallbackShown?: () => void;
+    // 컨트롤 표시 여부 (줌/현재위치/나침반)
+    showControls?: boolean;
+    // 선택된 장소 하단 오버레이 표시 여부
+    showPlaceOverlay?: boolean;
 }
 
 // 과거 호환용 타입 별칭 (점진적 마이그레이션용)

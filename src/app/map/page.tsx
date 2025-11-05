@@ -21,6 +21,65 @@ interface Place {
     courseId?: number; // 코스에서 변환된 항목일 경우 연결용 아이디
 }
 
+// --- 클래식 핀 마커 생성 함수 ---
+function createReactNaverMapIcon(category: string, orderIndex?: number, isSelected: boolean = false) {
+    const cat = category?.toLowerCase() || "";
+
+    let color = "#10B981";
+    let icon = "📍";
+
+    if (cat.includes("카페") || cat.includes("cafe")) {
+        color = "#8B5CF6";
+        icon = "☕";
+    } else if (cat.includes("음식") || cat.includes("식당") || cat.includes("맛집") || cat.includes("restaurant")) {
+        color = "#EF4444";
+        icon = "🍽️";
+    } else if (cat.includes("관광") || cat.includes("명소") || cat.includes("랜드마크")) {
+        color = "#10B981";
+        icon = "📍";
+    }
+
+    const width = isSelected ? 44 : 36;
+    const height = isSelected ? 54 : 46;
+    const iconSize = isSelected ? 22 : 18;
+    const numberSize = isSelected ? 13 : 11;
+    const numberBox = isSelected ? 24 : 20;
+
+    return {
+        content: `
+            <div style="position: relative; width: ${width}px; height: ${height}px;">
+                <div style="
+                    width: ${width}px; height: ${width}px; background: ${color};
+                    border: 3px solid white; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    box-shadow: 0 3px 10px rgba(0,0,0,0.3); font-size: ${iconSize}px;
+                ">${icon}</div>
+                <div style="
+                    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+                    width: 0; height: 0; border-left: 8px solid transparent;
+                    border-right: 8px solid transparent; border-top: 10px solid ${color};
+                "></div>
+                ${
+                    orderIndex
+                        ? `
+                    <div style="
+                        position: absolute; top: -8px; right: -8px; background: white;
+                        border: 2px solid ${color}; border-radius: 50%;
+                        width: ${numberBox}px; height: ${numberBox}px;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: ${numberSize}px; font-weight: bold; color: ${color};
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                    ">${orderIndex}</div>
+                `
+                        : ""
+                }
+            </div>
+        `,
+        size: { width, height },
+        anchor: { x: width / 2, y: height },
+    };
+}
+
 interface Course {
     id: number;
     title: string;
@@ -44,6 +103,63 @@ function MapPageInner() {
     const navermaps = typeof window !== "undefined" ? (window as any).naver?.maps : null;
     const mapRef = useRef<any>(null);
     const suppressSearchButtonRef = useRef<boolean>(false);
+
+    // 네이버 지도 SDK 보조 로더 (Provider가 못 불러왔을 때 대비)
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if ((window as any).naver?.maps) return; // 이미 로드됨
+        const existing = Array.from(document.getElementsByTagName("script")).some((s) =>
+            (s as HTMLScriptElement).src.includes("oapi.map.naver.com/openapi/v3/maps.js")
+        );
+        if (existing) return;
+
+        const clientId =
+            process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID ||
+            process.env.NEXT_PUBLIC_NAVER_MAP_API_KEY_ID ||
+            process.env.NEXT_PUBLIC_NAVER_CLIENT_ID ||
+            "";
+        if (!clientId) {
+            console.error("Naver Maps Client ID 미설정: NEXT_PUBLIC_NAVER_MAP_CLIENT_ID (또는 *_API_KEY_ID) 필요");
+            return;
+        }
+        const tryParams = ["ncpKeyId", "ncpClientId"] as const;
+        const loadWithParam = (param: (typeof tryParams)[number]) =>
+            new Promise<void>((res, rej) => {
+                const prev = document.getElementById("naver-maps-script-fallback");
+                prev?.parentElement?.removeChild(prev as any);
+                (window as any).navermap_authFailure = () => {
+                    (window as any).navermap_authFailure = undefined;
+                    rej(new Error("AUTH_FAILURE"));
+                };
+                const script = document.createElement("script");
+                script.id = "naver-maps-script-fallback";
+                script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?${param}=${encodeURIComponent(clientId)}`;
+                script.async = true;
+                script.defer = true;
+                script.onload = () => {
+                    (window as any).navermap_authFailure = undefined;
+                    setTimeout(() => setMapsReady(Boolean((window as any).naver?.maps)), 0);
+                    res();
+                };
+                script.onerror = (e) => {
+                    (window as any).navermap_authFailure = undefined;
+                    rej(e as any);
+                };
+                document.head.appendChild(script);
+            });
+
+        (async () => {
+            for (const p of tryParams) {
+                try {
+                    await loadWithParam(p);
+                    return;
+                } catch (e) {
+                    console.warn("fallback 로더 재시도:", p, e);
+                }
+            }
+            console.error("네이버 지도 SDK 로드 실패(all params)");
+        })();
+    }, []);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -488,27 +604,6 @@ function MapPageInner() {
         }
     }, [places, viewBounds]);
 
-    // 핀 아이콘 매핑 (로컬 이미지 사용: 음식점=maker1.png, 카페=cafeMaker.png)
-    const getNaverPinIcon = useCallback(
-        (type: "user" | "cafe" | "food" | "default") => {
-            if (!navermaps) return undefined as any;
-            const urlMap: Record<string, string> = {
-                user: "/images/maker.png",
-                cafe: "/images/cafeMaker.png",
-                food: "/images/maker1.png",
-                default: "https://navermaps.github.io/maps.js/docs/img/example/pin_default.png",
-            };
-            const url = urlMap[type] || urlMap.default;
-            return {
-                url,
-                size: new navermaps.Size(32, 44),
-                scaledSize: new navermaps.Size(32, 44),
-                anchor: new navermaps.Point(14, 40),
-            } as any;
-        },
-        [navermaps]
-    );
-
     // 지도 클릭 시: 선택 해제하고 목록으로 복귀 (패널은 유지)
     useEffect(() => {
         if (!navermaps || !mapRef.current) return;
@@ -634,27 +729,27 @@ function MapPageInner() {
                         selectedPlace ? (
                             // 장소 상세 정보 - StyleMap 톤(그린 계열) 적용 카드 스타일
                             <div className="p-2">
-                                <div className="bg-white rounded-md shadow-sm border border-gray-200 p-3">
-                                    <h3 className="text-base font-semibold text-gray-900 mb-1 leading-snug">
+                                <div className="bg-white rounded-sm shadow-sm border border-gray-200 p-2">
+                                    <h3 className="text-sm font-semibold text-gray-900 mb-0.5 leading-snug">
                                         {selectedPlace.name}
                                     </h3>
-                                    <div className="flex items-center gap-1 text-gray-700 mb-1">
+                                    <div className="flex items-center gap-1 text-gray-700 mb-0.5">
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
                                             viewBox="0 0 24 24"
                                             fill="currentColor"
-                                            className="w-3 h-3 text-blue-700"
+                                            className="w-2.5 h-2.5 text-blue-700"
                                         >
                                             <path d="M9.813 15.904C7.024 14.946 5 12.248 5 9a7 7 0 1 1 14 0c0 3.248-2.024 5.946-4.813 6.904l-.4 1.6a2 2 0 0 1-1.94 1.496h-1.694a2 2 0 0 1-1.94-1.496l-.4-1.6z" />
                                         </svg>
-                                        <span className="font-medium">{selectedPlace.category || "장소"}</span>
+                                        <span className="font-medium text-xs">{selectedPlace.category || "장소"}</span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-gray-700 mb-1">
+                                    <div className="flex items-center gap-1 text-gray-700 mb-0.5">
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
                                             viewBox="0 0 24 24"
                                             fill="currentColor"
-                                            className="w-3 h-3 text-blue-700"
+                                            className="w-2.5 h-2.5 text-blue-700"
                                         >
                                             <path
                                                 fillRule="evenodd"
@@ -662,22 +757,24 @@ function MapPageInner() {
                                                 clipRule="evenodd"
                                             />
                                         </svg>
-                                        <span className="text-gray-700">{selectedPlace.address}</span>
+                                        <span className="text-gray-700 text-xs">{selectedPlace.address}</span>
                                     </div>
                                     {selectedPlace.phone && (
-                                        <div className="flex items-center gap-1 text-gray-700 mb-2">
+                                        <div className="flex items-center gap-1 text-gray-700 mb-1.5">
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 viewBox="0 0 24 24"
                                                 fill="currentColor"
-                                                className="w-3 h-3 text-blue-700"
+                                                className="w-2.5 h-2.5 text-blue-700"
                                             >
                                                 <path d="M2.25 5.25A2.25 2.25 0 0 1 4.5 3h2.708a2.25 2.25 0 0 1 2.132 1.552l.762 2.287a2.25 2.25 0 0 1-.54 2.316l-1.2 1.2a14.25 14.25 0 0 0 5.484 5.484l1.2-1.2a2.25 2.25 0 0 1 2.316-.54l2.287.762A2.25 2.25 0 0 1 21 16.792V19.5a2.25 2.25 0 0 1-2.25 2.25h-.75C9.716 21.75 2.25 14.284 2.25 5.25v0Z" />
                                             </svg>
-                                            <span className="tracking-wide font-medium">{selectedPlace.phone}</span>
+                                            <span className="tracking-wide font-medium text-xs">
+                                                {selectedPlace.phone}
+                                            </span>
                                         </div>
                                     )}
-                                    <div className="mt-2 flex gap-3">
+                                    <div className="mt-1.5 flex gap-2">
                                         <button
                                             onClick={() =>
                                                 window.open(
@@ -687,13 +784,13 @@ function MapPageInner() {
                                                     "_blank"
                                                 )
                                             }
-                                            className="px-3 py-1.5 rounded-full border border-blue-500 text-blue-700 bg-white font-semibold text-sm hover:bg-blue-50 transition-colors hover:cursor-pointer flex items-center gap-1 shadow-sm"
+                                            className="px-2.5 py-1 rounded-full border border-blue-500 text-blue-700 bg-white font-semibold text-xs hover:bg-blue-50 transition-colors hover:cursor-pointer flex items-center gap-1 shadow-sm"
                                         >
                                             <svg
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 viewBox="0 0 24 24"
                                                 fill="currentColor"
-                                                className="w-3 h-3"
+                                                className="w-2.5 h-2.5"
                                             >
                                                 <path
                                                     fillRule="evenodd"
@@ -710,7 +807,7 @@ function MapPageInner() {
                                                     : undefined
                                             }
                                             disabled={!selectedPlace.phone}
-                                            className={`px-3 py-1.5 rounded-full font-semibold text-white text-sm flex items-center gap-1 hover:cursor-pointer transition-colors shadow-sm ${
+                                            className={`px-2.5 py-1 rounded-full font-semibold text-white text-xs flex items-center gap-1 hover:cursor-pointer transition-colors shadow-sm ${
                                                 selectedPlace.phone
                                                     ? "bg-blue-600 hover:bg-blue-700"
                                                     : "bg-gray-300 cursor-not-allowed"
@@ -720,7 +817,7 @@ function MapPageInner() {
                                                 xmlns="http://www.w3.org/2000/svg"
                                                 viewBox="0 0 24 24"
                                                 fill="currentColor"
-                                                className="w-3 h-3"
+                                                className="w-2.5 h-2.5"
                                             >
                                                 <path d="M2.25 5.25A2.25 2.25 0 0 1 4.5 3h2.708a2.25 2.25 0 0 1 2.132 1.552l.762 2.287a2.25 2.25 0 0 1-.54 2.316l-1.2 1.2a14.25 14.25 0 0 0 5.484 5.484l1.2-1.2a2.25 2.25 0 0 1 2.316-.54l2.287.762A2.25 2.25 0 0 1 21 16.792V19.5a2.25 2.25 0 0 1-2.25 2.25h-.75C9.716 21.75 2.25 14.284 2.25 5.25v0Z" />
                                             </svg>
@@ -805,11 +902,12 @@ function MapPageInner() {
                                 position={new navermaps.LatLng(userLocation.lat, userLocation.lng)}
                                 title="현재 위치"
                                 zIndex={300}
-                                icon={getNaverPinIcon("user")}
                             />
                         )}
-                        {(selectedPlace ? [selectedPlace] : filteredPlaces).map((place) => {
+                        {(selectedPlace ? [selectedPlace] : filteredPlaces).map((place, idx) => {
                             const isSel = selectedPlace?.id === place.id;
+                            const markerIcon = createReactNaverMapIcon(place.category, undefined, isSel);
+
                             return (
                                 <Marker
                                     key={place.id}
@@ -817,18 +915,31 @@ function MapPageInner() {
                                     title={place.name}
                                     onClick={() => handlePlaceClick(place)}
                                     zIndex={isSel ? 100 : 10}
-                                    icon={getNaverPinIcon(
-                                        place.category?.includes("카페")
-                                            ? "cafe"
-                                            : place.category?.includes("음식") || place.category?.includes("맛집")
-                                            ? "food"
-                                            : "default"
-                                    )}
+                                    icon={{
+                                        content: markerIcon.content,
+                                        size: new navermaps.Size(markerIcon.size.width, markerIcon.size.height),
+                                        anchor: new navermaps.Point(markerIcon.anchor.x, markerIcon.anchor.y),
+                                    }}
                                 />
                             );
                         })}
                     </NaverMap>
                 </MapDiv>
+
+                {/* 닫기(X): 단일 장소 상세 보기일 때만 표시 → 전체 정보(목록/모든 핀)로 복귀 */}
+                {selectedPlace && (
+                    <button
+                        onClick={() => {
+                            setSelectedPlace(null);
+                            setLeftPanelOpen(true);
+                        }}
+                        className="hover:cursor-pointer absolute right-3 top-3 z-50 bg-white/95 backdrop-blur border border-gray-300 rounded-full w-9 h-9 shadow-md flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                        aria-label="닫기"
+                        title="닫기"
+                    >
+                        ×
+                    </button>
+                )}
 
                 {/* --- 지도 위 UI 컨트롤 --- */}
                 {showMapSearchButton && (
@@ -966,7 +1077,7 @@ function MapPageInner() {
                             setLeftPanelOpen((v) => !v);
                             setTimeout(triggerMapResize, 320);
                         }}
-                        className="hover:cursor-pointer fixed top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:bg-gray-50 transition-all duration-300 z-20"
+                        className="hover:cursor-pointer fixed top-1/2 -translate-y-1/2 bg-white border border-gray-300 rounded-r-lg px-2 py-4 shadow-md hover:bg-gray-50 transition-all duration-300 z-50"
                         style={{ left: leftPanelOpen ? "24rem" : "0" }}
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >
@@ -979,8 +1090,10 @@ function MapPageInner() {
                             setLeftPanelOpen((v) => !v);
                             setTimeout(triggerMapResize, 320);
                         }}
-                        className="hover:cursor-pointer absolute left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-3 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-20"
-                        style={{ bottom: leftPanelOpen ? "calc(60vh + 16px)" : "80px" }}
+                        className="hover:cursor-pointer absolute left-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full px-3 py-1 shadow-md hover:bg-gray-50 transition-all duration-300 z-50"
+                        style={{
+                            bottom: leftPanelOpen ? "calc(60vh + 16px)" : "calc(env(safe-area-inset-bottom) + 150px)",
+                        }}
                         title={leftPanelOpen ? "패널 닫기" : "패널 열기"}
                     >
                         <span className="text-gray-700 text-xl ">{leftPanelOpen ? "▾" : "▴"}</span>

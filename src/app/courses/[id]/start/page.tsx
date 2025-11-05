@@ -133,7 +133,7 @@ function GuidePageInner() {
     const mapPlaces = useMemo(() => {
         if (!currentPlace) return [];
 
-        // 🟢 목적지만 반환 (userLocation 체크 제거)
+        const currentOrderIndex = course?.coursePlaces?.[currentStep]?.order_index;
         return [
             {
                 id: currentPlace.id,
@@ -141,9 +141,10 @@ function GuidePageInner() {
                 latitude: currentPlace.latitude,
                 longitude: currentPlace.longitude,
                 address: currentPlace.address,
+                orderIndex: currentOrderIndex,
             },
         ];
-    }, [currentPlace]);
+    }, [currentPlace, course, currentStep]);
 
     // 다음/이전 장소로 이동하는 함수
     const goToNextStep = () => {
@@ -194,13 +195,16 @@ function GuidePageInner() {
             {/* 지도 영역 */}
             <div className="flex-1 relative min-w-0">
                 <NaverMap
+                    key={`step-${course?.coursePlaces?.[currentStep]?.order_index || currentStep}-${currentPlace.id}`}
                     places={mapPlaces as any}
                     userLocation={userLocation}
                     selectedPlace={null}
                     onPlaceClick={() => {}}
                     className="w-full h-full"
                     drawPath={Boolean(userLocation && (mapPlaces as any)?.length > 0)}
-                    routeMode="driving"
+                    routeMode="walking"
+                    numberedMarkers={true}
+                    nearFallbackStorageKey={`start-fallback-${courseId}`}
                 />
 
                 {/* 닫기 버튼: 코스 상세로 이동 */}
