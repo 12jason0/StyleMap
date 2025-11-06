@@ -16,6 +16,7 @@ const Header = () => {
     const [hasFavorites, setHasFavorites] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const [gardenUnlocked, setGardenUnlocked] = useState(false);
+    const [showComingSoon, setShowComingSoon] = useState<null | "forest" | "garden">(null);
     const pathname = usePathname();
     const router = useRouter();
     const menuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -377,31 +378,40 @@ const Header = () => {
                         >
                             지도
                         </Link>
-                        <Link
-                            href="/forest"
-                            className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                            onClick={closeMenu}
+                        <div
+                            className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
+                            onClick={() => {
+                                try { setIsMenuOpen(false); } catch {}
+                                setShowComingSoon("forest");
+                            }}
+                            title="곧 공개됩니다"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={() => {
+                                try { setIsMenuOpen(false); } catch {}
+                                setShowComingSoon("forest");
+                            }}
                         >
-                            숲
-                        </Link>
-                        {gardenUnlocked ? (
-                            <Link
-                                href="/garden"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                onClick={closeMenu}
-                            >
-                                정원
-                            </Link>
-                        ) : (
-                            <div
-                                className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-not-allowed flex items-center gap-2"
-                                title="첫 번째 나무를 완성하면 정원이 열려요"
-                                aria-disabled
-                            >
-                                <span>🔒</span>
-                                <span>정원 (잠김)</span>
-                            </div>
-                        )}
+                            <span>🔒</span>
+                            <span>숲</span>
+                        </div>
+                        <div
+                            className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
+                            onClick={() => {
+                                try { setIsMenuOpen(false); } catch {}
+                                setShowComingSoon("garden");
+                            }}
+                            title="곧 공개됩니다"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={() => {
+                                try { setIsMenuOpen(false); } catch {}
+                                setShowComingSoon("garden");
+                            }}
+                        >
+                            <span>🔒</span>
+                            <span>정원</span>
+                        </div>
                         <Link
                             href="/escape"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
@@ -549,6 +559,22 @@ const Header = () => {
                                 로그아웃
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {showComingSoon && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2100]" onClick={() => setShowComingSoon(null)}>
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-80 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                        <div className="text-center mb-4">
+                            <div className="text-lg font-bold text-gray-900 mb-2">comming soon</div>
+                            <p className="text-gray-600">곧 공개됩니다. 조금만 기다려 주세요!</p>
+                        </div>
+                        <button
+                            onClick={() => setShowComingSoon(null)}
+                            className="w-full px-4 py-2.5 bg-gray-900 text-white rounded-lg font-semibold hover:bg-gray-800 transition-all cursor-pointer"
+                        >
+                            닫기
+                        </button>
                     </div>
                 </div>
             )}

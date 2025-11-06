@@ -20,72 +20,7 @@ export default function Footer() {
         >
             <div className="max-w-7xl mx-auto px-4 py-2">
                 <nav className="flex items-center justify-around">
-                    <a
-                        href="/"
-                        aria-label="메인"
-                        title="메인"
-                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/") ? "bg-green-50" : ""}`}
-                        style={{ color: isActive("/") ? "#7aa06f" : "#99c08e" }}
-                    >
-                        <svg
-                            width="28"
-                            height="28"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <path d="M3 10.5L12 4l9 6.5" />
-                            <path d="M5 10.5V20h14V10.5" />
-                            <path d="M10 20v-5h4v5" />
-                        </svg>
-                    </a>
-                    <a
-                        href="/mypage"
-                        aria-label="마이페이지"
-                        title="마이페이지"
-                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/mypage") ? "bg-green-50" : ""}`}
-                        style={{ color: isActive("/mypage") ? "#7aa06f" : "#99c08e" }}
-                    >
-                        <svg
-                            width="28"
-                            height="28"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <circle cx="12" cy="8" r="3.5" />
-                            <path d="M4 20c1.8-4.4 6-5.5 8-5.5s6.2 1.1 8 5.5" />
-                        </svg>
-                    </a>
-                    <a
-                        href="/forest"
-                        aria-label="나무"
-                        title="나무"
-                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/forest") ? "bg-green-50" : ""}`}
-                        style={{ color: isActive("/forest") ? "#7aa06f" : "#99c08e" }}
-                    >
-                        <svg
-                            width="28"
-                            height="28"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <path d="M12 4l-4 5h8l-4-5z" />
-                            <path d="M12 8l-5 6h10l-5-6z" />
-                            <path d="M12 14v6" />
-                            <path d="M9 20h6" />
-                        </svg>
-                    </a>
+                    {/* 코스 */}
                     <a
                         href="/courses"
                         aria-label="코스"
@@ -108,6 +43,76 @@ export default function Footer() {
                             <path d="M15 6v13" />
                         </svg>
                     </a>
+                    {/* 맵 */}
+                    <a
+                        href="/map"
+                        aria-label="맵"
+                        title="맵"
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/map") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/map") ? "#7aa06f" : "#99c08e" }}
+                    >
+                        <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M15 9l-3 6-3-3 6-3z" />
+                            <circle cx="12" cy="12" r="1" />
+                        </svg>
+                    </a>
+                    {/* 홈 */}
+                    <a
+                        href="/"
+                        aria-label="메인"
+                        title="메인"
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/") ? "#7aa06f" : "#99c08e" }}
+                    >
+                        <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M3 10.5L12 4l9 6.5" />
+                            <path d="M5 10.5V20h14V10.5" />
+                            <path d="M10 20v-5h4v5" />
+                        </svg>
+                    </a>
+                    {/* 마이페이지 */}
+                    <a
+                        href="/mypage"
+                        aria-label="마이페이지"
+                        title="마이페이지"
+                        className={`p-2 rounded-md hover:bg-green-50 ${isActive("/mypage") ? "bg-green-50" : ""}`}
+                        style={{ color: isActive("/mypage") ? "#7aa06f" : "#99c08e" }}
+                    >
+                        <svg
+                            width="28"
+                            height="28"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <circle cx="12" cy="8" r="3.5" />
+                            <path d="M4 20c1.8-4.4 6-5.5 8-5.5s6.2 1.1 8 5.5" />
+                        </svg>
+                    </a>
+
+                    {/* Escape */}
                     <a
                         href="/escape"
                         aria-label="Escape"
