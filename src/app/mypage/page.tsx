@@ -846,7 +846,16 @@ const MyPage = () => {
                                 onClick={() => setSelectedBadge(b)}
                             >
                                 {b.image_url ? (
-                                    <img src={b.image_url} alt={b.name} className="w-20 h-20 object-contain mb-3" />
+                                    <div className="w-20 h-20 mb-3 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center">
+                                        <img
+                                            src={b.image_url}
+                                            alt={b.name}
+                                            className="w-full h-full object-contain"
+                                            onError={(e) => {
+                                                (e.currentTarget.style.display = "none");
+                                            }}
+                                        />
+                                    </div>
                                 ) : (
                                     <div className="w-20 h-20 mb-3 rounded-full bg-yellow-100 flex items-center justify-center text-3xl">
                                         🏅

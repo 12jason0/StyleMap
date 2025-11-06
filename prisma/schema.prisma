@@ -45,6 +45,7 @@ model User {
   waterLogs          WaterLog[]
   waterStock         Int      @default(0)  // ✅ 현재 보유한 물의 양
   totalWaterGiven    Int      @default(0)  // ✅ 지금까지 준 누적 물의 횟수 (통계용)
+  pushTokens         PushToken[] 
 
   @@index([provider, socialId])
   @@map("users")
@@ -94,6 +95,23 @@ model UserPreference {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
+}
+
+// 알람
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    Int      @unique
+  token     String
+  platform  String   @default("expo")
+  subscribed Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 model Course {

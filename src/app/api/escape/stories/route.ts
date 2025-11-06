@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/auth";
+import { sendPushNotificationToAll } from "@/lib/push-notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -108,5 +110,131 @@ export async function GET(request: NextRequest) {
     } catch (error) {
         console.error("Failed to fetch stories:", error);
         return NextResponse.json({ error: "Failed to fetch stories" }, { status: 500 });
+    }
+}
+
+// 새 스토리 생성
+export async function POST(request: NextRequest) {
+    try {
+        // 관리자만 허용: /api/admin/auth 에서 발급한 쿠키 검사
+        const isAdmin = request.cookies.get("admin_auth")?.value === "true";
+        if (!isAdmin) {
+            return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
+        }
+
+        const body = await request.json().catch(() => ({}));
+        const {
+            title,
+            synopsis,
+            region,
+            estimated_duration_min,
+            price,
+            reward_badge_id,
+            imageUrl,
+            level,
+            epilogue_text,
+            stationName,
+            stationLat,
+            stationLng,
+            scenario,
+        } = body || {};
+
+        if (!title || typeof title !== "string") {
+            return NextResponse.json({ error: "스토리 제목은 필수입니다." }, { status: 400 });
+        }
+
+        const created = await prisma.story.create({
+            data: {
+                title,
+                synopsis: synopsis ?? null,
+                region: region ?? null,
+                estimated_duration_min: Number.isFinite(Number(estimated_duration_min))
+                    ? Number(estimated_duration_min)
+                    : null,
+                price: price != null ? String(price) : null,
+                reward_badge_id: Number.isFinite(Number(reward_badge_id)) ? Number(reward_badge_id) : null,
+                imageUrl: imageUrl ?? null,
+                level: Number.isFinite(Number(level)) ? Number(level) : 1,
+                epilogue_text: epilogue_text ?? null,
+                stationName: stationName ?? null,
+                stationLat: Number.isFinite(Number(stationLat)) ? Number(stationLat) : null,
+                stationLng: Number.isFinite(Number(stationLng)) ? Number(stationLng) : null,
+                scenario: scenario ?? null,
+                is_active: true,
+            },
+            select: {
+                id: true,
+                title: true,
+                synopsis: true,
+                region: true,
+                estimated_duration_min: true,
+                price: true,
+                reward_badge_id: true,
+                imageUrl: true,
+                level: true,
+                epilogue_text: true,
+                created_at: true,
+            },
+        });
+
+        // 🔔 스토리 생성 푸시 알림 전송 (실패해도 생성은 성공 처리)
+        try {
+            await sendPushNotificationToAll("새로운 스토리가 열렸어요! 🎉", `${created.title} - 바로 확인해보세요`, {
+                screen: "escape",
+                storyId: created.id,
+            });
+            console.log("스토리 푸시 전송 성공:", created.title);
+        } catch (err) {
+            console.error("스토리 푸시 전송 실패:", err);
+        }
+
+        return NextResponse.json({ success: true, story: created }, { status: 201 });
+    } catch (error) {
+        console.error("스토리 생성 실패:", error);
+        return NextResponse.json({ error: "스토리 생성 실패" }, { status: 500 });
+    }
+}
+
+// 스토리 수정 (관리자)
+export async function PUT(request: NextRequest) {
+    try {
+        const isAdmin = request.cookies.get("admin_auth")?.value === "true";
+        if (!isAdmin) {
+            return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
+        }
+        const body = await request.json().catch(() => ({}));
+        const { id, ...patch } = body || {};
+        const storyId = Number(id);
+        if (!Number.isFinite(storyId)) {
+            return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
+        }
+        const data: any = {};
+        if (patch.title !== undefined) data.title = String(patch.title);
+        if (patch.synopsis !== undefined) data.synopsis = patch.synopsis ?? null;
+        if (patch.region !== undefined) data.region = patch.region ?? null;
+        if (patch.estimated_duration_min !== undefined)
+            data.estimated_duration_min = Number.isFinite(Number(patch.estimated_duration_min))
+                ? Number(patch.estimated_duration_min)
+                : null;
+        if (patch.price !== undefined) data.price = patch.price != null ? String(patch.price) : null;
+        if (patch.reward_badge_id !== undefined)
+            data.reward_badge_id = Number.isFinite(Number(patch.reward_badge_id))
+                ? Number(patch.reward_badge_id)
+                : null;
+        if (patch.imageUrl !== undefined) data.imageUrl = patch.imageUrl ?? null;
+        if (patch.level !== undefined) data.level = Number.isFinite(Number(patch.level)) ? Number(patch.level) : 1;
+        if (patch.epilogue_text !== undefined) data.epilogue_text = patch.epilogue_text ?? null;
+        if (patch.stationName !== undefined) data.stationName = patch.stationName ?? null;
+        if (patch.stationLat !== undefined)
+            data.stationLat = Number.isFinite(Number(patch.stationLat)) ? Number(patch.stationLat) : null;
+        if (patch.stationLng !== undefined)
+            data.stationLng = Number.isFinite(Number(patch.stationLng)) ? Number(patch.stationLng) : null;
+        if (patch.scenario !== undefined) data.scenario = patch.scenario ?? null;
+
+        const updated = await prisma.story.update({ where: { id: storyId }, data, select: { id: true, title: true } });
+        return NextResponse.json({ success: true, story: updated });
+    } catch (error) {
+        console.error("스토리 수정 실패:", error);
+        return NextResponse.json({ error: "스토리 수정 실패" }, { status: 500 });
     }
 }

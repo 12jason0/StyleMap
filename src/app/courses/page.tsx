@@ -2,7 +2,7 @@
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ImageFallback";
 
 interface Course {
     id: string;
@@ -180,18 +180,14 @@ function CoursesPageInner() {
                         >
                             {/* 이미지 */}
                             <div className="relative h-36 rounded-t-2xl overflow-hidden">
-                                {course.imageUrl ? (
-                                    <Image
-                                        src={course.imageUrl}
-                                        alt={course.title}
-                                        fill
-                                        sizes="100vw"
-                                        priority={idx === 0}
-                                        className="object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full bg-white" />
-                                )}
+                                <Image
+                                    src={course.imageUrl || ""}
+                                    alt={course.title}
+                                    fill
+                                    sizes="100vw"
+                                    priority={idx === 0}
+                                    className="object-cover"
+                                />
                                 <div className="absolute top-3 right-3 bg-emerald-600 text-white text-xs px-2 py-1 rounded-full font-medium">
                                     {course.concept}
                                 </div>

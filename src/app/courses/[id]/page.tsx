@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffectOnce } from "react-use";
-import Image from "next/image";
+import Image from "@/components/ImageFallback";
 import dynamic from "next/dynamic";
 
 import { Place as MapPlace, UserLocation } from "@/types/map";

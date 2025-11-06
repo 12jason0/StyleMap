@@ -99,6 +99,17 @@ export default function AdminPage() {
     const [linkRecommendedTime, setLinkRecommendedTime] = useState<string>("");
     const [linkNotes, setLinkNotes] = useState<string>("");
 
+    // Escape Story creation state
+    const [storyForm, setStoryForm] = useState({
+        title: "",
+        synopsis: "",
+        region: "",
+        level: "",
+        imageUrl: "",
+    });
+    const [storySubmitting, setStorySubmitting] = useState(false);
+    const [storyResult, setStoryResult] = useState<string | null>(null);
+
     const fetchCourses = async () => {
         try {
             setLoading(true);
@@ -495,9 +506,49 @@ export default function AdminPage() {
         setAdminAuthed(false);
     };
 
+    const handleStoryChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setStoryForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleCreateStory = async (e: FormEvent) => {
+        e.preventDefault();
+        setStorySubmitting(true);
+        setStoryResult(null);
+        try {
+            const payload: any = {
+                title: storyForm.title.trim(),
+                synopsis: storyForm.synopsis.trim() || undefined,
+                region: storyForm.region.trim() || undefined,
+                level: storyForm.level ? Number(storyForm.level) : undefined,
+                imageUrl: storyForm.imageUrl.trim() || undefined,
+            };
+            if (!payload.title) {
+                setStoryResult("❌ 제목은 필수입니다.");
+                return;
+            }
+            const res = await fetch("/api/escape/stories", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                setStoryResult(`✅ 스토리 생성 완료 (ID: ${data?.story?.id ?? "?"})`);
+                setStoryForm({ title: "", synopsis: "", region: "", level: "", imageUrl: "" });
+            } else {
+                setStoryResult(`❌ 실패: ${data?.error || "스토리 생성 실패"}`);
+            }
+        } catch (err) {
+            setStoryResult("❌ 네트워크 오류가 발생했습니다.");
+        } finally {
+            setStorySubmitting(false);
+        }
+    };
+
     return (
         <>
-            <main className="max-w-7xl mx-auto px-4 py-8 pt-24 text-black">
+            <main className="max-w-7xl mx-auto px-4 py-8 text-black">
                 {adminAuthLoading ? (
                     <div className="text-center text-gray-600">관리자 인증 확인 중...</div>
                 ) : !adminAuthed ? (
@@ -527,9 +578,20 @@ export default function AdminPage() {
                         </form>
                     </div>
                 ) : null}
+                <div className="text-center">
+                    <a href="/admin/notifications" className="text-blue-500">
+                        홍보 알람 보내기
+                    </a>
+                </div>
+                <div className="text-center">
+                    <a href="/admin/escape-stories" className="text-blue-500">
+                        escape 스토리 생성
+                    </a>
+                </div>
 
                 {adminAuthed && (
                     <>
+                        {/* Escape Story Creation moved to /admin/escape-stories */}
                         <div className="flex items-center justify-between mb-2">
                             <h1 className="text-3xl font-bold text-gray-900">관리자 페이지</h1>
                             <button

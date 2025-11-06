@@ -54,11 +54,16 @@ export default function AppInstallQR({
 
                 {/* 선택된 QR만 표시 */}
                 <div className="flex flex-col items-center gap-2">
-                    <img
-                        alt={isApple ? "App Store QR" : "Google Play QR"}
-                        className="w-full max-w-[220px] h-auto"
-                        src={qrSrc(currentUrl)}
-                    />
+                    <div className="w-full max-w-[220px] aspect-square bg-gray-200 rounded overflow-hidden flex items-center justify-center">
+                        <img
+                            alt={isApple ? "App Store QR" : "Google Play QR"}
+                            className="w-full h-full object-contain"
+                            src={qrSrc(currentUrl)}
+                            onError={(e) => {
+                                (e.currentTarget.style.display = "none");
+                            }}
+                        />
+                    </div>
                     <span className="text-xs text-gray-600">{isApple ? "App Store" : "Google Play"}</span>
                 </div>
 

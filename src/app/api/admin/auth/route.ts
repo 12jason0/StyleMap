@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 const COOKIE_NAME = "admin_auth";
 const COOKIE_TTL_SEC = 60 * 60 * 12; // 12h
 
-function isAuthenticated(): boolean {
-    const jar = cookies();
+async function isAuthenticated(): Promise<boolean> {
+    const jar = await cookies();
     const cookie = jar.get(COOKIE_NAME);
     return cookie?.value === "true";
 }
 
 export async function GET() {
-    const ok = isAuthenticated();
+    const ok = await isAuthenticated();
     return NextResponse.json({ authenticated: ok });
 }
 

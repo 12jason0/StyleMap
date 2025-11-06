@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import Image from "next/image";
+import Image from "@/components/ImageFallback";
 
 export type SliderItem = {
     id: string;
@@ -105,19 +105,14 @@ export default function HeroSlider({ items }: HeroSliderProps) {
                             }`}
                         >
                             <div className="absolute inset-0">
-                                {item.imageUrl ? (
-                                    <Image
-                                        src={item.imageUrl}
-                                        alt={item.location || "slide"}
-                                        fill
-                                        priority={index === currentSlide}
-                                        // 이미지가 컨테이너 좌우 패딩(px-4 → 1rem * 2)으로 전체 2rem이 줄어듭니다.
-                                        sizes="(max-width: 1280px) calc(100vw - 2rem), 1280px"
-                                        className="object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full bg-white" />
-                                )}
+                                <Image
+                                    src={item.imageUrl || ""}
+                                    alt={item.location || "slide"}
+                                    fill
+                                    priority={index === currentSlide}
+                                    sizes="(max-width: 1280px) calc(100vw - 2rem), 1280px"
+                                    className="object-cover"
+                                />
                                 <div className="absolute inset-0 bg-black/50" />
                             </div>
                             <div className="absolute bottom-6 right-6 left-6 text-right">

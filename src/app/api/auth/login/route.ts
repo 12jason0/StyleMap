@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
         }
 
-        const user = { id: found.id, email: found.email, password: found.password, nickname: found.nickname } as any;
+        const user = { id: found.id, email: found.email, password: found.password, nickname: found.username } as any;
         console.log("사용자 찾음:", { id: user.id, email: user.email, nickname: user.nickname });
 
         // 비밀번호 검증

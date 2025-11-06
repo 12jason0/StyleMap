@@ -1,6 +1,6 @@
 import "react-native-gesture-handler";
 import React, { createContext, useEffect, useMemo, useState } from "react";
-import { NavigationContainer, DefaultTheme, Theme } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, Theme, LinkingOptions } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import MapScreen from "./src/screens/MapScreen";
 import MyPageScreen from "./src/screens/MyPageScreen";
 import EscapeScreen from "./src/screens/EscapeScreen";
 import { registerForPushNotificationsAsync } from "./src/notifications";
+import { registerPushTokenToServer } from "./src/api";
 
 const Tab = createBottomTabNavigator();
 
@@ -28,11 +29,26 @@ export default function App() {
     (async () => {
       const t = await registerForPushNotificationsAsync();
       setPushToken(t);
+      try { await registerPushTokenToServer(t || null); } catch {}
     })();
   }, []);
 
+  const linking: LinkingOptions<ReactNavigation.RootParamList> = {
+    prefixes: ["stylemap://", "https://dona.io.kr"],
+    // 탭 라우트 선택만 처리하고, 각 탭은 WebView에서 해당 경로를 로드
+    subscribe(listener) {
+      const onReceiveURL = ({ url }: { url: string }) => listener(url);
+      const subscription = (Linking as any).addEventListener("url", onReceiveURL);
+      return () => subscription.remove();
+    },
+    getInitialURL: async () => {
+      const url = await (Linking as any).getInitialURL?.();
+      return url ?? "stylemap://";
+    },
+  } as any;
+
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer theme={navTheme} linking={linking}>
       <StatusBar style="dark" />
       <PushTokenContext.Provider value={pushToken}>
       <Tab.Navigator

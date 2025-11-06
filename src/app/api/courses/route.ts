@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { filterCoursesByImagePolicy, type ImagePolicy, type CourseWithPlaces } from "@/lib/imagePolicy";
+import { sendPushNotificationToAll } from "@/lib/push-notifications";
 import { getUserIdFromRequest } from "@/lib/auth";
 import { getUserPreferenceSet } from "@/lib/userProfile";
 import { defaultCache } from "@/lib/cache";
@@ -201,6 +202,18 @@ export async function POST(request: NextRequest) {
 
         // 캐시 무효화: 간단히 전체 키 삭제
         defaultCache.clear?.();
+
+        // 🔔 모든 사용자에게 푸시 알림 보내기
+        try {
+            await sendPushNotificationToAll("새로운 코스가 추가되었어요! 🎉", `${created.title} - 지금 확인해보세요`, {
+                screen: "courses",
+                courseId: created.id,
+            });
+            console.log("푸시 알림 전송 성공:", created.title);
+        } catch (error) {
+            console.error("푸시 알림 전송 실패:", error);
+            // 알림 실패해도 코스 생성은 성공으로 처리
+        }
 
         return NextResponse.json({ success: true, course: created }, { status: 201 });
     } catch (error) {

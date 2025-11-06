@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { fetchWeekStamps, getLocalTodayKey, postCheckin } from "@/lib/checkinClient";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
+import Image from "@/components/ImageFallback";
 import SectionHeader from "@/components/SectionHeader";
 import HeroSlider from "@/components/HeroSlider";
 import OnboardingSection from "@/components/OnboardingSection";

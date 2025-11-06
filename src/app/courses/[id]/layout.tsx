@@ -10,7 +10,7 @@ export default function CoursesIdLayout({ children }: { children: React.ReactNod
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
+import Image from "@/components/ImageFallback";
 import dynamic from "next/dynamic";
 
 import ReviewModal from "@/components/ReviewModal";
@@ -713,18 +713,14 @@ function CourseDetailPage() {
                 {/* Hero Section */}
                 <section className="relative h-[360px] md:h-[520px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
-                        {heroImageUrl ? (
-                            <Image
-                                src={heroImageUrl}
-                                alt={courseData.title}
-                                fill
-                                priority
-                                sizes="100vw"
-                                className="object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gray-200" />
-                        )}
+                        <Image
+                            src={heroImageUrl || ""}
+                            alt={courseData.title}
+                            fill
+                            priority
+                            sizes="100vw"
+                            className="object-cover"
+                        />
                         <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
                     </div>
 

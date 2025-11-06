@@ -391,11 +391,11 @@ const Header = () => {
                                 try { setIsMenuOpen(false); } catch {}
                                 setShowComingSoon("forest");
                             }}
-                        >
+                            >
                             <span>🔒</span>
                             <span>숲</span>
                         </div>
-                        <div
+                            <div
                             className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
                             onClick={() => {
                                 try { setIsMenuOpen(false); } catch {}
@@ -408,10 +408,10 @@ const Header = () => {
                                 try { setIsMenuOpen(false); } catch {}
                                 setShowComingSoon("garden");
                             }}
-                        >
-                            <span>🔒</span>
+                            >
+                                <span>🔒</span>
                             <span>정원</span>
-                        </div>
+                            </div>
                         <Link
                             href="/escape"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
