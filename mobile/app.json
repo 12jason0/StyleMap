@@ -1,0 +1,25 @@
+{
+    "expo": {
+        "name": "StyleMap",
+        "slug": "stylemap",
+        "scheme": "stylemap",
+        "version": "0.1.0",
+        "orientation": "portrait",
+        "userInterfaceStyle": "automatic",
+        "updates": {
+            "fallbackToCacheTimeout": 0
+        },
+        "assetBundlePatterns": ["**/*"],
+        "ios": {
+            "supportsTablet": true
+        },
+        "android": {
+            "adaptiveIcon": {
+                "backgroundColor": "#ffffff"
+            }
+        },
+        "web": {
+            "bundler": "metro"
+        }
+    }
+}
