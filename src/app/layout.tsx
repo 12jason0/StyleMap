@@ -13,8 +13,33 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-    title: "DoNa",
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dona.local"),
+    title: {
+        default: "DoNa",
+        template: "%s · DoNa",
+    },
     description: "두나 - 당신만의 여행 코스",
+    openGraph: {
+        type: "website",
+        siteName: "DoNa",
+        title: "DoNa",
+        description: "두나 - 당신만의 여행 코스",
+        url: process.env.NEXT_PUBLIC_SITE_URL || "https://stylemap.local",
+        images: [
+            {
+                url: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",
+                width: 512,
+                height: 512,
+                alt: "DoNa",
+            },
+        ],
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "DoNa",
+        description: "두나 - 당신만의 여행 코스",
+        images: ["https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"],
+    },
     verification: {
         other: { "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1" },
     },
