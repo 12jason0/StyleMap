@@ -495,6 +495,64 @@ function MapPageInner() {
         });
     }, []);
 
+    // 더 정확한 위치: 고정밀 + 최대한 최신 값
+    const getPreciseLocation = useCallback(async (): Promise<{ lat: number; lng: number } | null> => {
+        if (!navigator.geolocation) return null;
+        // 우선 고정밀 단발 요청
+        const preciseOnce = () =>
+            new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                    (err) => reject(err),
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            });
+        try {
+            return await preciseOnce();
+        } catch {
+            // watchPosition로 1회 수신 시도 (일부 브라우저에서 더 빨라질 수 있음)
+            try {
+                return await new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+                    const watchId = navigator.geolocation.watchPosition(
+                        (pos) => {
+                            try {
+                                navigator.geolocation.clearWatch(watchId);
+                            } catch {}
+                            resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                        },
+                        (err) => {
+                            try {
+                                navigator.geolocation.clearWatch(watchId);
+                            } catch {}
+                            reject(err);
+                        },
+                        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                    );
+                });
+            } catch {
+                return null;
+            }
+        }
+    }, []);
+
+    const distanceMeters = useCallback((a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+        try {
+            const R = 6371e3;
+            const toRad = (v: number) => (v * Math.PI) / 180;
+            const dLat = toRad(b.lat - a.lat);
+            const dLng = toRad(b.lng - a.lng);
+            const lat1 = toRad(a.lat);
+            const lat2 = toRad(b.lat);
+            const s =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+            return R * c;
+        } catch {
+            return Infinity;
+        }
+    }, []);
+
     useEffect(() => {
         if (!mapsReady) return; // 지도 SDK 준비 후 최초 데이터 로드 실행
         (async () => {
@@ -503,6 +561,16 @@ function MapPageInner() {
                 setUserLocation(loc);
                 setCenter(loc);
                 fetchPlacesAndCourses(loc, undefined, { limit: 50, skipCourses: true });
+                // 고정밀 위치가 오면 큰 차이일 때만 보정
+                try {
+                    const precise = await getPreciseLocation();
+                    if (precise && Number.isFinite(precise.lat) && Number.isFinite(precise.lng)) {
+                        setUserLocation(precise);
+                        if (distanceMeters(loc, precise) > 120) {
+                            setCenter(precise);
+                        }
+                    }
+                } catch {}
             } catch {
                 // 위치 권한 실패 시: 초기에는 검색을 수행하지 않고 사용자 조작을 기다림
                 setError("현재 위치를 가져오지 못했습니다. 위치 권한을 허용하거나 상단 검색을 이용하세요.");
@@ -510,7 +578,7 @@ function MapPageInner() {
                 setCourses([]);
             }
         })();
-    }, [mapsReady, fetchPlacesAndCourses, getQuickLocation]);
+    }, [mapsReady, fetchPlacesAndCourses, getQuickLocation, getPreciseLocation, distanceMeters]);
 
     // 패널이 열릴 때 지도 중심을 패널을 제외한 영역의 시각적 중앙으로 보정
     useEffect(() => {
@@ -902,6 +970,36 @@ function MapPageInner() {
                                 position={new navermaps.LatLng(userLocation.lat, userLocation.lng)}
                                 title="현재 위치"
                                 zIndex={300}
+                                icon={{
+                                    content: `
+                <div style="position: relative; width: 40px; height: 50px;">
+                    <div style="
+                        width: 40px; 
+                        height: 40px; 
+                        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+                        border: 3px solid white; 
+                        border-radius: 50%;
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center;
+                        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+                        font-size: 20px;
+                    ">📍</div>
+                    <div style="
+                        position: absolute;
+                        bottom: 0;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        width: 0;
+                        height: 0;
+                        border-left: 8px solid transparent;
+                        border-right: 8px solid transparent;
+                        border-top: 10px solid #059669;
+                    "></div>
+                </div>`,
+                                    size: new navermaps.Size(40, 50),
+                                    anchor: new navermaps.Point(20, 50),
+                                }}
                             />
                         )}
                         {(selectedPlace ? [selectedPlace] : filteredPlaces).map((place, idx) => {
@@ -1021,7 +1119,9 @@ function MapPageInner() {
                         onClick={() => {
                             (async () => {
                                 try {
-                                    const loc = await getQuickLocation();
+                                    // 버튼 눌렀을 때는 고정밀 우선 시도, 실패 시 빠른 위치로 폴백
+                                    const precise = await getPreciseLocation();
+                                    const loc = precise ?? (await getQuickLocation());
                                     setUserLocation(loc);
                                     setCenter(loc);
                                     setZoom(15);

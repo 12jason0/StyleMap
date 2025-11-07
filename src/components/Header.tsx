@@ -378,48 +378,7 @@ const Header = () => {
                         >
                             지도
                         </Link>
-                        <div
-                            className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
-                            onClick={() => {
-                                try {
-                                    setIsMenuOpen(false);
-                                } catch {}
-                                setShowComingSoon("forest");
-                            }}
-                            title="곧 공개됩니다"
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={() => {
-                                try {
-                                    setIsMenuOpen(false);
-                                } catch {}
-                                setShowComingSoon("forest");
-                            }}
-                        >
-                            <span>🔒</span>
-                            <span>숲</span>
-                        </div>
-                        <div
-                            className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
-                            onClick={() => {
-                                try {
-                                    setIsMenuOpen(false);
-                                } catch {}
-                                setShowComingSoon("garden");
-                            }}
-                            title="곧 공개됩니다"
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={() => {
-                                try {
-                                    setIsMenuOpen(false);
-                                } catch {}
-                                setShowComingSoon("garden");
-                            }}
-                        >
-                            <span>🔒</span>
-                            <span>정원</span>
-                        </div>
+
                         <Link
                             href="/escape"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
@@ -462,6 +421,48 @@ const Header = () => {
                                     </Link>
                                 </>
                             )}
+                        </div>
+                        <div
+                            className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
+                            onClick={() => {
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
+                                setShowComingSoon("forest");
+                            }}
+                            title="곧 공개됩니다"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={() => {
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
+                                setShowComingSoon("forest");
+                            }}
+                        >
+                            <span>🔒</span>
+                            <span>숲</span>
+                        </div>
+                        <div
+                            className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
+                            onClick={() => {
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
+                                setShowComingSoon("garden");
+                            }}
+                            title="곧 공개됩니다"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={() => {
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
+                                setShowComingSoon("garden");
+                            }}
+                        >
+                            <span>🔒</span>
+                            <span>정원</span>
                         </div>
 
                         {/* 하단 고정: 서비스 소개 / 이용안내 */}

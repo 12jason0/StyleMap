@@ -328,23 +328,33 @@ export default function NaverMapComponent({
         let didExtend = false;
 
         const createUserLocationContent = () => {
-            const size = 36;
+            const size = 40;
             return `
-		<div style="position: relative; width: ${size}px; height: ${size + 10}px;">
-			<div style="
-				width: ${size}px; height: ${size}px; background: var(--brand-green, #10B981);
-				border: 2px solid white; border-radius: 50%;
-				display: flex; align-items: center; justify-content: center;
-				box-shadow: 0 2px 8px rgba(0,0,0,.25);
-			">
-				<div style="
-					width: 12px; height: 12px; background: white; border-radius: 50%;
-					box-shadow: 0 0 4px rgba(0,0,0,.2);
-				"></div>
-			</div>
-			<div style="position:absolute;left:50%;bottom:0;transform:translate(-50%,0);width:0;height:0;
-				border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--brand-green, #10B981);"></div>
-		</div>`;
+                <div style="position: relative; width: ${size}px; height: ${size + 10}px;">
+                    <div style="
+                        width: ${size}px; 
+                        height: ${size}px; 
+                        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+                        border: 3px solid white; 
+                        border-radius: 50%;
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center;
+                        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+                        font-size: 20px;
+                    ">📍</div>
+                    <div style="
+                        position: absolute;
+                        bottom: 0;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        width: 0;
+                        height: 0;
+                        border-left: 8px solid transparent;
+                        border-right: 8px solid transparent;
+                        border-top: 10px solid #059669;
+                    "></div>
+                </div>`;
         };
 
         // 사용자 위치

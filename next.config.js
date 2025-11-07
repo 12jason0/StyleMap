@@ -23,15 +23,17 @@ const nextConfig = {
                                 "'self'",
                                 "'unsafe-inline'",
                                 ...(isDev ? ["'unsafe-eval'"] : []),
-                                "https://vercel.live", // ✅ 추가
-                                "https://*.vercel.live", // ✅ 추가
+                                "https://vercel.live",
+                                "https://*.vercel.live",
                                 "https://oapi.map.naver.com",
                                 "https://openapi.map.naver.com",
                                 "https://ssl.pstatic.net",
-                                "https://nrbe.pstatic.net", // ✅ 추가
-                                "https://*.pstatic.net", // ✅ 추가 (모든 pstatic.net 서브도메인 허용)
+                                "https://nrbe.pstatic.net",
+                                "https://*.pstatic.net",
                                 "https://www.googletagmanager.com",
                                 "https://www.google-analytics.com",
+                                "https://t1.kakaocdn.net", // 👈 카카오 SDK 추가
+                                "https://developers.kakao.com", // 👈 카카오 개발자 추가
                                 ...(isDev ? ["http://oapi.map.naver.com", "http://nrbe.map.naver.net"] : []),
                             ].join(" ");
                             const styleSrc = [
@@ -45,10 +47,10 @@ const nextConfig = {
                             );
                             const connectSrc = [
                                 "'self'",
-                                "https://vercel.live", // ✅ 추가
-                                "https://*.vercel.live", // ✅ 추가
-                                "https://nrbe.pstatic.net", // ✅ 추가
-                                "https://*.pstatic.net", // ✅ 추가
+                                "https://vercel.live",
+                                "https://*.vercel.live",
+                                "https://nrbe.pstatic.net",
+                                "https://*.pstatic.net",
                                 "https://oapi.map.naver.com",
                                 "https://openapi.map.naver.com",
                                 "https://naveropenapi.apigw.ntruss.com",
@@ -58,6 +60,9 @@ const nextConfig = {
                                 "https://analytics.google.com",
                                 "https://stats.g.doubleclick.net",
                                 "https://region1.google-analytics.com",
+                                "https://*.kakao.com", // 👈 카카오 API 추가
+                                "https://kauth.kakao.com", // 👈 카카오 인증 추가
+                                "https://t1.kakaocdn.net", // 👈 카카오 CDN 추가
                                 ...(isDev
                                     ? [
                                           "http://oapi.map.naver.com",
@@ -67,11 +72,9 @@ const nextConfig = {
                                     : []),
                             ].join(" ");
                             const fontSrc = ["'self'", "data:", "https://cdn.jsdelivr.net"].join(" ");
-                            const frameSrc = [
-                                "'self'",
-                                "https://vercel.live", // ✅ 추가
-                                "https://www.googletagmanager.com",
-                            ].join(" ");
+                            const frameSrc = ["'self'", "https://vercel.live", "https://www.googletagmanager.com"].join(
+                                " "
+                            );
                             return (
                                 `default-src 'self'; ` +
                                 `script-src ${scriptSrc}; ` +
