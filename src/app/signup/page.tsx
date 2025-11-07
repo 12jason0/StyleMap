@@ -12,6 +12,9 @@ const Signup = () => {
         password: "",
         confirmPassword: "",
         nickname: "",
+        phone: "",
+        birthday: "", // YYYY-MM-DD
+        ageRange: "", // e.g., 10대/20대/30대/40대/50대+
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -53,6 +56,9 @@ const Signup = () => {
                     email: formData.email,
                     password: formData.password,
                     nickname: formData.nickname.trim(),
+                    phone: formData.phone.trim() || undefined,
+                    birthday: formData.birthday.trim() || undefined,
+                    ageRange: formData.ageRange || undefined,
                 }),
             });
 
@@ -259,6 +265,54 @@ const Signup = () => {
                                 required
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
                             />
+                        </div>
+                        <div>
+                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                                전화번호 (선택)
+                            </label>
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                placeholder="010-0000-0000"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label htmlFor="birthday" className="block text-sm font-medium text-gray-700 mb-1">
+                                    생일 (선택)
+                                </label>
+                                <input
+                                    type="date"
+                                    id="birthday"
+                                    name="birthday"
+                                    value={formData.birthday}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="ageRange" className="block text-sm font-medium text-gray-700 mb-1">
+                                    연령대 (선택)
+                                </label>
+                                <select
+                                    id="ageRange"
+                                    name="ageRange"
+                                    value={formData.ageRange}
+                                    onChange={(e) => handleChange(e as any)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white focus:ring-emerald-500 focus:border-emerald-500"
+                                >
+                                    <option value="">선택 없음</option>
+                                    <option value="10대">10대</option>
+                                    <option value="20대">20대</option>
+                                    <option value="30대">30대</option>
+                                    <option value="40대">40대</option>
+                                    <option value="50대+">50대+</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">

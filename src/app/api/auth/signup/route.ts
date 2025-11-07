@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
     try {
-        const { email, password, nickname } = await request.json();
-        console.log("회원가입 시도:", { email, nickname });
+        const { email, password, nickname, phone, birthday, ageRange } = await request.json();
+        console.log("회원가입 시도:", { email, nickname, phone, birthday, ageRange });
 
         // 입력 검증
         if (!email || !password || !nickname) {
@@ -31,8 +31,33 @@ export async function POST(request: NextRequest) {
         if (existing) return NextResponse.json({ error: "이미 사용 중인 이메일입니다." }, { status: 409 });
 
         const hashedPassword = await bcrypt.hash(password, 12);
+
+        // 선택 항목 정리 및 나이 계산
+        const trimmedPhone = typeof phone === "string" && phone.trim() ? phone.trim() : undefined;
+        const trimmedAgeRange = typeof ageRange === "string" && ageRange.trim() ? ageRange.trim() : undefined;
+        const birthdayTs = typeof birthday === "string" && birthday.trim() ? Date.parse(birthday.trim()) : NaN;
+        const birthdayDate = Number.isNaN(birthdayTs) ? undefined : new Date(birthdayTs);
+
+        let computedAge: number | undefined = undefined;
+        if (birthdayDate) {
+            const now = new Date();
+            let age = now.getFullYear() - birthdayDate.getFullYear();
+            const m = now.getMonth() - birthdayDate.getMonth();
+            if (m < 0 || (m === 0 && now.getDate() < birthdayDate.getDate())) age--;
+            if (Number.isFinite(age) && age >= 0 && age <= 120) computedAge = age;
+        }
+
         const created = await (prisma as any).user.create({
-            data: { email, password: hashedPassword, nickname, provider: "local" },
+            data: {
+                email,
+                password: hashedPassword,
+                nickname,
+                provider: "local",
+                phone: trimmedPhone,
+                ageRange: trimmedAgeRange,
+                birthday: birthdayDate,
+                age: computedAge,
+            },
             select: { id: true, email: true, nickname: true },
         });
 

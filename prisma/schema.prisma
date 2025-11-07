@@ -18,6 +18,10 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   mbti               String?             @db.VarChar(20)
+  // 신규: 연락처/생년월일/연령대
+  phone              String?             @db.VarChar(30)
+  birthday           DateTime?
+  ageRange           String?             @db.VarChar(20)
   age                Int?
   coinBalance        Int                 @default(0)
   couponCount        Int                 @default(0)
