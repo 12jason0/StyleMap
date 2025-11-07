@@ -63,6 +63,8 @@ const nextConfig = {
                                 "https://*.kakao.com", // 👈 카카오 API 추가
                                 "https://kauth.kakao.com", // 👈 카카오 인증 추가
                                 "https://t1.kakaocdn.net", // 👈 카카오 CDN 추가
+                                "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com",
+                                "https://*.amazonaws.com",
                                 ...(isDev
                                     ? [
                                           "http://oapi.map.naver.com",
