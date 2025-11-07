@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
             category: p.category?.join(", "),
             phone: p.phone,
             website: p.site,
-            imageUrl: p.thumUrl || "/images/placeholder-location.jpg", // 썸네일 이미지가 있으면 사용
+            imageUrl: p.thumUrl || "", // 빈 값이면 프론트에서 회색 placeholder
             latitude: parseFloat(p.y), // 위도
             longitude: parseFloat(p.x), // 경도
         }));

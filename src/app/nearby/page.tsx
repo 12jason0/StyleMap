@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "@/components/ImageFallback";
 
 type Course = {
     id: string;
@@ -158,7 +159,7 @@ export default function NearbyPage() {
                             >
                                 초기화
                             </button>
-                        </div>  
+                        </div>
 
                         {loading ? (
                             <div className="p-8 text-center text-gray-500">불러오는 중...</div>
@@ -174,19 +175,13 @@ export default function NearbyPage() {
                                             prefetch={true}
                                             className="block border border-gray-200 rounded-2xl p-4 hover:bg-gray-50 transition-colors"
                                         >
-                                            <div className="w-full h-40 rounded-xl overflow-hidden bg-gray-100 mb-3">
-                                                {c.imageUrl ? (
-                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                    <img
-                                                        src={c.imageUrl}
-                                                        alt={c.title}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-2xl">
-                                                        📷
-                                                    </div>
-                                                )}
+                                            <div className="w-full h-40 rounded-xl overflow-hidden bg-gray-100 mb-3 relative">
+                                                <Image
+                                                    src={c.imageUrl || ""}
+                                                    alt={c.title}
+                                                    fill
+                                                    className="object-cover"
+                                                />
                                             </div>
                                             <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{c.title}</h3>
                                             <div className="text-xs text-gray-500 flex flex-wrap gap-3">

@@ -433,7 +433,7 @@ function CourseDetailPage() {
 
             console.log("Final Course Data:", finalCourseData);
             setCourseData(finalCourseData);
-            document.title = `StyleMap | ${finalCourseData.title}`;
+            document.title = `DoNa | ${finalCourseData.title}`;
         } catch (err) {
             console.error("Error fetching course data:", err);
             setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -532,9 +532,12 @@ function CourseDetailPage() {
                 Kakao.init(jsKey);
             }
 
-            const shareImage = heroImageUrl || courseData?.imageUrl || "/images/placeholder-location.jpg";
-            const title = courseData?.title || "StyleMap 코스";
-            const desc = courseData?.description || "StyleMap에서 코스를 확인해 보세요";
+            const shareImage =
+                heroImageUrl ||
+                courseData?.imageUrl ||
+                "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png";
+            const title = courseData?.title || "DoNa 코스";
+            const desc = courseData?.description || "DoNa에서 코스를 확인해 보세요";
 
             Kakao.Share.sendDefault({
                 objectType: "feed",

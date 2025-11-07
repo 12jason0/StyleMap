@@ -39,7 +39,7 @@ const ContactPage = () => {
 
                     <div className="mb-8">
                         <p className="text-lg text-gray-700 mb-4">
-                            StyleMap 서비스에 대해 궁금한 점이 있으시거나, 도움이 필요하신가요?
+                            DoNa 서비스에 대해 궁금한 점이 있으시거나, 도움이 필요하신가요?
                         </p>
                         <p className="text-gray-600">
                             언제든지 아래 연락처로 문의해 주시면 신속하게 답변해 드리겠습니다.

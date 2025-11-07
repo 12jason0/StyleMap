@@ -154,8 +154,6 @@ export default function NaverMapComponent({
         }
     };
 
-    // 커스텀 HTML 마커 생성 로직 제거 (기본 마커 사용)
-
     // 네이버 지도 스크립트 로더
     const loadNaverMapsScript = (): Promise<void> => {
         return new Promise((resolve, reject) => {
@@ -329,11 +327,40 @@ export default function NaverMapComponent({
         const bounds = new naver.maps.LatLngBounds();
         let didExtend = false;
 
+        const createUserLocationContent = () => {
+            const size = 36;
+            return `
+		<div style="position: relative; width: ${size}px; height: ${size + 10}px;">
+			<div style="
+				width: ${size}px; height: ${size}px; background: var(--brand-green, #10B981);
+				border: 2px solid white; border-radius: 50%;
+				display: flex; align-items: center; justify-content: center;
+				box-shadow: 0 2px 8px rgba(0,0,0,.25);
+			">
+				<div style="
+					width: 12px; height: 12px; background: white; border-radius: 50%;
+					box-shadow: 0 0 4px rgba(0,0,0,.2);
+				"></div>
+			</div>
+			<div style="position:absolute;left:50%;bottom:0;transform:translate(-50%,0);width:0;height:0;
+				border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--brand-green, #10B981);"></div>
+		</div>`;
+        };
+
         // 사용자 위치
         let userPos: any = null;
         if (userLocation && isValidLatLng(userLocation.lat, userLocation.lng)) {
             userPos = new naver.maps.LatLng(Number(userLocation.lat), Number(userLocation.lng));
-            const me = new naver.maps.Marker({ position: userPos, map, zIndex: 20, title: "현재 위치" });
+            const me = new naver.maps.Marker({
+                position: userPos,
+                map,
+                zIndex: 20,
+                title: "현재 위치",
+                icon: {
+                    content: createUserLocationContent(),
+                    anchor: new naver.maps.Point(18, 46),
+                },
+            });
             markersRef.current.push(me);
             bounds.extend(userPos);
             didExtend = true;
@@ -362,7 +389,7 @@ export default function NaverMapComponent({
                         border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--brand-green, #10B981);"></div>
                 </div>`;
         };
-
+        // (moved) createUserLocationContent는 상단으로 이동
         valid.forEach((p, idx) => {
             const pos = new naver.maps.LatLng(Number(p.latitude), Number(p.longitude));
             const isSelected = selectedPlace?.id === p.id;

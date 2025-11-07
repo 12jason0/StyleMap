@@ -342,7 +342,7 @@ const Header = () => {
                     onClick={(e) => e.stopPropagation()}
                     style={{ right: panelRight, width: drawerWidth }}
                 >
-                    <div className="flex-1 overflow-y-auto overscroll-contain p-6 space-y-2">
+                    <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-hide p-6 space-y-2">
                         <Link
                             href="/"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
@@ -381,37 +381,45 @@ const Header = () => {
                         <div
                             className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
                             onClick={() => {
-                                try { setIsMenuOpen(false); } catch {}
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
                                 setShowComingSoon("forest");
                             }}
                             title="곧 공개됩니다"
                             role="button"
                             tabIndex={0}
                             onKeyDown={() => {
-                                try { setIsMenuOpen(false); } catch {}
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
                                 setShowComingSoon("forest");
                             }}
-                            >
+                        >
                             <span>🔒</span>
                             <span>숲</span>
                         </div>
-                            <div
+                        <div
                             className="w-full px-3 py-2 rounded-md text-base font-medium text-gray-400 bg-gray-50 cursor-pointer flex items-center gap-2 hover:bg-gray-100"
                             onClick={() => {
-                                try { setIsMenuOpen(false); } catch {}
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
                                 setShowComingSoon("garden");
                             }}
                             title="곧 공개됩니다"
                             role="button"
                             tabIndex={0}
                             onKeyDown={() => {
-                                try { setIsMenuOpen(false); } catch {}
+                                try {
+                                    setIsMenuOpen(false);
+                                } catch {}
                                 setShowComingSoon("garden");
                             }}
-                            >
-                                <span>🔒</span>
+                        >
+                            <span>🔒</span>
                             <span>정원</span>
-                            </div>
+                        </div>
                         <Link
                             href="/escape"
                             className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
@@ -456,38 +464,6 @@ const Header = () => {
                             )}
                         </div>
 
-                        {/* 쿠키/정책 링크: 회원가입 아래, 서비스 소개 이전 */}
-                        <div className="pt-2 mt-2 border-t border-gray-200">
-                            <Link
-                                href="/cookies"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                onClick={closeMenu}
-                            >
-                                쿠키 정책
-                            </Link>
-                            <Link
-                                href="/privacy"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                onClick={closeMenu}
-                            >
-                                개인정보 처리방침
-                            </Link>
-                            <Link
-                                href="/data-deletion"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                onClick={closeMenu}
-                            >
-                                사용자 데이터 삭제 안내
-                            </Link>
-                            <Link
-                                href="/terms"
-                                className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50"
-                                onClick={closeMenu}
-                            >
-                                이용약관
-                            </Link>
-                        </div>
-
                         {/* 하단 고정: 서비스 소개 / 이용안내 */}
                         <div className="pt-4 mt-2 border-t border-gray-200 grid grid-cols-2 gap-3">
                             <Link
@@ -526,7 +502,55 @@ const Header = () => {
                                         <path d="M12 6h.01" />
                                     </svg>
                                 </span>
-                                <span className="text-sm font-semibold text-gray-800">이용안내</span>
+                                <span className="text-sm font-semibold text-gray-800">
+                                    이용
+                                    <br />
+                                    안내
+                                </span>
+                            </Link>
+                            <Link
+                                href="/privacy"
+                                onClick={closeMenu}
+                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
+                            >
+                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
+                                    <svg
+                                        className="w-5 h-5 text-gray-700"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M12 2l6 4v4c0 5-3 9-6 10-3-1-6-5-6-10V6l6-4z" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-semibold text-gray-800">
+                                    개인
+                                    <br />
+                                    정보
+                                </span>
+                            </Link>
+                            <Link
+                                href="/terms"
+                                onClick={closeMenu}
+                                className="flex flex-col items-center justify-center gap-2 px-3 py-3 rounded-xl bg-gray-50 hover:bg-gray-100"
+                            >
+                                <span className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow">
+                                    <svg
+                                        className="w-5 h-5 text-gray-700"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                    >
+                                        <path d="M6 2h9a2 2 0 012 2v16l-4-2-4 2-4-2V4a2 2 0 012-2z" />
+                                    </svg>
+                                </span>
+                                <span className="text-sm font-semibold text-gray-800">
+                                    이용
+                                    <br />
+                                    약관
+                                </span>
                             </Link>
                         </div>
                     </div>
@@ -563,8 +587,14 @@ const Header = () => {
                 </div>
             )}
             {showComingSoon && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2100]" onClick={() => setShowComingSoon(null)}>
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-80 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2100]"
+                    onClick={() => setShowComingSoon(null)}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-xl p-6 w-80 animate-fade-in"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="text-center mb-4">
                             <div className="text-lg font-bold text-gray-900 mb-2">comming soon</div>
                             <p className="text-gray-600">곧 공개됩니다. 조금만 기다려 주세요!</p>

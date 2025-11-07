@@ -1,0 +1,226 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+export default function DonaSplashFinal({ onDone }: { onDone?: () => void }) {
+    const [fadeOut, setFadeOut] = useState(false);
+    const [step, setStep] = useState(0);
+
+    useEffect(() => {
+        // 느긋한 타이밍으로 조정 (총 약 7초 노출)
+        const timeline = [
+            { delay: 300, action: () => setStep(1) },
+            { delay: 900, action: () => setStep(2) },
+            { delay: 1600, action: () => setStep(3) },
+            { delay: 2300, action: () => setStep(4) },
+            { delay: 3000, action: () => setStep(5) },
+            { delay: 3800, action: () => setStep(6) }, // 로고 등장 후 충분히 머무름
+            { delay: 6000, action: () => setFadeOut(true) },
+            { delay: 7000, action: () => onDone?.() },
+        ];
+        const timers = timeline.map(({ delay, action }) => setTimeout(action, delay));
+        return () => timers.forEach(clearTimeout);
+    }, [onDone]);
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#7FCC9F",
+                transition: "opacity 1s ease",
+                opacity: fadeOut ? 0 : 1,
+                zIndex: 9999,
+            }}
+        >
+            {/* 지도 배경 그리드 */}
+            <div
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    opacity: step >= 2 ? 0.15 : 0,
+                    transform: step >= 2 ? "scale(1)" : "scale(0.9)",
+                    transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                    background:
+                        "repeating-linear-gradient(0deg, rgba(255,255,255,0.3) 0px, rgba(255,255,255,0.3) 1px, transparent 1px, transparent 50px), repeating-linear-gradient(90deg, rgba(255,255,255,0.3) 0px, rgba(255,255,255,0.3) 1px, transparent 1px, transparent 50px)",
+                }}
+            />
+
+            {/* 지도 위 핀들과 경로 */}
+            <div style={{ position: "relative", width: "340px", height: "420px" }}>
+                {/* 핀 1 - 하트 (출발) */}
+                {step >= 3 && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            left: "50px",
+                            top: "80px",
+                            animation: "pinDrop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards",
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: "50px",
+                                height: "50px",
+                                background: "#FF8DA1",
+                                borderRadius: "50% 50% 50% 0",
+                                transform: "rotate(-45deg)",
+                                border: "3px solid white",
+                                boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <span style={{ transform: "rotate(45deg)", fontSize: "24px" }}>💕</span>
+                        </div>
+                        <div
+                            style={{
+                                marginTop: "6px",
+                                transform: "translateX(8px)",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                color: "white",
+                                textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                            }}
+                        >
+                            출발
+                        </div>
+                    </div>
+                )}
+
+                {/* 핀 2 - 나무 (중간) */}
+                {step >= 4 && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            left: "160px",
+                            top: "200px",
+                            animation: "pinDrop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards",
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: "50px",
+                                height: "50px",
+                                background: "#F5DEB3",
+                                borderRadius: "50% 50% 50% 0",
+                                transform: "rotate(-45deg)",
+                                border: "3px solid white",
+                                boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <span style={{ transform: "rotate(45deg)", fontSize: "24px" }}>🌳</span>
+                        </div>
+                        <div
+                            style={{
+                                marginTop: "6px",
+                                transform: "translateX(-2px)",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                color: "white",
+                                textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                            }}
+                        >
+                            데이트
+                        </div>
+                    </div>
+                )}
+
+                {/* 핀 3 - 하트 (도착) */}
+                {step >= 5 && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            left: "250px",
+                            top: "120px",
+                            animation: "pinDrop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards",
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: "50px",
+                                height: "50px",
+                                background: "#FF6B7A",
+                                borderRadius: "50% 50% 50% 0",
+                                transform: "rotate(-45deg)",
+                                border: "3px solid white",
+                                boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                            }}
+                        >
+                            <span style={{ transform: "rotate(45deg)", fontSize: "24px" }}>💖</span>
+                        </div>
+                        <div
+                            style={{
+                                marginTop: "6px",
+                                transform: "translateX(8px)",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                color: "white",
+                                textShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                            }}
+                        >
+                            도착
+                        </div>
+                    </div>
+                )}
+
+                {/* DoNa 로고 */}
+                {step >= 6 && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            left: "50%",
+                            top: "50%",
+                            transform: "translate(-50%, -50%)",
+                            animation: "logoAppear 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+                            textAlign: "center",
+                        }}
+                    >
+                        <div
+                            style={{
+                                background: "rgba(255, 255, 255, 0.98)",
+                                backdropFilter: "blur(12px)",
+                                padding: "24px 28px",
+                                borderRadius: "28px",
+                                boxShadow: "0 25px 70px rgba(0,0,0,0.2)",
+                            }}
+                        >
+                            <img
+                                src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"
+                                alt="DoNa"
+                                style={{ width: "300px", height: "auto", margin: "0 auto 12px", display: "block" }}
+                            />
+                            <p style={{ fontSize: 16, color: "#7FCC9F", margin: 0, fontWeight: 600 }}>
+                                나만의 특별한 순간을 기록하세요
+                            </p>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <style>{`
+                @keyframes pinDrop {
+                    0% { transform: translateY(-120px) scale(0) rotate(0deg); opacity: 0; }
+                    60% { transform: translateY(8px) scale(1.15) rotate(5deg); opacity: 1; }
+                    80% { transform: translateY(-3px) scale(0.95) rotate(-2deg); }
+                    100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+                }
+                @keyframes logoAppear {
+                    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7) rotate(-5deg); }
+                    70% { transform: translate(-50%, -50%) scale(1.05) rotate(2deg); }
+                    100% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+                }
+            `}</style>
+        </div>
+    );
+}

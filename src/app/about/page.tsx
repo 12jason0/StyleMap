@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "@/components/ImageFallback";
 
 interface Course {
     id: string;
@@ -174,11 +175,9 @@ const AboutPage = () => {
                             <span className="text-6xl">📦</span>
                         </div>
                         <h1 className="text-3xl font-bold text-gray-900 mb-4">여행, 이제 직접 안 짜도 돼요</h1>
-                        <p className="text-lg font-semibold text-blue-600 mb-3">
-                            밀키트처럼 꺼내 먹는 여행 코스, StyleMap
-                        </p>
+                        <p className="text-lg font-semibold text-blue-600 mb-3">밀키트처럼 꺼내 먹는 여행 코스, DoNa</p>
                         <p className="text-base text-gray-600 mb-6 max-w-3xl mx-auto">
-                            여행 계획하기 귀찮으시죠? StyleMap이 여러분을 위한 완벽한 여행 코스를 준비해드립니다. 컨셉과
+                            여행 계획하기 귀찮으시죠? DoNa가 여러분을 위한 완벽한 여행 코스를 준비해드립니다. 컨셉과
                             카테고리만 선택하면 바로 출발할 수 있어요!
                         </p>
                         <div className="flex flex-wrap justify-center gap-3">
@@ -364,13 +363,14 @@ const AboutPage = () => {
                                                     onClick={() => (window.location.href = `/courses/${course.id}`)}
                                                 >
                                                     <div className="h-40 relative">
-                                                        <img
+                                                        <Image
                                                             src={
                                                                 course.imageUrl ||
                                                                 "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&h=200&fit=crop"
                                                             }
                                                             alt={course.title}
-                                                            className="w-full h-full object-cover"
+                                                            fill
+                                                            className="object-cover"
                                                         />
                                                         <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
                                                             {course.concept || "코스"}
@@ -537,10 +537,10 @@ const AboutPage = () => {
                     </div>
                 </section>
 
-                {/* 왜 StyleMap인가요? */}
+                {/* 왜 DoNa인가요? */}
                 <section className="py-12 px-4 bg-white">
                     <div className="max-w-[500px] mx-auto">
-                        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">왜 StyleMap인가요?</h2>
+                        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">왜 DoNa인가요?</h2>
                         <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl shadow-lg p-8">
                             <div className="grid grid-cols-1 gap-6 items-center">
                                 <div>
@@ -551,7 +551,7 @@ const AboutPage = () => {
                                         "어디 갈까?", "뭐 먹을까?", "길 찾기 어려워..." 이런 고민들, 이제 그만!
                                     </p>
                                     <p className="text-gray-600 mb-4">
-                                        StyleMap은 여러분이 직접 여행 계획을 짤 필요 없이, 이미 검증된 완벽한 코스를
+                                        DoNa는 여러분이 직접 여행 계획을 짤 필요 없이, 이미 검증된 완벽한 코스를
                                         밀키트처럼 제공해드립니다.
                                     </p>
                                     <p className="text-gray-600">

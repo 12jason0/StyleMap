@@ -11,7 +11,7 @@ export default function DataDeletionPage() {
                         <section className="mb-8">
                             <h2 className="text-2xl font-bold text-gray-900 mb-3">데이터 삭제 안내</h2>
                             <p className="mb-4">
-                                StyleMap에서 탈퇴하시거나 개인정보 삭제를 원하시면 아래 이메일로 요청해 주세요.
+                                DoNa에서 탈퇴하시거나 개인정보 삭제를 원하시면 아래 이메일로 요청해 주세요.
                             </p>
                             <div className="bg-gray-50 border rounded-lg p-4">
                                 <p className="text-sm">
@@ -65,12 +65,3 @@ export default function DataDeletionPage() {
         </div>
     );
 }
-
-
-
-
-
-
-
-
-

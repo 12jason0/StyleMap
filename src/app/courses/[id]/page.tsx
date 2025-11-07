@@ -204,7 +204,7 @@ export default function CourseDetailPage() {
     const heroImageUrl = useMemo(() => {
         if (courseData?.imageUrl) return courseData.imageUrl;
         if (sortedCoursePlaces.length > 0) return sortedCoursePlaces[0].place.imageUrl || undefined;
-        return "/images/placeholder.png";
+        return ""; // 빈 값이면 ImageFallback에서 회색 placeholder 표시
     }, [courseData?.imageUrl, sortedCoursePlaces]);
 
     const totalCost = useMemo(() => courseData?.price || "", [courseData]);
@@ -358,9 +358,12 @@ export default function CourseDetailPage() {
                 Kakao.init(jsKey);
             }
 
-            const shareImage = heroImageUrl || courseData?.imageUrl || "/images/placeholder-location.jpg"; // ✅ snake_case
-            const title = courseData?.title || "StyleMap 코스";
-            const desc = courseData?.description || "StyleMap에서 코스를 확인해 보세요";
+            const shareImage =
+                heroImageUrl ||
+                courseData?.imageUrl ||
+                "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"; // 유효한 공개 이미지
+            const title = courseData?.title || "DoNa 코스";
+            const desc = courseData?.description || "DoNa에서 코스를 확인해 보세요";
 
             Kakao.Share.sendDefault({
                 objectType: "feed",
@@ -436,7 +439,7 @@ export default function CourseDetailPage() {
 
                 const courseData = await courseRes.json();
                 setCourseData(courseData);
-                document.title = `StyleMap | ${courseData.title}`;
+                document.title = `DoNa | ${courseData.title}`;
 
                 if (reviewsRes.ok) {
                     const reviewsData = await reviewsRes.json();
@@ -563,7 +566,7 @@ export default function CourseDetailPage() {
                 <section className="relative h-[300px] overflow-hidden pt-10">
                     <div className="absolute inset-0">
                         <Image
-                            src={heroImageUrl || "/images/placeholder.png"}
+                            src={heroImageUrl || ""}
                             alt={courseData.title}
                             fill
                             priority

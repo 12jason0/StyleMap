@@ -3,10 +3,11 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import AppInstallQR from "@/components/AppInstallQR";
+import DonaSplashFinal from "@/components/DonaSplashFinal";
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -14,10 +15,29 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
     const isEscapeId = pathname ? /^\/escape\/[^/]+$/.test(pathname) : false;
     const isCourseStart = pathname ? /^\/courses\/[^/]+\/start$/.test(pathname) : false;
     const [isQrOpen, setIsQrOpen] = useState(false);
+    const [showSplash, setShowSplash] = useState(false);
+
+    useEffect(() => {
+        try {
+            const key = "dona-splash-shown";
+            const already = typeof window !== "undefined" ? sessionStorage.getItem(key) : "1";
+            if (!already) setShowSplash(true);
+        } catch {}
+    }, []);
 
     return (
         <div className="min-h-screen bg-white min-[600px]:bg-[url('https://stylemap-images.s3.ap-southeast-2.amazonaws.com/homepage.png')] min-[600px]:bg-cover min-[600px]:bg-center">
             <div className="h-screen min-[600px]:max-w-[1180px] min-[600px]:mx-auto min-[600px]:flex min-[600px]:items-stretch min-[600px]:gap-6">
+                {showSplash && (
+                    <DonaSplashFinal
+                        onDone={() => {
+                            setShowSplash(false);
+                            try {
+                                sessionStorage.setItem("dona-splash-shown", "1");
+                            } catch {}
+                        }}
+                    />
+                )}
                 {/* 데스크톱용 좌측 다운로드 히어로 패널 */}
                 <section className="hidden min-[600px]:block relative w-[600px] h-full">
                     <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/40 to-transparent" />

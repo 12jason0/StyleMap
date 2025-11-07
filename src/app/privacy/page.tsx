@@ -58,7 +58,7 @@ export default function PrivacyPolicyPage() {
                         </div>
 
                         <p className="text-gray-700 mb-6">
-                            StyleMap(이하 '서비스')은 개인정보보호법 제30조에 따라 정보주체의 개인정보를 보호하고 이와
+                            DoNa(이하 '서비스')은 개인정보보호법 제30조에 따라 정보주체의 개인정보를 보호하고 이와
                             관련한 고충을 신속하고 원활하게 처리할 수 있도록 하기 위하여 다음과 같이 개인정보 처리방침을
                             수립·공개합니다.
                         </p>
@@ -67,7 +67,7 @@ export default function PrivacyPolicyPage() {
                             제1조 개인정보의 처리목적
                         </h2>
                         <p className="text-gray-700 mb-4">
-                            StyleMap은 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적
+                            DoNa는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적
                             이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 개인정보보호법 제18조에 따라
                             별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.
                         </p>
@@ -104,7 +104,7 @@ export default function PrivacyPolicyPage() {
                         <h2 id="items" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
                             제3조 처리하는 개인정보 항목
                         </h2>
-                        <p className="text-gray-700 mb-4">StyleMap은 다음의 개인정보 항목을 처리하고 있습니다.</p>
+                        <p className="text-gray-700 mb-4">DoNa는 다음의 개인정보 항목을 처리하고 있습니다.</p>
 
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">1. 회원가입 시</h3>
                         <ul className="list-disc pl-6 mb-4 text-gray-700">
@@ -183,7 +183,7 @@ export default function PrivacyPolicyPage() {
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제5조 개인정보의 제3자 제공</h2>
                         <p className="text-gray-700 mb-6">
-                            StyleMap은 정보주체의 개인정보를 제1조(개인정보의 처리목적)에서 명시한 범위 내에서만
+                            DoNa는 정보주체의 개인정보를 제1조(개인정보의 처리목적)에서 명시한 범위 내에서만
                             처리하며, 정보주체의 동의, 법률의 특별한 규정 등 개인정보보호법 제17조에 해당하는 경우에만
                             개인정보를 제3자에게 제공합니다. 현재 서비스는 법률에 따른 의무 이행 외에 개인정보를
                             제3자에게 제공하고 있지 않습니다.
@@ -191,7 +191,7 @@ export default function PrivacyPolicyPage() {
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제6조 개인정보처리 위탁</h2>
                         <p className="text-gray-700 mb-4">
-                            StyleMap은 현재 개인정보 처리업무를 위탁하고 있지 않습니다.
+                            DoNa는 현재 개인정보 처리업무를 위탁하고 있지 않습니다.
                         </p>
 
                         {/* 이하 내용은 기존과 동일하므로 생략합니다. 가독성을 위해 기존 코드를 그대로 붙여넣으시면 됩니다. */}
@@ -201,7 +201,7 @@ export default function PrivacyPolicyPage() {
                             제7조 정보주체의 권리·의무 및 행사방법
                         </h2>
                         <p className="text-gray-700 mb-4">
-                            정보주체는 StyleMap에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수
+                            정보주체는 DoNa에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수
                             있습니다.
                         </p>
                         <ul className="list-disc pl-6 mb-4 text-gray-700">
@@ -212,12 +212,12 @@ export default function PrivacyPolicyPage() {
                         </ul>
                         <p className="text-gray-700 mb-6">
                             위의 권리 행사는 개인정보보호법 시행령 제41조제1항에 따라 서면, 전자우편 등을 통하여 하실 수
-                            있으며 StyleMap은 이에 대해 지체없이 조치하겠습니다.
+                            있으며 DoNa는 이에 대해 지체없이 조치하겠습니다.
                         </p>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제8조 개인정보의 파기</h2>
                         <p className="text-gray-700 mb-6">
-                            StyleMap은 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는
+                            DoNa는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는
                             지체없이 해당 개인정보를 파기합니다.
                         </p>
 
@@ -225,7 +225,7 @@ export default function PrivacyPolicyPage() {
                             제9조 개인정보의 안전성 확보조치
                         </h2>
                         <p className="text-gray-700 mb-4">
-                            StyleMap은 개인정보보호법 제29조에 따라 다음과 같이 안전성 확보에 필요한 기술적/관리적 및
+                            DoNa는 개인정보보호법 제29조에 따라 다음과 같이 안전성 확보에 필요한 기술적/관리적 및
                             물리적 조치를 하고 있습니다.
                         </p>
                         <ul className="list-disc pl-6 mb-6 text-gray-700">

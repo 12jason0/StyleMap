@@ -11,7 +11,7 @@ export default function BusinessPage() {
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 mb-2">서비스명</h3>
-                                    <p className="text-gray-700">StyleMap</p>
+                                    <p className="text-gray-700">DoNa</p>
                                 </div>
 
                                 <div>
@@ -55,7 +55,7 @@ export default function BusinessPage() {
                         <div className="mt-8 bg-blue-50 rounded-lg p-6">
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">서비스 소개</h2>
                             <p className="text-gray-700 mb-4">
-                                StyleMap은 AI 기술을 활용하여 사용자 맞춤형 여행 코스를 추천하는 플랫폼입니다.
+                                DoNa는 AI 기술을 활용하여 사용자 맞춤형 여행 코스를 추천하는 플랫폼입니다.
                             </p>
                             <ul className="list-disc pl-6 text-gray-700 space-y-2">
                                 <li>
@@ -132,11 +132,11 @@ export default function BusinessPage() {
                         {/* 법적 고지 */}
                         <div className="mt-8 text-sm text-gray-600 border-t pt-6">
                             <p className="mb-2">
-                                <strong>저작권:</strong> 본 웹사이트의 모든 콘텐츠는 StyleMap의 저작물이며, 무단 복제 및
+                                <strong>저작권:</strong> 본 웹사이트의 모든 콘텐츠는 DoNa의 저작물이며, 무단 복제 및
                                 배포를 금지합니다.
                             </p>
                             <p className="mb-2">
-                                <strong>면책조항:</strong> StyleMap은 베타 서비스 운영 중으로, 서비스 이용으로 인한
+                                <strong>면책조항:</strong> DoNa는 베타 서비스 운영 중으로, 서비스 이용으로 인한
                                 직간접적 손해에 대해 제한적 책임을 집니다.
                             </p>
                             <p>

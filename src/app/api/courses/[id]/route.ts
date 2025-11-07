@@ -52,7 +52,7 @@ export async function GET(
             description: course.description || "",
             duration: course.duration || "",
             location: course.region || "",
-            imageUrl: course.imageUrl || "/images/maker.png",
+            imageUrl: course.imageUrl || "",
             concept: course.concept || "",
             rating: Number(course.rating) || 0,
             view_count: course.view_count || 0,
@@ -94,7 +94,7 @@ export async function GET(
                       reservation_required: !!cp.place.reservation_required,
                       latitude: cp.place.latitude ? Number(cp.place.latitude) : null,
                       longitude: cp.place.longitude ? Number(cp.place.longitude) : null,
-                      imageUrl: cp.place.imageUrl?.trim() ? cp.place.imageUrl : "/images/maker.png",
+                      imageUrl: cp.place.imageUrl?.trim() ? cp.place.imageUrl : "",
                   }
                 : null,
         }));

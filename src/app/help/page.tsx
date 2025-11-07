@@ -18,8 +18,8 @@ const FAQPage = () => {
     const [faqs, setFaqs] = useState<FAQItem[]>([
         {
             id: 1,
-            question: "StyleMap은 어떤 서비스인가요?",
-            answer: "StyleMap은 AI가 추천하는 완벽한 여행 코스를 제공하는 서비스입니다. 밀키트처럼 꺼내 먹는 여행 코스로, 복잡한 계획 없이도 완벽한 여행을 경험할 수 있습니다.",
+            question: "DoNa는 어떤 서비스인가요?",
+            answer: "DoNa는 AI가 추천하는 완벽한 여행 코스를 제공하는 서비스입니다. 밀키트처럼 꺼내 먹는 여행 코스로, 복잡한 계획 없이도 완벽한 여행을 경험할 수 있습니다.",
             category: "서비스 소개",
             isOpen: false,
         },
@@ -47,7 +47,7 @@ const FAQPage = () => {
         {
             id: 5,
             question: "지도에서 현재 위치가 표시되지 않아요",
-            answer: "브라우저의 위치 권한을 허용해주세요. 설정 > 개인정보 보호 > 위치 서비스에서 StyleMap에 대한 위치 권한을 확인해주세요.",
+            answer: "브라우저의 위치 권한을 허용해주세요. 설정 > 개인정보 보호 > 위치 서비스에서 DoNa에 대한 위치 권한을 확인해주세요.",
             category: "기술 문제",
             isOpen: false,
         },

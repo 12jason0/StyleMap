@@ -66,7 +66,7 @@ export async function composeImageWithTemplate(
     });
 }
 
-export async function downloadImage(blob: Blob, filename: string = "stylemap-escape.png") {
+export async function downloadImage(blob: Blob, filename: string = "dona-escape.png") {
     const url = URL.createObjectURL(blob);
     const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -77,7 +77,7 @@ export async function downloadImage(blob: Blob, filename: string = "stylemap-esc
         if (isMobile && navAny?.share && navAny?.canShare) {
             const file = new File([blob], filename, { type: "image/png" });
             if (navAny.canShare({ files: [file] })) {
-                await navAny.share({ files: [file], title: "StyleMap Escape", text: "StyleMap 코스를 완료했어요! 🎉" });
+                await navAny.share({ files: [file], title: "DoNa Escape", text: "DoNa 코스를 완료했어요! 🎉" });
                 URL.revokeObjectURL(url);
                 return { success: true, method: "share" as const };
             }

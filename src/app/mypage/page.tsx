@@ -779,10 +779,8 @@ const MyPage = () => {
         try {
             const Kakao = await ensureKakaoSdk();
             const link = typeof location !== "undefined" ? location.href : "";
-            const imageUrl = badge.image_url || "/images/maker.png";
-            const bragText = `${userInfo?.name || "저"}는 '${
-                badge.name
-            }' 배지를 획득했어요! StyleMap에서 함께 도전해요 ✨`;
+            const imageUrl = badge.image_url || "";
+            const bragText = `${userInfo?.name || "저"}는 '${badge.name}' 배지를 획득했어요! DoNa에서 함께 도전해요 ✨`;
             if (Kakao && Kakao.Share) {
                 Kakao.Share.sendDefault({
                     objectType: "feed",
@@ -852,7 +850,7 @@ const MyPage = () => {
                                             alt={b.name}
                                             className="w-full h-full object-contain"
                                             onError={(e) => {
-                                                (e.currentTarget.style.display = "none");
+                                                e.currentTarget.style.display = "none";
                                             }}
                                         />
                                     </div>

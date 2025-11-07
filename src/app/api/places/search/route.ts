@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
                 description: it?.category || undefined,
                 phone: it?.telephone || undefined,
                 website: it?.link || undefined,
-                imageUrl: "/images/placeholder-location.jpg",
+                imageUrl: "",
                 latitude: coords.lat,
                 longitude: coords.lng,
             });

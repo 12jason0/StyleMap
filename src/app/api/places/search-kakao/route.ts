@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
                     category: d.category_group_name || d.category_name,
                     phone: d.phone,
                     website: d.place_url,
-                    imageUrl: "/images/placeholder-location.jpg",
+                    imageUrl: "",
                     latitude: parseFloat(d.y),
                     longitude: parseFloat(d.x),
                 }))

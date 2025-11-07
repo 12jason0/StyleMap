@@ -15,49 +15,49 @@ const CookiesPolicyPage = () => {
             type: "필수",
             purpose: "사용자 로그인 상태 유지",
             duration: "7일",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "user",
             type: "필수",
             purpose: "사용자 기본 정보 저장",
             duration: "7일",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "loginTime",
             type: "필수",
             purpose: "로그인 시간 기록",
             duration: "브라우저 종료 시까지",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "cookie_consent",
             type: "필수",
             purpose: "쿠키 동의 여부 저장",
             duration: "1년",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "hideAiAdUntil",
             type: "기능성",
             purpose: "AI 광고 숨김 설정",
             duration: "사용자 설정",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "userCoupons",
             type: "기능성",
             purpose: "AI 추천 쿠폰 수 저장",
             duration: "영구",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "aboutPageData",
             type: "성능",
             purpose: "페이지 데이터 캐싱",
             duration: "세션",
-            provider: "StyleMap",
+            provider: "DoNa",
         },
         {
             name: "_kak*",
@@ -142,7 +142,7 @@ const CookiesPolicyPage = () => {
                                 웹사이트 개선에 도움이 되는 정보를 제공합니다.
                             </p>
                             <p className="mb-4">
-                                StyleMap은 사용자 경험을 개선하고 맞춤형 서비스를 제공하기 위해 쿠키와 유사한 기술을
+                                DoNa는 사용자 경험을 개선하고 맞춤형 서비스를 제공하기 위해 쿠키와 유사한 기술을
                                 사용합니다.
                             </p>
                         </section>

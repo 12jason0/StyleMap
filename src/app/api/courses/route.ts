@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
             const firstPlaceImage = Array.isArray(course?.coursePlaces)
                 ? course.coursePlaces.find((cp: any) => cp?.place?.imageUrl)?.place?.imageUrl
                 : undefined;
-            const resolvedImageUrl = course.imageUrl || firstPlaceImage || "/images/maker.png";
+            const resolvedImageUrl = course.imageUrl || firstPlaceImage || ""; // 빈 값이면 프론트에서 회색 div 처리
 
             return {
                 id: String(course.id),

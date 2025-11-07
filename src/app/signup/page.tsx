@@ -215,7 +215,7 @@ const Signup = () => {
                 <div className="bg-white rounded-2xl shadow-sm border border-green-100 p-8">
                     <div className="text-center">
                         <h1 className="text-3xl font-bold text-gray-900 mb-2 font-brand">회원가입</h1>
-                        <p className="text-gray-600">StyleMap과 함께 여행을 시작하세요</p>
+                        <p className="text-gray-600">DoNa와 함께 여행을 시작하세요</p>
                     </div>
 
                     {error && (

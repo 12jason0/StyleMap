@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
             user: {
                 nickname: r.user?.username || "익명",
                 initial: (r.user?.username?.[0] || "U").toUpperCase(),
-                profileImageUrl: r.user?.profileImageUrl || "/images/maker.png",
+                profileImageUrl: r.user?.profileImageUrl || "",
             },
             course: r.course
                 ? {
