@@ -7,6 +7,25 @@ export default function DonaSplashFinal({ onDone }: { onDone?: () => void }) {
     const [step, setStep] = useState(0);
 
     useEffect(() => {
+        // 모바일에서 주소창/당김 새로고침 등으로 인한 레이아웃 이동 방지: 스크롤 락
+        const html = document.documentElement;
+        const body = document.body;
+        const prevHtmlOverflow = html.style.overflow;
+        const prevHtmlHeight = html.style.height;
+        const prevHtmlOverscroll = html.style.getPropertyValue("overscroll-behavior");
+        const prevBodyOverflow = body.style.overflow;
+        const prevBodyHeight = body.style.height;
+        const prevBodyOverscroll = body.style.getPropertyValue("overscroll-behavior");
+        const prevBodyTouchAction = body.style.getPropertyValue("touch-action");
+
+        html.style.overflow = "hidden";
+        html.style.height = "100%";
+        html.style.setProperty("overscroll-behavior", "none");
+        body.style.overflow = "hidden";
+        body.style.height = "100%";
+        body.style.setProperty("overscroll-behavior", "none");
+        body.style.setProperty("touch-action", "none");
+
         // 느긋한 타이밍으로 조정 (총 약 7초 노출)
         const timeline = [
             { delay: 300, action: () => setStep(1) },
@@ -19,7 +38,22 @@ export default function DonaSplashFinal({ onDone }: { onDone?: () => void }) {
             { delay: 7000, action: () => onDone?.() },
         ];
         const timers = timeline.map(({ delay, action }) => setTimeout(action, delay));
-        return () => timers.forEach(clearTimeout);
+        return () => {
+            timers.forEach(clearTimeout);
+            // 스크롤 락 해제
+            html.style.overflow = prevHtmlOverflow;
+            if (prevHtmlHeight) html.style.height = prevHtmlHeight;
+            else html.style.removeProperty("height");
+            if (prevHtmlOverscroll) html.style.setProperty("overscroll-behavior", prevHtmlOverscroll);
+            else html.style.removeProperty("overscroll-behavior");
+            body.style.overflow = prevBodyOverflow;
+            if (prevBodyHeight) body.style.height = prevBodyHeight;
+            else body.style.removeProperty("height");
+            if (prevBodyOverscroll) body.style.setProperty("overscroll-behavior", prevBodyOverscroll);
+            else body.style.removeProperty("overscroll-behavior");
+            if (prevBodyTouchAction) body.style.setProperty("touch-action", prevBodyTouchAction);
+            else body.style.removeProperty("touch-action");
+        };
     }, [onDone]);
 
     return (
@@ -27,6 +61,8 @@ export default function DonaSplashFinal({ onDone }: { onDone?: () => void }) {
             style={{
                 position: "fixed",
                 inset: 0,
+                width: "100vw",
+                height: "100dvh",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -34,6 +70,8 @@ export default function DonaSplashFinal({ onDone }: { onDone?: () => void }) {
                 transition: "opacity 1s ease",
                 opacity: fadeOut ? 0 : 1,
                 zIndex: 9999,
+                overscrollBehavior: "none",
+                touchAction: "none",
             }}
         >
             {/* 지도 배경 그리드 */}
