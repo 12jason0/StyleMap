@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import Image from "@/components/ImageFallback";
 
 // --- 타입 정의 ---
 type Badge = { id: number; name: string; description: string; image_url?: string };
@@ -216,20 +216,16 @@ const StoryCard = ({
             className="group flex flex-col gap-4 border rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white"
             onClick={() => onDetails(story.id)}
         >
-            {imageSrc ? (
-                <div className="relative h-40 rounded-2xl overflow-hidden">
-                    <Image
-                        src={imageSrc}
-                        alt={story.title}
-                        fill
-                        priority={isFirst}
-                        sizes="100vw"
-                        className="object-cover"
-                    />
-                </div>
-            ) : (
-                <div className="h-40 rounded-2xl bg-gray-100" />
-            )}
+            <div className="relative h-40 rounded-2xl overflow-hidden">
+                <Image
+                    src={imageSrc || ""}
+                    alt={story.title}
+                    fill
+                    priority={isFirst}
+                    sizes="100vw"
+                    className="object-cover"
+                />
+            </div>
             <div className="pt-1 pr-4 pb-4 pl-4">
                 <div className="mb-2 flex items-center justify-between">
                     <div>
@@ -326,17 +322,15 @@ const DetailsModal = ({
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="p-6 max-h-[70vh] overflow-auto">
-                        {story.imageUrl && (
-                            <div className="relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100">
-                                <Image
-                                    src={story.imageUrl}
-                                    alt={story.title}
-                                    fill
-                                    className="object-cover"
-                                    sizes="100vw"
-                                />
-                            </div>
-                        )}
+                        <div className="relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100">
+                            <Image
+                                src={story.imageUrl || ""}
+                                alt={story.title}
+                                fill
+                                className="object-cover"
+                                sizes="100vw"
+                            />
+                        </div>
                         <h2 className="text-2xl font-bold text-gray-900">{story.title}</h2>
                         <p className="text-gray-700 mt-2">{story.synopsis}</p>
                         <div className="mt-6">

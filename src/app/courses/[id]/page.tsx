@@ -394,46 +394,7 @@ export default function CourseDetailPage() {
         }
     };
 
-    const handleDMShare = async () => {
-        try {
-            const url = typeof window !== "undefined" ? window.location.href : "";
-            const shareImage =
-                heroImageUrl ||
-                courseData?.imageUrl ||
-                "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png";
-            const title = courseData?.title || "DoNa 코스";
-            const text = courseData?.description || "DoNa에서 코스를 확인해 보세요";
-
-            // 1) Web Share API (시스템 공유 시트 → 인스타 DM 선택 가능)
-            const navAny = navigator as any;
-            if (navAny?.share) {
-                // 이미지 파일도 가능한 경우 시도
-                try {
-                    const res = await fetch(shareImage, { mode: "cors" }).catch(() => null as any);
-                    if (res && res.ok) {
-                        const blob = await res.blob();
-                        const file = new File([blob], "course.jpg", { type: blob.type || "image/jpeg" });
-                        if (navAny?.canShare?.({ files: [file] })) {
-                            await navAny.share({ title, text, url, files: [file] });
-                            setShowShareModal(false);
-                            return;
-                        }
-                    }
-                } catch {}
-                await navAny.share({ title, text, url });
-                setShowShareModal(false);
-                return;
-            }
-
-            // 2) Web Share 미지원 → 인스타그램 DM 웹으로 폴백
-            const igUrl = `https://www.instagram.com/direct/new/?text=${encodeURIComponent(`${title}\n${url}`)}`;
-            window.open(igUrl, "_blank");
-            setShowShareModal(false);
-        } catch (error) {
-            console.error("Error sharing to DM:", error);
-            showToast("디엠 공유에 실패했습니다.", "error");
-        }
-    };
+    // (제거됨) 인스타/DM 공유 버튼/핸들러
 
     const handleCopyLink = async () => {
         try {
@@ -1036,15 +997,7 @@ export default function CourseDetailPage() {
                                     <div className="font-bold">카카오톡으로 공유</div>
                                 </div>
                             </button>
-                            <button
-                                onClick={handleDMShare}
-                                className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl"
-                            >
-                                <div className="text-2xl">📱</div>
-                                <div className="text-left">
-                                    <div className="font-bold">디엠으로 공유</div>
-                                </div>
-                            </button>
+                            {/* (제거됨) 추가 공유 버튼 */}
                             <button
                                 onClick={handleCopyLink}
                                 className="hover:cursor-pointer w-full flex items-center gap-4 p-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200"

@@ -1640,184 +1640,121 @@ function EscapeIntroPageInner() {
         }
     };
 
-    const handleShareToInstagram = async () => {
-        try {
-            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            // 1단계: 콜라주 이미지 생성
-            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            setToast("템플릿을 생성하는 중...");
 
-            // getCollageBlob()는 4장의 사진을 템플릿과 합성
+    const handleShareToKakao = async () => {
+        try {
+            setToast("템플릿을 생성하는 중...");
             const blob = await getCollageBlob();
             if (!blob) {
                 setToast("이미지 생성에 실패했습니다");
                 return;
             }
 
-            // 파일명: 지역명 + -template.jpg
-            const regionNameRaw = String((story as any)?.region || (story as any)?.title || "stylemap");
-            const regionSlug = regionNameRaw
-                .trim()
-                .toLowerCase()
-                .replace(/\s+/g, "-")
-                .replace(/[^a-z0-9가-힣_-]/g, "");
-            const downloadName = `${regionSlug || "stylemap"}-template.jpg`;
-
-            // Blob을 File 객체로 변환 (Web Share API용)
-            const file = new File([blob], downloadName, { type: "image/jpeg" });
-
-            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            // 2단계: Web Share API 시도 (최고의 방법!)
-            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            const navAny = navigator as any;
-
-            try {
-                // 브라우저가 파일 공유를 지원하는지 확인
-                const canShareFiles = navAny?.canShare?.({ files: [file] });
-
-                if (navAny?.share && canShareFiles) {
-                    // 브라우저 공유 시트 표시
-                    await navAny.share({
-                        files: [file],
-                        title: "DoNa",
-                    });
-
-                    setToast("✅ 공유 완료!");
-
-                    // 💧 물방울 보상 지급
-                    try {
-                        const token = localStorage.getItem("authToken");
-                        await fetch("/api/forest/water", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                            },
-                            credentials: "include",
-                            body: JSON.stringify({ source: "escape" }),
-                        });
-                    } catch {}
-
-                    // 배지 지급 + 사건 완료 저장
-                    await awardBadgeAndComplete();
-
-                    return; // ✅ 성공! 종료
-                }
-            } catch (shareError: any) {
-                // 사용자가 공유를 취소한 경우
-                if (shareError?.name === "AbortError") {
-                    setToast("공유가 취소되었습니다");
-                    return;
-                }
-                // 다른 오류는 무시하고 다음 단계로
+            // 업로드하여 공개 이미지 URL 확보
+            let imageUrl = await autoSaveCollage();
+            if (!imageUrl) {
+                try {
+                    const form = new FormData();
+                    form.append("photos", new File([blob], "collage.jpg", { type: "image/jpeg" }));
+                    const up = await fetch("/api/upload", { method: "POST", body: form, credentials: "include" });
+                    if (up.ok) {
+                        const ur = await up.json();
+                        imageUrl = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
+                    }
+                } catch {}
             }
 
-            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            // 3단계: 폴백 - 플랫폼별 다운로드
-            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-            const isInApp = /Instagram|KAKAOTALK|NAVER|FBAN|FBAV|Line|Whale/i.test(navigator.userAgent);
+            const landingUrl =
+                typeof window !== "undefined" ? `${window.location.origin}/mypage` : "https://dona.app";
 
-            if (isIOS) {
-                // ━━━ iOS: base64 data URL을 HTML로 감싸서 표시 (길게 눌러 저장 가능) ━━━
-                const base64: string = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(String(reader.result));
-                    reader.onerror = () => reject(new Error("iOS base64 변환 실패"));
-                    reader.readAsDataURL(blob);
+            // Kakao JS SDK 로드/초기화
+            const ensureKakao = () =>
+                new Promise<void>((resolve, reject) => {
+                    const w = window as any;
+                    if (w.Kakao) return resolve();
+                    const s = document.createElement("script");
+                    s.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
+                    s.async = true;
+                    s.onload = () => resolve();
+                    s.onerror = () => reject(new Error("Kakao SDK load failed"));
+                    document.head.appendChild(s);
                 });
 
-                const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta charset="utf-8" />
-<title>이미지 저장</title>
-<style>
-  body{margin:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
-  img{max-width:100%;height:auto;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.5);margin:16px}
-  .guide{color:#fff;text-align:center;max-width:420px;padding:16px 20px;background:rgba(255,255,255,.08);border-radius:12px}
-</style>
-</head>
-<body>
-  <img src="${base64}" alt="image" />
-  <div class="guide">이미지를 길게 눌러 "사진에 저장"을 선택하세요.</div>
-  <a href="instagram://story-camera" style="margin-top:14px;color:#fff;text-decoration:underline;">Instagram 열기</a>
-</body>
-</html>`;
+            await ensureKakao();
+            const w = window as any;
+            const Kakao = w.Kakao;
+            const jsKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined;
+            if (!Kakao?.isInitialized?.()) {
+                if (!jsKey) throw new Error("NEXT_PUBLIC_KAKAO_JS_KEY missing");
+                Kakao.init(jsKey);
+            }
 
-                const newWin = window.open("about:blank", "_blank");
-                if (newWin) {
-                    newWin.document.open();
-                    newWin.document.write(html);
-                    newWin.document.close();
-                } else {
-                    document.open();
-                    document.write(html);
-                    document.close();
+            // 카카오톡 공유
+            try {
+                Kakao.Share.sendDefault({
+                    objectType: "feed",
+                    content: {
+                        title: "DoNa Escape 콜라주",
+                        description: "나의 콜라주를 카카오톡으로 공유해요",
+                        imageUrl: imageUrl || undefined,
+                        link: {
+                            mobileWebUrl: landingUrl,
+                            webUrl: landingUrl,
+                        },
+                    },
+                    buttons: [
+                        {
+                            title: "열어보기",
+                            link: {
+                                mobileWebUrl: landingUrl,
+                                webUrl: landingUrl,
+                            },
+                        },
+                    ],
+                });
+
+                setToast("카카오톡 공유 창이 열렸어요!");
+                // 보상 및 완료 처리
+                try {
+                    const token = localStorage.getItem("authToken");
+                    await fetch("/api/forest/water", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                        credentials: "include",
+                        body: JSON.stringify({ source: "escape" }),
+                    });
+                } catch {}
+                await awardBadgeAndComplete();
+                return;
+            } catch {}
+
+            // 폴백: 시스템 공유 시트 또는 링크 복사
+            const navAny = navigator as any;
+            try {
+                if (navAny?.share) {
+                    await navAny.share({
+                        title: "DoNa Escape 콜라주",
+                        text: "DoNa에서 만든 콜라주를 확인해 보세요",
+                        url: landingUrl,
+                    });
+                    setToast("공유 완료!");
+                    await awardBadgeAndComplete();
+                    return;
                 }
-
-                setToast("이미지를 길게 눌러 '사진에 저장'을 선택하세요");
-
-                // iOS에서도 인스타 이동 전에 완료 처리(사용자 복귀 신뢰 어려움 → 사전 처리)
+            } catch {}
+            try {
+                await navigator.clipboard.writeText(landingUrl);
+                setToast("링크가 복사되었습니다.");
                 await awardBadgeAndComplete();
-            } else if (isMobile) {
-                // ━━━ Android: 다운로드 폴더에 저장 ━━━
-                const url = URL.createObjectURL(blob);
-                if (isInApp) {
-                    // 인앱 브라우저는 다운로드가 막히는 경우가 많아 새 탭으로 직접 열기
-                    window.open(url, "_blank");
-                } else {
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = downloadName;
-                    a.rel = "noopener";
-                    a.target = "_blank";
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                }
-
-                setToast("✅ 이미지가 다운로드되었습니다!");
-
-                // ⏱️ 1.5초 대기 (파일 시스템 동기화)
-                setTimeout(() => {
-                    URL.revokeObjectURL(url);
-
-                    // 안내 메시지 표시
-                    const wantsToOpenInstagram = confirm(
-                        "📱 이미지가 다운로드되었습니다!\n\n" +
-                            "Instagram 앱을 열어서\n" +
-                            "다운로드한 사진을 스토리에 올려주세요.\n\n" +
-                            "확인을 누르면 Instagram 앱이 열립니다."
-                    );
-
-                    if (wantsToOpenInstagram) {
-                        window.location.href = "instagram://story-camera";
-                    }
-                }, 1500); // ⚠️ 중요: 충분한 대기 시간!
-
-                // Android도 사전 완료 처리
-                await awardBadgeAndComplete();
-            } else {
-                // ━━━ 데스크톱: 일반 다운로드 ━━━
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = downloadName;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                setToast("✅ 이미지가 다운로드되었습니다!");
-
-                await awardBadgeAndComplete();
+            } catch {
+                setToast("공유에 실패했습니다. 잠시 후 다시 시도해주세요.");
             }
         } catch (error: any) {
-            console.error("Instagram 공유 오류:", error);
-            setToast("오류가 발생했습니다. 다시 시도해주세요");
+            console.error("Kakao 공유 오류:", error);
+            setToast("공유에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
     };
 
@@ -2910,11 +2847,11 @@ function EscapeIntroPageInner() {
                                                     템플릿 미리보기
                                                 </button>
                                                 <button
-                                                    onClick={handleShareToInstagram}
+                                                    onClick={handleShareToKakao}
                                                     disabled={selectedGallery.length !== 4}
                                                     className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md bg-gradient-to-r from-green-500 to-green-600"
                                                 >
-                                                    인스타 스토리 올리기
+                                                    카카오톡으로 공유
                                                 </button>
                                             </div>
                                         </div>

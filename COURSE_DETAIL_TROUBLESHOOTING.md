@@ -51,7 +51,7 @@ curl http://localhost:3000/api/courses/1
 {
     "id": "1",
     "title": "성수 감성 카페투어",
-    "description": "인스타 감성 카페 3곳을 둘러보는 특별한 코스",
+    "description": "감성 카페 3곳을 둘러보는 특별한 코스",
     "duration": "3시간",
     "location": "성수동",
     "price": "30000원",

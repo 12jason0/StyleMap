@@ -122,7 +122,7 @@ const AIOnboarding = () => {
                         </p>
 
                         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-4">
-                            {["힐링 & 휴식", "액티브한 모험", "문화 탐방", "맛집 투어", "쇼핑", "인스타 핫플"].map(
+                            {["힐링 & 휴식", "액티브한 모험", "문화 탐방", "맛집 투어", "쇼핑"].map(
                                 (style) => (
                                     <button
                                         key={style}
