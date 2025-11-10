@@ -1,6 +1,19 @@
-# 모든 검색엔진 허용
+# DoNa - 데이트 코스 추천 앱
 User-agent: *
 Allow: /
+Allow: /courses
+Allow: /escape
+Allow: /personalized-home
+Allow: /map
+
+# 미운영 페이지 크롤링 차단
+Disallow: /garden
+Disallow: /tree
+
+# 개인정보 페이지 차단
+Disallow: /api/
+Disallow: /mypage
+Disallow: /settings
 
 # 네이버 검색봇
 User-agent: Yeti

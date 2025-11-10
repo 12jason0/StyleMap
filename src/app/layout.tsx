@@ -15,15 +15,27 @@ const inter = Inter({
 export const metadata: Metadata = {
     metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dona.io.kr"),
     title: {
-        default: "DoNa - 데이트 코스 추천",
-        template: "%s | DoNa",
+        default: "두나 DoNa - 데이트 코스 추천",
+        template: "%s | 두나 DoNa",
     },
     description: "특별한 데이트를 위한 맞춤 코스 추천! 탈출방 스타일의 미션과 함께 즐기는 데이트, 두나에서 시작하세요.",
-    keywords: "데이트 코스, 데이트 추천, 커플 데이트, 서울 데이트, 데이트 장소, 연인 데이트, 데이트 코스 추천",
+    keywords: [
+        "두나",
+        "DoNa",
+        "데이트 코스",
+        "데이트 추천",
+        "커플 데이트",
+        "서울 데이트",
+        "데이트 장소",
+        "데이트 앱",
+        "탈출 데이트",
+        "연인 데이트",
+        "로맨틱 데이트",
+    ],
     openGraph: {
         type: "website",
-        siteName: "DoNa",
-        title: "DoNa - 데이트 코스 추천",
+        siteName: "두나 DoNa",
+        title: "두나 DoNa - 데이트 코스 추천",
         description: "특별한 데이트를 위한 맞춤 코스 추천",
         url: process.env.NEXT_PUBLIC_SITE_URL || "https://dona.io.kr",
         images: [
@@ -42,9 +54,9 @@ export const metadata: Metadata = {
         images: ["https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"],
     },
     verification: {
-        google: "구글 서치콘솔 인증코드", // 구글 서치콘솔 등록 후 추가
-        other: { 
-            "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1" 
+        google: "b1a43bde06d184c8", // 구글 서치콘솔 등록 후 추가
+        other: {
+            "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1",
         },
     },
     robots: {
@@ -54,6 +66,9 @@ export const metadata: Metadata = {
             index: true,
             follow: true,
         },
+    },
+    alternates: {
+        canonical: process.env.NEXT_PUBLIC_SITE_URL || "https://dona.io.kr",
     },
     icons: {
         icon: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",
