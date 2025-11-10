@@ -13,35 +13,47 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dona.local"),
+    metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dona.io.kr"),
     title: {
-        default: "DoNa",
-        template: "%s · DoNa",
+        default: "DoNa - 데이트 코스 추천",
+        template: "%s | DoNa",
     },
-    description: "두나 - 당신만의 여행 코스",
+    description: "특별한 데이트를 위한 맞춤 코스 추천! 탈출방 스타일의 미션과 함께 즐기는 데이트, 두나에서 시작하세요.",
+    keywords: "데이트 코스, 데이트 추천, 커플 데이트, 서울 데이트, 데이트 장소, 연인 데이트, 데이트 코스 추천",
     openGraph: {
         type: "website",
         siteName: "DoNa",
-        title: "DoNa",
-        description: "두나 - 당신만의 여행 코스",
-        url: process.env.NEXT_PUBLIC_SITE_URL || "https://stylemap.local",
+        title: "DoNa - 데이트 코스 추천",
+        description: "특별한 데이트를 위한 맞춤 코스 추천",
+        url: process.env.NEXT_PUBLIC_SITE_URL || "https://dona.io.kr",
         images: [
             {
                 url: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",
                 width: 512,
                 height: 512,
-                alt: "DoNa",
+                alt: "DoNa 로고",
             },
         ],
     },
     twitter: {
         card: "summary_large_image",
-        title: "DoNa",
-        description: "두나 - 당신만의 여행 코스",
+        title: "DoNa - 데이트 코스 추천",
+        description: "특별한 데이트를 위한 맞춤 코스 추천",
         images: ["https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"],
     },
     verification: {
-        other: { "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1" },
+        google: "구글 서치콘솔 인증코드", // 구글 서치콘솔 등록 후 추가
+        other: { 
+            "naver-site-verification": "247ecc2d7ba71441970f8ae0c7cf097cf3d895f1" 
+        },
+    },
+    robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+            index: true,
+            follow: true,
+        },
     },
     icons: {
         icon: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",

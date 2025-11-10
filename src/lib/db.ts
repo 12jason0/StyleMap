@@ -7,11 +7,8 @@ declare global {
     var __prisma: PrismaClient | undefined;
 }
 
-// ✅ DATABASE_URL(직접 Postgres)을 우선 사용하고, 없으면 PRISMA_DATABASE_URL을 사용
-const databaseUrl =
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL || // 일부 호스팅에서 이 키를 사용
-    process.env.PRISMA_DATABASE_URL;
+// ✅ PRISMA_DATABASE_URL (Accelerate)를 우선 사용
+const databaseUrl = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL;
 
 export const prisma: PrismaClient =
     global.__prisma ??

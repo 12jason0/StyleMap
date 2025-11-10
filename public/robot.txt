@@ -1,0 +1,14 @@
+# 모든 검색엔진 허용
+User-agent: *
+Allow: /
+
+# 네이버 검색봇
+User-agent: Yeti
+Allow: /
+
+# 구글 검색봇
+User-agent: Googlebot
+Allow: /
+
+# 사이트맵 위치
+Sitemap: https://dona.io.kr/sitemap.xml

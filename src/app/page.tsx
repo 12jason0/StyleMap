@@ -501,17 +501,13 @@ export default function Home() {
                                                         return next;
                                                     });
                                                     setTimeout(() => {
-                                                        if (Array.isArray(data.weekStamps)) {
-                                                            setWeekStamps(data.weekStamps as boolean[]);
-                                                            if (typeof data.weekCount === "number") setCycleProgress(((data.weekCount as number) % 7) as number);
-                                                        } else {
-                                                            setWeekStamps((prev) => {
-                                                                const next = [...prev];
-                                                                next[targetIdx] = true;
-                                                                return next;
-                                                            });
-                                                            setCycleProgress((((filled + 1) % 7) as number));
-                                                        }
+                                                        // 서버에서 전체 배열을 내려줘도 UI에서는 '하나만 추가'로 확정 반영
+                                                        setWeekStamps((prev) => {
+                                                            const next = [...prev];
+                                                            next[targetIdx] = true;
+                                                            return next;
+                                                        });
+                                                        setCycleProgress((((filled + 1) % 7) as number));
                                                         setAnimStamps(null);
                                                         setIsStamping(false);
                                                         setStampCompleted(true);
