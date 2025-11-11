@@ -658,6 +658,7 @@ export default function Home() {
                         </div>
                     </section>
                 )}
+
                 {/* 출석 위젯: 테마별과 당신을 위한 추천 사이 */}
                 <section className="py-6">
                     <div className="max-w-7xl mx-auto px-4">
