@@ -1,8 +1,9 @@
 import React, { useCallback, useRef, useState, useEffect, useContext } from "react";
 import { BackHandler, Platform, StyleSheet, View, ActivityIndicator, Linking } from "react-native";
+
 import { WebView } from "react-native-webview";
 import { loadAuthToken, saveAuthToken } from "../storage";
-import { PushTokenContext } from "../../App";
+import { PushTokenContext } from "../context/PushTokenContext";
 import { registerPushToken } from "../utils/registerPushToken";
 
 type Props = {
@@ -79,6 +80,72 @@ export default function WebScreen({ uri }: Props) {
         });
     } catch(e) {}
 `);
+            // 웹 하단 탭바(고정 footer) 숨김: 앱 내 중복 하단바 제거
+            // 중복된 하단 탭바 중 아래쪽 것만 숨기기
+            lines.push(`
+    (function tuneBarsAndHeader(){
+        function hideOnlyDuplicateBar(){
+            try{
+                var nodes = Array.prototype.slice.call(document.querySelectorAll('*'));
+                var fixedBottom = [];
+                nodes.forEach(function(el){
+                    var cs = window.getComputedStyle(el);
+                    if (!cs) return;
+                    var pos = cs.position;
+                    var bottomVal = cs.bottom || 'auto';
+                    var bottom = parseInt(bottomVal === 'auto' ? '0' : bottomVal, 10);
+                    var rect = el.getBoundingClientRect();
+                    var atBottom = rect.bottom >= (window.innerHeight - 2) || bottom <= 2;
+                    var plausibleHeight = rect.height > 20 && rect.height < 140;
+                    var wideEnough = rect.width > (window.innerWidth * 0.5);
+                    if ((pos === 'fixed' || pos === 'sticky') && atBottom && plausibleHeight && wideEnough) {
+                        fixedBottom.push({el: el, bottom: rect.bottom, h: rect.height});
+                    }
+                });
+                
+                // 여러 개가 있으면 가장 아래에 있는 것만 숨기기
+                if (fixedBottom.length > 1) {
+                    fixedBottom.sort(function(a, b){ return b.bottom - a.bottom; });
+                    // 가장 아래쪽 탭바만 숨기기
+                    try{ fixedBottom[0].el.style.display = 'none'; }catch(e){}
+                }
+            }catch(e){}
+        }
+        
+        function fixHeader(){
+            try{
+                // 하단 네이티브 탭바와 겹침 방지용 여백
+                var style = document.createElement('style');
+                style.textContent = 'body{ padding-bottom: 100px !important; }';
+                document.head.appendChild(style);
+                var nodes = Array.prototype.slice.call(document.querySelectorAll('*'));
+                nodes.forEach(function(el){
+                    var cs = window.getComputedStyle(el);
+                    if (!cs) return;
+                    var pos = cs.position;
+                    var topVal = cs.top || 'auto';
+                    var top = parseInt(topVal === 'auto' ? '0' : topVal, 10);
+                    var rect = el.getBoundingClientRect();
+                    var nearTop = rect.top <= 2 || top <= 2;
+                    var plausibleHeight = rect.height > 40 && rect.height < 200;
+                    if (pos === 'fixed' && nearTop && plausibleHeight) {
+                        el.style.top = 'calc(env(safe-area-inset-top, 0px))';
+                    }
+                });
+            }catch(e){}
+        }
+        
+        document.addEventListener('DOMContentLoaded', hideOnlyDuplicateBar);
+        window.addEventListener('load', hideOnlyDuplicateBar);
+        setTimeout(hideOnlyDuplicateBar, 300);
+        setTimeout(hideOnlyDuplicateBar, 1000);
+
+        document.addEventListener('DOMContentLoaded', fixHeader);
+        window.addEventListener('load', fixHeader);
+        setTimeout(fixHeader, 300);
+        setTimeout(fixHeader, 1000);
+    })();
+`);
             lines.push("})();");
             setInitialScript(lines.join("\n"));
         })();
@@ -90,6 +157,7 @@ export default function WebScreen({ uri }: Props) {
                 <WebView
                     ref={webRef}
                     source={{ uri }}
+                    contentInsetAdjustmentBehavior="automatic"
                     onLoadStart={() => setLoading(true)}
                     onLoadEnd={() => setLoading(false)}
                     onNavigationStateChange={(nav) => setCanGoBack(nav.canGoBack)}
@@ -136,16 +204,23 @@ export default function WebScreen({ uri }: Props) {
                     mediaPlaybackRequiresUserAction={false}
                     pullToRefreshEnabled={Platform.OS === "android"}
                     onShouldStartLoadWithRequest={(req) => {
-                        const url = req.url;
-                        // 전화/이메일 등 OS 핸들링
-                        if (url.startsWith("tel:") || url.startsWith("mailto:") || url.startsWith("sms:")) {
+                        const url = req.url || "";
+                        // OS가 처리해야 하는 스킴만 외부로 전달
+                        if (
+                            url.startsWith("tel:") ||
+                            url.startsWith("mailto:") ||
+                            url.startsWith("sms:") ||
+                            url.startsWith("intent:")
+                        ) {
                             Linking.openURL(url).catch(() => {});
                             return false;
                         }
-                        // 같은 도메인은 웹뷰 내에서 열기, 외부는 시스템 브라우저로
-                        if (sameHost(url)) return true;
-                        Linking.openURL(url).catch(() => {});
-                        return false;
+                        // http/https 내비게이션은 모두 WebView 안에서 처리
+                        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("about:blank")) {
+                            return true;
+                        }
+                        // 나머지는 기본적으로 허용
+                        return true;
                     }}
                 />
             )}
@@ -159,7 +234,7 @@ export default function WebScreen({ uri }: Props) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#fff" },
+    container: { flex: 1, backgroundColor: "#fff", paddingTop: Platform.OS === "ios" ? 44 : 0 },
     loading: {
         position: "absolute",
         top: 8,

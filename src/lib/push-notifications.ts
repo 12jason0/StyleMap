@@ -2,6 +2,54 @@ import prisma from "@/lib/db";
 
 type PushData = Record<string, any> | undefined;
 
+// 지정 사용자들에게만 발송
+export async function sendPushNotificationToUsers(userIds: number[], title: string, body: string, data?: PushData) {
+    const uniqueUserIds = Array.from(new Set(userIds.filter((id) => Number.isFinite(Number(id)))));
+    if (uniqueUserIds.length === 0) return { success: true, sent: 0 };
+
+    // 토큰 조회 (구독자만)
+    const tokens = await prisma.pushToken
+        .findMany({
+            where: { userId: { in: uniqueUserIds }, subscribed: true },
+            select: { token: true },
+        })
+        .catch(() => [] as { token: string }[]);
+
+    const valid = tokens.map((t) => t.token).filter(Boolean);
+    if (valid.length === 0) return { success: true, sent: 0 };
+
+    // Expo Push API로 전송 (100개 단위)
+    const batchSize = 100;
+    let sent = 0;
+    for (let i = 0; i < valid.length; i += batchSize) {
+        const slice = valid.slice(i, i + batchSize);
+        const messages = slice.map((token) => ({
+            to: token,
+            sound: "default",
+            title,
+            body,
+            data: data || {},
+        }));
+
+        try {
+            const resp = await fetch("https://exp.host/--/api/v2/push/send", {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(messages),
+            });
+            sent += slice.length;
+            await resp.json().catch(() => ({}));
+        } catch (err) {
+            console.error("Expo push send failed:", err);
+        }
+    }
+
+    return { success: true, sent };
+}
+
 // 구독자에게만 발송
 export async function sendPushNotificationToAll(title: string, body: string, data?: PushData) {
     // 1) 토큰 조회 (구독자만) - 스키마 미반영 환경에서도 동작하도록 폴백 처리

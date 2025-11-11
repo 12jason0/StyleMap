@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { filterCoursesByImagePolicy, type ImagePolicy, type CourseWithPlaces } from "@/lib/imagePolicy";
-import { sendPushNotificationToAll } from "@/lib/push-notifications";
+import { sendPushNotificationToAll, sendPushNotificationToUsers } from "@/lib/push-notifications";
 import { getUserIdFromRequest } from "@/lib/auth";
 import { getUserPreferenceSet } from "@/lib/userProfile";
 import { defaultCache } from "@/lib/cache";
@@ -203,15 +203,52 @@ export async function POST(request: NextRequest) {
         // 캐시 무효화: 간단히 전체 키 삭제
         defaultCache.clear?.();
 
-        // 🔔 모든 사용자에게 푸시 알림 보내기
+        // 🔔 지역 기반 타겟 사용자에게만 푸시 알림 보내기
         try {
-            await sendPushNotificationToAll("새로운 코스가 추가되었어요! 🎉", `${created.title} - 지금 확인해보세요`, {
-                screen: "courses",
-                courseId: created.id,
-            });
-            console.log("푸시 알림 전송 성공:", created.title);
+            const region = created.region?.trim();
+            if (region) {
+                // 1) User.location 이 해당 지역인 사용자
+                const usersByProfile = await prisma.user
+                    .findMany({
+                        where: { location: region },
+                        select: { id: true },
+                    })
+                    .catch(() => [] as { id: number }[]);
+
+                // 2) 해당 지역 코스에 상호작용(조회/클릭/좋아요/시청시간 등)이 있는 사용자 (중복 제거)
+                const usersByInteraction = await prisma.userInteraction
+                    .findMany({
+                        where: {
+                            course: { region },
+                        },
+                        select: { userId: true },
+                        distinct: ["userId"],
+                    })
+                    .catch(() => [] as { userId: number }[]);
+
+                const targetUserIds = Array.from(
+                    new Set<number>([
+                        ...usersByProfile.map((u) => u.id),
+                        ...usersByInteraction.map((u) => u.userId),
+                    ])
+                );
+
+                if (targetUserIds.length > 0) {
+                    await sendPushNotificationToUsers(
+                        targetUserIds,
+                        "내 활동 지역에 새 코스가 생겼어요! 🎉",
+                        `${created.title} - 지금 확인해보세요`,
+                        { screen: "courses", courseId: created.id, region }
+                    );
+                    console.log(`푸시 알림 전송 성공(타겟 ${targetUserIds.length}명):`, created.title, region);
+                } else {
+                    console.log("타겟 사용자 없음 → 푸시 생략", { region });
+                }
+            } else {
+                console.log("코스 지역 정보 없음 → 푸시 생략");
+            }
         } catch (error) {
-            console.error("푸시 알림 전송 실패:", error);
+            console.error("푸시 알림 전송 실패(타겟):", error);
             // 알림 실패해도 코스 생성은 성공으로 처리
         }
 

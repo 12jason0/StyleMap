@@ -1,84 +1,73 @@
 import "react-native-gesture-handler";
-import React, { createContext, useEffect, useMemo, useState } from "react";
-import { NavigationContainer, DefaultTheme, Theme, LinkingOptions } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import React, { useEffect, useRef, useState } from "react";
+import { NavigationContainer, DefaultTheme, Theme } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
+import * as Notifications from "expo-notifications";
+import { Linking } from "react-native";
 
-import HomeScreen from "./src/screens/HomeScreen";
-import CoursesScreen from "./src/screens/CoursesScreen";
-import MapScreen from "./src/screens/MapScreen";
-import MyPageScreen from "./src/screens/MyPageScreen";
-import EscapeScreen from "./src/screens/EscapeScreen";
+import WebScreen from "./src/components/WebScreen"; // ← 이 경로로 import
 import { registerForPushNotificationsAsync } from "./src/notifications";
 import { registerPushTokenToServer } from "./src/api";
-
-const Tab = createBottomTabNavigator();
+import { initDB } from "./src/utils/storage";
+import { PushTokenContext } from "./src/context/PushTokenContext";
 
 const navTheme: Theme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, primary: "#6db48c", background: "#ffffff" },
+    ...DefaultTheme,
+    colors: { ...DefaultTheme.colors, primary: "#6db48c", background: "#ffffff" },
 };
 
-export const PushTokenContext = createContext<string | null>(null);
+Notifications.setNotificationHandler({
+    handleNotification: async () =>
+        ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            shouldShowBanner: true as any,
+            shouldShowList: true as any,
+        } as Notifications.NotificationBehavior),
+});
 
 export default function App() {
-  const [pushToken, setPushToken] = useState<string | null>(null);
+    const [pushToken, setPushToken] = useState<string | null>(null);
+    const notificationListener = useRef<Notifications.Subscription | null>(null);
+    const responseListener = useRef<Notifications.Subscription | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const t = await registerForPushNotificationsAsync();
-      setPushToken(t);
-      try { await registerPushTokenToServer(t || null); } catch {}
-    })();
-  }, []);
+    useEffect(() => {
+        initDB().catch((error) => {
+            console.error("DB 초기화 실패:", error);
+        });
 
-  const linking: LinkingOptions<ReactNavigation.RootParamList> = {
-    prefixes: ["stylemap://", "https://dona.io.kr"],
-    // 탭 라우트 선택만 처리하고, 각 탭은 WebView에서 해당 경로를 로드
-    subscribe(listener) {
-      const onReceiveURL = ({ url }: { url: string }) => listener(url);
-      const subscription = (Linking as any).addEventListener("url", onReceiveURL);
-      return () => subscription.remove();
-    },
-    getInitialURL: async () => {
-      const url = await (Linking as any).getInitialURL?.();
-      return url ?? "stylemap://";
-    },
-  } as any;
+        (async () => {
+            const t = await registerForPushNotificationsAsync();
+            setPushToken(t);
+            try {
+                await registerPushTokenToServer(t || null);
+                console.log("푸시 토큰 서버 등록 완료:", t);
+            } catch (error) {
+                console.error("푸시 토큰 서버 등록 실패:", error);
+            }
+        })();
 
-  return (
-    <NavigationContainer theme={navTheme} linking={linking}>
-      <StatusBar style="dark" />
-      <PushTokenContext.Provider value={pushToken}>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: "#6db48c",
-          tabBarInactiveTintColor: "#99c08e",
-          tabBarStyle: { backgroundColor: "#fff", borderTopColor: "rgba(153,192,142,0.5)", borderTopWidth: 2 },
-          tabBarIcon: ({ color, size, focused }) => {
-            const icons: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicons.glyphMap]> = {
-              홈: ["home-outline", "home"],
-              코스: ["library-outline", "library"],
-              맵: ["compass-outline", "compass"],
-              마이: ["person-circle-outline", "person-circle"],
-              사건: ["search-outline", "search"],
-            };
-            const pair = icons[route.name] || ["ellipse-outline", "ellipse"];
-            return <Ionicons name={focused ? pair[1] : pair[0]} size={size} color={color} />;
-          },
-        })}
-      >
-        <Tab.Screen name="코스" component={CoursesScreen} />
-        <Tab.Screen name="맵" component={MapScreen} />
-        <Tab.Screen name="마이" component={MyPageScreen} />
-        <Tab.Screen name="홈" component={HomeScreen} />
-        <Tab.Screen name="사건" component={EscapeScreen} />
-      </Tab.Navigator>
-      </PushTokenContext.Provider>
-    </NavigationContainer>
-  );
+        notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
+            console.log("📩 알림 수신:", notification);
+        });
+
+        responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+            console.log("👆 알림 클릭:", response);
+        });
+
+        return () => {
+            notificationListener.current?.remove?.();
+            responseListener.current?.remove?.();
+        };
+    }, []);
+
+    return (
+        <NavigationContainer theme={navTheme}>
+            <StatusBar style="dark" />
+            <PushTokenContext.Provider value={pushToken}>
+                <WebScreen uri="https://dona.io.kr" />
+            </PushTokenContext.Provider>
+        </NavigationContainer>
+    );
 }
-
-

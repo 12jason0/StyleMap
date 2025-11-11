@@ -4,7 +4,7 @@ export async function registerPushToken(userId: number, pushToken: string): Prom
     try {
         console.log("푸시 토큰 등록 시작:", { userId, pushToken });
 
-        const response = await fetch(`${WEB_BASE}/api/push/register`, {
+        const response = await fetch(`${WEB_BASE}/api/push`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

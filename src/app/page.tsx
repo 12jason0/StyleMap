@@ -46,6 +46,8 @@ export default function Home() {
     const [alreadyToday, setAlreadyToday] = useState(false);
     const [cycleProgress, setCycleProgress] = useState(0);
     const [todayIndex, setTodayIndex] = useState(0);
+    const [streak, setStreak] = useState<number>(0);
+    const [userId, setUserId] = useState<number | null>(null);
     const router = useRouter();
     const hasShownCheckinModalRef = useRef(false);
 
@@ -54,6 +56,55 @@ export default function Home() {
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
+
+    // 출석 스트릭 및 userId 조회
+    useEffect(() => {
+        (async () => {
+            try {
+                const token = localStorage.getItem("authToken");
+                if (!token) return;
+
+                const [profileRes, checkinRes] = await Promise.all([
+                    fetch("/api/users/profile", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+                    fetch("/api/users/checkins", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+                ]);
+                if (profileRes.ok) {
+                    const p = await profileRes.json().catch(() => ({}));
+                    const id =
+                        Number(p?.user?.id ?? p?.id ?? p?.userId ?? p?.user_id) &&
+                        Number.isFinite(Number(p?.user?.id ?? p?.id ?? p?.userId ?? p?.user_id))
+                            ? Number(p?.user?.id ?? p?.id ?? p?.userId ?? p?.user_id)
+                            : null;
+                    if (id) setUserId(id);
+                }
+                if (checkinRes.ok) {
+                    const c = await checkinRes.json().catch(() => ({}));
+                    if (Number.isFinite(Number(c?.streak))) setStreak(Number(c.streak));
+                }
+            } catch {}
+        })();
+    }, []);
+
+    const sendAttendancePush = async () => {
+        try {
+            if (!userId) {
+                setErrorMessage("사용자 정보를 불러오지 못했습니다. 다시 시도해 주세요.");
+                return;
+            }
+            await fetch("/api/push/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId,
+                    title: "출석 체크 알림",
+                    body: "오늘도 새싹 도장 찍고 보상 받아가세요!",
+                    data: { screen: "mypage", tab: "checkins" },
+                }),
+            });
+        } catch {
+            setErrorMessage("알림 전송에 실패했습니다.");
+        }
+    };
 
     useEffect(() => {
         const fetchCourses = async () => {
@@ -482,8 +533,10 @@ export default function Home() {
                                                 }
                                                 // 이미 오늘 출석한 경우: 서버 배열로 동기화하고 종료
                                                 if (data.alreadyChecked) {
-                                                    if (Array.isArray(data.weekStamps)) setWeekStamps(data.weekStamps as boolean[]);
-                                                    if (typeof data.weekCount === "number") setCycleProgress(((data.weekCount as number) % 7) as number);
+                                                    if (Array.isArray(data.weekStamps))
+                                                        setWeekStamps(data.weekStamps as boolean[]);
+                                                    if (typeof data.weekCount === "number")
+                                                        setCycleProgress(((data.weekCount as number) % 7) as number);
                                                     setAlreadyToday(true);
                                                     setIsStamping(false);
                                                     setStampCompleted(true);
@@ -507,7 +560,7 @@ export default function Home() {
                                                             next[targetIdx] = true;
                                                             return next;
                                                         });
-                                                        setCycleProgress((((filled + 1) % 7) as number));
+                                                        setCycleProgress(((filled + 1) % 7) as number);
                                                         setAnimStamps(null);
                                                         setIsStamping(false);
                                                         setStampCompleted(true);
@@ -558,7 +611,7 @@ export default function Home() {
                 />
                 <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
                 {recs.length > 0 && (
-                    <section className="py-10">
+                    <section>
                         <div className="max-w-7xl mx-auto px-4">
                             <div className="flex items-center justify-between mb-4">
                                 <h2 className="text-xl font-bold text-black flex items-center gap-2">
@@ -605,6 +658,43 @@ export default function Home() {
                         </div>
                     </section>
                 )}
+                {/* 출석 위젯: 테마별과 당신을 위한 추천 사이 */}
+                <section className="py-6">
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    aria-label="출석 탭으로 이동"
+                                    onClick={() => router.push("/mypage?tab=checkins")}
+                                    className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-2xl hover:shadow cursor-pointer"
+                                    title="출석 탭으로 이동"
+                                >
+                                    🌱
+                                </button>
+                                <div>
+                                    <div className="text-sm text-gray-600">출석 현황</div>
+                                    <div className="text-base md:text-lg font-bold text-gray-900">
+                                        {streak >= 5
+                                            ? `🔥 ${streak}일 연속 출석 중!`
+                                            : streak > 0
+                                            ? `${streak}일 연속 출석 중`
+                                            : "오늘도 새싹 도장 찍어보세요!"}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={sendAttendancePush}
+                                    className="w-10 h-10 rounded-full bg-white border border-emerald-200 text-emerald-700 hover:bg-emerald-50 cursor-pointer flex items-center justify-center"
+                                    title="출석 알림 푸시 보내기"
+                                    aria-label="출석 알림 푸시"
+                                >
+                                    🔔
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <OnboardingSection onStart={handleStartOnboarding} />
             </>
         </>

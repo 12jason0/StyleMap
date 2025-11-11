@@ -4,14 +4,32 @@ import { resolveUserId } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // UTC+9
+
 function startOfDay(date: Date): Date {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
     return d;
 }
 
+// KST(UTC+9) 기준 자정
+function startOfDayKST(date: Date): Date {
+    const ms = date.getTime() + KST_OFFSET_MS; // KST로 보정
+    const kst = new Date(ms);
+    const y = kst.getUTCFullYear();
+    const m = kst.getUTCMonth();
+    const d = kst.getUTCDate();
+    // 해당 KST 날짜의 00:00을 UTC 기준 밀리초로 만든 뒤 다시 UTC-9h로 되돌려 실제 Date 생성
+    const startUtcMs = Date.UTC(y, m, d);
+    return new Date(startUtcMs - KST_OFFSET_MS);
+}
+
 function isSameDay(a: Date, b: Date): boolean {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function isSameDayKST(a: Date, b: Date): boolean {
+    return startOfDayKST(a).getTime() === startOfDayKST(b).getTime();
 }
 
 function startOfWeekMonday(date: Date): Date {
@@ -25,10 +43,10 @@ function startOfWeekMonday(date: Date): Date {
 function computeConsecutiveStreak(sortedDescCheckins: { date: Date }[], now: Date): number {
     if (sortedDescCheckins.length === 0) return 0;
     let streak = 0;
-    let expected = startOfDay(now);
+    let expected = startOfDayKST(now);
     for (const c of sortedDescCheckins) {
-        const day = startOfDay(new Date(c.date));
-        if (isSameDay(day, expected)) {
+        const day = startOfDayKST(new Date(c.date));
+        if (isSameDayKST(day, expected)) {
             streak += 1;
             expected = new Date(expected);
             expected.setDate(expected.getDate() - 1);
@@ -47,27 +65,27 @@ function computeEffectiveStreak(sortedDescCheckins: { date: Date; rewarded?: boo
         return computeConsecutiveStreak(sortedDescCheckins, now);
     }
     // 같은 날 보상이 발생한 경우, 그 날은 7개 달성 상태로 표기
-    if (isSameDay(startOfDay(new Date(lastRewarded.date)), startOfDay(now))) {
+    if (isSameDayKST(startOfDayKST(new Date(lastRewarded.date)), startOfDayKST(now))) {
         return 7;
     }
     // 보상 발생일 이후부터 다시 1부터 연속 계산
-    const cutoff = startOfDay(new Date(lastRewarded.date));
-    const filtered = sortedDescCheckins.filter((c) => startOfDay(new Date(c.date)) > cutoff);
+    const cutoff = startOfDayKST(new Date(lastRewarded.date));
+    const filtered = sortedDescCheckins.filter((c) => startOfDayKST(new Date(c.date)) > cutoff);
     return computeConsecutiveStreak(filtered, now);
 }
 
 // 보상일 기반 7칸 사이클 도장 배열 생성
 function buildCycleStamps(sortedDescCheckins: { date: Date; rewarded?: boolean }[], now: Date): boolean[] {
-    const todayStart = startOfDay(now);
+    const todayStart = startOfDayKST(now);
     const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
 
     let cycleStart = new Date(todayStart);
     // 보상 당일: 7칸 모두 채워서 보여주기 위해 오늘-6일부터 표시
-    if (lastRewarded && isSameDay(startOfDay(new Date(lastRewarded.date)), todayStart)) {
+    if (lastRewarded && isSameDayKST(startOfDayKST(new Date(lastRewarded.date)), todayStart)) {
         cycleStart.setDate(cycleStart.getDate() - 6);
     } else if (lastRewarded) {
         // 보상 다음날부터 1칸부터 시작
-        const rewardedDay = startOfDay(new Date(lastRewarded.date));
+        const rewardedDay = startOfDayKST(new Date(lastRewarded.date));
         cycleStart = new Date(rewardedDay);
         cycleStart.setDate(cycleStart.getDate() + 1);
     } else {
@@ -77,8 +95,12 @@ function buildCycleStamps(sortedDescCheckins: { date: Date; rewarded?: boolean }
     }
 
     const dayKey = (d: Date) => {
-        const sd = startOfDay(d);
-        return `${sd.getFullYear()}-${sd.getMonth()}-${sd.getDate()}`;
+        const sd = startOfDayKST(d);
+        // 월은 0-기반이므로 +1, 두 자리 패딩
+        const y = sd.getUTCFullYear();
+        const m = String(sd.getUTCMonth() + 1).padStart(2, "0");
+        const day = String(sd.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
     };
     const checkedDaySet = new Set(sortedDescCheckins.map((c) => dayKey(new Date(c.date))));
 
@@ -105,7 +127,7 @@ export async function GET(request: NextRequest) {
 
         const now = new Date();
         // 오늘 출석 여부 및 오늘 제외한 과거 도장 배열 생성
-        const todayStart = startOfDay(new Date(now));
+        const todayStart = startOfDayKST(new Date(now));
         const todayEnd = new Date(todayStart);
         todayEnd.setDate(todayEnd.getDate() + 1);
         const todayChecked = checkins.some((c: { date: Date }) => {
@@ -134,8 +156,7 @@ export async function POST(request: NextRequest) {
         if (!Number.isFinite(userId)) return NextResponse.json({ success: false, error: "BAD_USER" }, { status: 400 });
 
         const now = new Date();
-        const start = new Date(now);
-        start.setHours(0, 0, 0, 0);
+        const start = startOfDayKST(now);
         const end = new Date(start);
         end.setDate(end.getDate() + 1);
 
@@ -167,9 +188,9 @@ export async function POST(request: NextRequest) {
         // 1번 칸부터 순서대로 채우는 배열 및 카운트 (오늘 포함)
         const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, effectiveStreak)));
         const weekCount = Math.min(7, Math.max(0, effectiveStreak));
-        const todayStart = startOfDay(now);
+        const todayStart = startOfDayKST(now);
         const hasRewardedToday = recent.some(
-            (c: { date: Date; rewarded?: boolean }) => c.rewarded === true && isSameDay(new Date(c.date), todayStart)
+            (c: { date: Date; rewarded?: boolean }) => c.rewarded === true && isSameDayKST(new Date(c.date), todayStart)
         );
 
         let awarded = false;

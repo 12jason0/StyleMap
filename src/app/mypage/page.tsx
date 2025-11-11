@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
+import Image from "@/components/ImageFallback";
 
 // --- 수정된 부분: 데이터 타입 정의 ---
 // API 응답 데이터 구조에 맞게 타입을 명확하게 수정했습니다.
@@ -146,7 +147,21 @@ const MyPage = () => {
     const [casePhotoLoading, setCasePhotoLoading] = useState(false);
     const [rewards, setRewards] = useState<UserRewardRow[]>([]);
     const [checkins, setCheckins] = useState<UserCheckinRow[]>([]);
+    const [currentMonth, setCurrentMonth] = useState<Date>(() => {
+        const d = new Date();
+        return new Date(d.getFullYear(), d.getMonth(), 1);
+    });
     // Removed: showCheckinModal state for MyPage attendance modal
+    // 비밀번호 변경 모달 상태
+    const [pwModalOpen, setPwModalOpen] = useState(false);
+    const [pwStep, setPwStep] = useState<"verify" | "change">("verify");
+    const [pwState, setPwState] = useState<{ current: string; next: string; confirm: string }>({
+        current: "",
+        next: "",
+        confirm: "",
+    });
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwError, setPwError] = useState("");
 
     useEffect(() => {
         fetchUserInfo();
@@ -163,7 +178,7 @@ const MyPage = () => {
         try {
             const url = new URL(window.location.href);
             const tab = url.searchParams.get("tab");
-            if (["profile", "preferences", "favorites", "completed", "badges"].includes(tab || "")) {
+            if (["profile", "preferences", "favorites", "completed", "badges", "checkins"].includes(tab || "")) {
                 setActiveTab(tab || "profile");
             }
         } catch {}
@@ -561,7 +576,15 @@ const MyPage = () => {
             <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">계정 관리</h3>
                 <div className="space-y-4">
-                    <button className="w-full text-left px-3 md:px-4 py-2.5 md:py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer text-sm md:text-base">
+                    <button
+                        onClick={() => {
+                            setPwModalOpen(true);
+                            setPwStep("verify");
+                            setPwState({ current: "", next: "", confirm: "" });
+                            setPwError("");
+                        }}
+                        className="w-full text-left px-3 md:px-4 py-2.5 md:py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer text-sm md:text-base"
+                    >
                         <div className="flex items-center justify-between">
                             <span className="font-medium text-gray-900">비밀번호 변경</span>
                             <span className="text-gray-400">→</span>
@@ -689,15 +712,15 @@ const MyPage = () => {
                                 onClick={() => router.push(`/courses/${favorite.course_id}`)}
                             >
                                 <div className="relative">
-                                    {favorite.course.imageUrl ? (
-                                        <img
-                                            src={favorite.course.imageUrl}
+                                    <div className="relative h-48">
+                                        <Image
+                                            src={favorite.course.imageUrl || ""}
                                             alt={favorite.course.title}
-                                            className="w-full h-48 object-cover"
+                                            fill
+                                            className="object-cover rounded-none"
+                                            priority={false}
                                         />
-                                    ) : (
-                                        <div className="w-full h-48 bg-white" />
-                                    )}
+                                    </div>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -913,32 +936,106 @@ const MyPage = () => {
         );
     }
 
+    // KST 기준 날짜 키 생성 (yyyy-mm-dd)
+    const getDateKeyKST = (date: Date): string => {
+        const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+        const ms = date.getTime() + KST_OFFSET_MS;
+        const k = new Date(ms);
+        const y = k.getUTCFullYear();
+        const m = String(k.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(k.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    };
+
+    const monthLabel = (d: Date) => `${d.getFullYear()}. ${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    const goPrevMonth = () => {
+        setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    };
+    const goNextMonth = () => {
+        setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    };
+
     function renderCheckinsTab() {
+        const year = currentMonth.getFullYear();
+        const month = currentMonth.getMonth(); // 0-based
+        const firstDay = new Date(year, month, 1);
+        const firstDow = firstDay.getDay(); // 0=Sun
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // 이번 달에 해당하는 체크인 day set
+        const checkinDaySet = new Set<string>(
+            checkins.map((c) => {
+                const d = new Date(c.date);
+                return getDateKeyKST(d);
+            })
+        );
+        const targetMonthKeyPrefix = `${year}-${String(month + 1).padStart(2, "0")}-`;
+
+        const days: Array<{ day: number | null; key: string | null; stamped: boolean }> = [];
+        for (let i = 0; i < firstDow; i++) {
+            days.push({ day: null, key: null, stamped: false });
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+            const key = `${targetMonthKeyPrefix}${String(d).padStart(2, "0")}`;
+            const stamped = checkinDaySet.has(key);
+            days.push({ day: d, key, stamped });
+        }
+
         return (
             <div className="space-y-6">
                 <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8">
                     <div className="flex items-center justify-between mb-4 md:mb-6">
                         <h3 className="text-xl md:text-2xl font-bold text-gray-900">출석 기록</h3>
                     </div>
-                    {checkins.length > 0 ? (
-                        <div className="divide-y">
-                            {checkins.map((c) => (
-                                <div key={c.id} className="py-3 flex items-center justify-between">
-                                    <div className="text-gray-800">
-                                        <div className="font-semibold">{new Date(c.date).toLocaleDateString()}</div>
-                                        <div className="text-xs text-gray-500">
-                                            기록: {new Date(c.createdAt).toLocaleString()}
-                                        </div>
-                                    </div>
-                                    <div className={c.rewarded ? "text-green-600 font-bold" : "text-gray-500"}>
-                                        {c.rewarded ? "보상 지급됨" : "미지급"}
-                                    </div>
+                    <div className="mb-4 flex items-center justify-between">
+                        <button
+                            onClick={goPrevMonth}
+                            className="px-3 py-1.5 rounded-lg border text-gray-400 cursor-pointer"
+                        >
+                            ← 이전
+                        </button>
+                        <div className="font-semibold text-gray-900">{monthLabel(currentMonth)}</div>
+                        <button
+                            onClick={goNextMonth}
+                            className="px-3 py-1.5 rounded-lg border text-gray-400 cursor-pointer"
+                        >
+                            다음 →
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2 text-center text-xs md:text-sm text-gray-600 mb-2">
+                        {["일", "월", "화", "수", "목", "금", "토"].map((w) => (
+                            <div key={w} className="py-1 font-medium">
+                                {w}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-7 gap-2">
+                        {days.map((cell, idx) => {
+                            if (cell.day === null) return <div key={`pad-${idx}`} className="h-10 md:h-12" />;
+                            const isToday =
+                                getDateKeyKST(new Date()) ===
+                                `${targetMonthKeyPrefix}${String(cell.day).padStart(2, "0")}`;
+                            return (
+                                <div
+                                    key={cell.key || idx}
+                                    className={`h-10 md:h-12 rounded-lg flex items-center justify-center ${
+                                        cell.stamped
+                                            ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                                            : "bg-white border-gray-200 text-gray-700"
+                                    } ${isToday ? "ring-2 ring-blue-400" : ""}`}
+                                    title={cell.key || ""}
+                                >
+                                    {cell.stamped ? (
+                                        <span className="text-base md:text-lg">🌱</span>
+                                    ) : (
+                                        <span className="opacity-70">{cell.day}</span>
+                                    )}
                                 </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center text-gray-600 py-10">출석 기록이 없습니다.</div>
-                    )}
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         );
@@ -1018,15 +1115,14 @@ const MyPage = () => {
                                             onClick={() => router.push(`/courses/${c.course_id}`)}
                                         >
                                             <div className="relative">
-                                                {c.imageUrl ? (
-                                                    <img
-                                                        src={c.imageUrl}
+                                                <div className="relative h-48">
+                                                    <Image
+                                                        src={c.imageUrl || ""}
                                                         alt={c.title}
-                                                        className="w-full h-48 object-cover"
+                                                        fill
+                                                        className="object-cover rounded-none"
                                                     />
-                                                ) : (
-                                                    <div className="w-full h-48 bg-white" />
-                                                )}
+                                                </div>
                                                 {c.concept && (
                                                     <div className="absolute bottom-2 left-2 bg-emerald-500 text-white px-2 py-1 rounded-full text-xs font-medium">
                                                         {c.concept}
@@ -1174,6 +1270,181 @@ const MyPage = () => {
                     </div>
                 )}
             </main>
+
+            {pwModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-xl p-6 w-[90vw] max-w-md mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">
+                                {pwStep === "verify" ? "현재 비밀번호 확인" : "새 비밀번호 설정"}
+                            </h3>
+                            <button
+                                className="hover:cursor-pointer text-gray-400 hover:text-gray-600 text-2xl"
+                                onClick={() => setPwModalOpen(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        {pwError && (
+                            <div className="mb-3 rounded border border-red-300 bg-red-50 p-2 text-sm text-red-700">
+                                {pwError}
+                            </div>
+                        )}
+                        {pwStep === "verify" ? (
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    setPwLoading(true);
+                                    setPwError("");
+                                    try {
+                                        const token = localStorage.getItem("authToken");
+                                        if (!token) {
+                                            setPwError("로그인이 필요합니다.");
+                                            setPwLoading(false);
+                                            return;
+                                        }
+                                        const res = await fetch("/api/users/password/verify", {
+                                            method: "POST",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                Authorization: `Bearer ${token}`,
+                                            },
+                                            body: JSON.stringify({ currentPassword: pwState.current }),
+                                        });
+                                        const data = await res.json().catch(() => ({}));
+                                        if (!res.ok || !data?.ok) {
+                                            setPwError(data?.error || "현재 비밀번호가 올바르지 않습니다.");
+                                            setPwLoading(false);
+                                            return;
+                                        }
+                                        setPwStep("change");
+                                    } catch (err) {
+                                        setPwError("확인 중 오류가 발생했습니다.");
+                                    } finally {
+                                        setPwLoading(false);
+                                    }
+                                }}
+                                className="space-y-4"
+                            >
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        현재 비밀번호
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={pwState.current}
+                                        onChange={(e) => setPwState((s) => ({ ...s, current: e.target.value }))}
+                                        required
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="현재 비밀번호"
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={pwLoading}
+                                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                    {pwLoading ? "확인 중..." : "다음"}
+                                </button>
+                            </form>
+                        ) : (
+                            <form
+                                onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    setPwLoading(true);
+                                    setPwError("");
+                                    if (pwState.next.length < 6) {
+                                        setPwError("새 비밀번호는 최소 6자 이상이어야 합니다.");
+                                        setPwLoading(false);
+                                        return;
+                                    }
+                                    if (pwState.next !== pwState.confirm) {
+                                        setPwError("새 비밀번호가 일치하지 않습니다.");
+                                        setPwLoading(false);
+                                        return;
+                                    }
+                                    try {
+                                        const token = localStorage.getItem("authToken");
+                                        if (!token) {
+                                            setPwError("로그인이 필요합니다.");
+                                            setPwLoading(false);
+                                            return;
+                                        }
+                                        const res = await fetch("/api/users/password", {
+                                            method: "PUT",
+                                            headers: {
+                                                "Content-Type": "application/json",
+                                                Authorization: `Bearer ${token}`,
+                                            },
+                                            body: JSON.stringify({
+                                                currentPassword: pwState.current,
+                                                newPassword: pwState.next,
+                                            }),
+                                        });
+                                        const data = await res.json().catch(() => ({}));
+                                        if (!res.ok || !data?.success) {
+                                            setPwError(data?.error || "비밀번호 변경에 실패했습니다.");
+                                            setPwLoading(false);
+                                            return;
+                                        }
+                                        setPwModalOpen(false);
+                                        alert("비밀번호가 변경되었습니다. 다시 로그인해 주세요.");
+                                        localStorage.removeItem("authToken");
+                                        window.dispatchEvent(new Event("authTokenChange"));
+                                        router.push("/login");
+                                    } catch (err) {
+                                        setPwError("변경 중 오류가 발생했습니다.");
+                                    } finally {
+                                        setPwLoading(false);
+                                    }
+                                }}
+                                className="space-y-4"
+                            >
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
+                                    <input
+                                        type="password"
+                                        value={pwState.next}
+                                        onChange={(e) => setPwState((s) => ({ ...s, next: e.target.value }))}
+                                        required
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="새 비밀번호 (6자 이상)"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        새 비밀번호 확인
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={pwState.confirm}
+                                        onChange={(e) => setPwState((s) => ({ ...s, confirm: e.target.value }))}
+                                        required
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="새 비밀번호 확인"
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPwModalOpen(false)}
+                                        className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors cursor-pointer"
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={pwLoading}
+                                        className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    >
+                                        {pwLoading ? "변경 중..." : "변경하기"}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {showEditModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
