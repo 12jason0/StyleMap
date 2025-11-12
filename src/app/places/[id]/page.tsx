@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import PlaceStatusBadge from "@/components/PlaceStatusBadge";
 import Image from "@/components/ImageFallback";
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 
-const NaverMap = dynamic(() => import("@/components/NaverMap"), {
+const NaverMap = dynamicImport(() => import("@/components/NaverMap"), {
     ssr: false,
     loading: () => <div className="w-full h-64 bg-gray-100 rounded-lg" />,
 });
@@ -32,10 +32,7 @@ export default async function PlaceDetailPage({ params }: PageProps) {
         where: { id: placeId },
         include: {
             closed_days: {
-                orderBy: [
-                    { day_of_week: "asc" },
-                    { specific_date: "asc" },
-                ],
+                orderBy: [{ day_of_week: "asc" }, { specific_date: "asc" }],
             },
         },
     });
@@ -228,7 +225,9 @@ export default async function PlaceDetailPage({ params }: PageProps) {
                             {place.address && (
                                 <div className="mt-4">
                                     <a
-                                        href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name)}?c=${place.longitude},${place.latitude},15,0,0,0,dh`}
+                                        href={`https://map.naver.com/v5/search/${encodeURIComponent(place.name)}?c=${
+                                            place.longitude
+                                        },${place.latitude},15,0,0,0,dh`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -247,12 +246,22 @@ export default async function PlaceDetailPage({ params }: PageProps) {
                             <h2 className="text-2xl font-bold mb-4">휴무일</h2>
                             <div className="space-y-2">
                                 {place.closed_days.map((closedDay, idx) => {
-                                    const dayNames = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+                                    const dayNames = [
+                                        "일요일",
+                                        "월요일",
+                                        "화요일",
+                                        "수요일",
+                                        "목요일",
+                                        "금요일",
+                                        "토요일",
+                                    ];
                                     let displayText = "";
 
                                     if (closedDay.specific_date) {
                                         const date = new Date(closedDay.specific_date);
-                                        displayText = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`;
+                                        displayText = `${date.getFullYear()}년 ${
+                                            date.getMonth() + 1
+                                        }월 ${date.getDate()}일`;
                                         if (closedDay.note) {
                                             displayText += ` (${closedDay.note})`;
                                         }
@@ -295,4 +304,3 @@ export default async function PlaceDetailPage({ params }: PageProps) {
         </div>
     );
 }
-
