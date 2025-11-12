@@ -7,6 +7,7 @@ import Image from "@/components/ImageFallback";
 import dynamic from "next/dynamic";
 
 import { Place as MapPlace, UserLocation } from "@/types/map";
+import PlaceStatusBadge from "@/components/PlaceStatusBadge";
 const ReviewModal = dynamic(() => import("@/components/ReviewModal"), { ssr: false, loading: () => null });
 const NaverMap = dynamic(() => import("@/components/NaverMap"), {
     ssr: false,
@@ -14,6 +15,12 @@ const NaverMap = dynamic(() => import("@/components/NaverMap"), {
 });
 
 // --- 타입 정의 ---
+interface PlaceClosedDay {
+    day_of_week: number | null;
+    specific_date: Date | string | null;
+    note?: string | null;
+}
+
 interface Place {
     id: number;
     name: string;
@@ -29,6 +36,7 @@ interface Place {
     latitude: number;
     longitude: number;
     imageUrl?: string; // ✅ snake_case 로 수정
+    closed_days?: PlaceClosedDay[];
 }
 
 interface CoursePlace {
@@ -748,6 +756,15 @@ export default function CourseDetailPage() {
                                                                         <span className="text-sm text-gray-600">
                                                                             🕒 {coursePlace.recommended_time}
                                                                         </span>
+                                                                    </div>
+                                                                    {/* 영업 상태 배지 */}
+                                                                    <div className="mb-2">
+                                                                        <PlaceStatusBadge
+                                                                            place={coursePlace.place}
+                                                                            closedDays={coursePlace.place.closed_days || []}
+                                                                            size="sm"
+                                                                            showHours={false}
+                                                                        />
                                                                     </div>
                                                                     <div className="mt-2 flex flex-wrap gap-2">
                                                                         {/* 상세보기 버튼 */}

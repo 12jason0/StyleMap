@@ -150,23 +150,24 @@ model Course {
 }
 
 model Place {
-  id                   Int           @id @default(autoincrement())
-  name                 String        @db.VarChar(255)
-  address              String?       @db.VarChar(500)
+  id                   Int              @id @default(autoincrement())
+  name                 String           @db.VarChar(255)
+  address              String?          @db.VarChar(500)
   description          String?
-  category             String?       @db.VarChar(100)
-  avg_cost_range       String?       @db.VarChar(100)
-  opening_hours        String?       @db.VarChar(200)
-  phone                String?       @db.VarChar(50)
-  website              String?       @db.VarChar(500)
-  parking_available    Boolean?      @default(false)
-  reservation_required Boolean?      @default(false)
+  category             String?          @db.VarChar(100)
+  avg_cost_range       String?          @db.VarChar(100)
+  opening_hours        String?          @db.VarChar(200)
+  phone                String?          @db.VarChar(50)
+  website              String?          @db.VarChar(500)
+  parking_available    Boolean?         @default(false)
+  reservation_required Boolean?         @default(false)
   latitude             Float?
   longitude            Float?
-  imageUrl             String?       @db.VarChar(500)
-  created_at           DateTime      @default(now())
-  updated_at           DateTime      @updatedAt
+  imageUrl             String?          @db.VarChar(500)
+  created_at           DateTime         @default(now())
+  updated_at           DateTime         @updatedAt
   tags                 String?
+  closed_days          PlaceClosedDay[]
   coursePlaces         CoursePlace[]
 
   @@map("places")
@@ -373,6 +374,22 @@ model CoursePlace {
   place              Place    @relation(fields: [place_id], references: [id])
 
   @@map("course_places")
+}
+
+model PlaceClosedDay {
+  id            Int       @id @default(autoincrement())
+  place_id      Int
+  day_of_week   Int?      // 0=일요일, 1=월요일, ..., 6=토요일
+  specific_date DateTime? @db.Date
+  note          String?   @db.VarChar(200)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  place         Place     @relation(fields: [place_id], references: [id], onDelete: Cascade)
+
+  @@index([place_id])
+  @@index([day_of_week])
+  @@index([specific_date])
+  @@map("place_closed_days")
 }
 
 model Highlight {

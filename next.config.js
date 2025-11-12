@@ -1,11 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    eslint: {
-        ignoreDuringBuilds: true,
-    },
-    typescript: {
-        ignoreBuildErrors: true,
-    },
+    eslint: { ignoreDuringBuilds: true },
+    typescript: { ignoreBuildErrors: true },
     async headers() {
         return [
             {
@@ -19,10 +15,14 @@ const nextConfig = {
                         key: "Content-Security-Policy",
                         value: (() => {
                             const isDev = process.env.NODE_ENV !== "production";
+
+                            // ✅ CSP 값은 directive 이름과 값 사이에 반드시 "공백 1개"로 구분
                             const scriptSrc = [
                                 "'self'",
                                 "'unsafe-inline'",
                                 ...(isDev ? ["'unsafe-eval'"] : []),
+                                "blob:", // ✅ 올바른 위치
+                                "https://cdn.jsdelivr.net", // ✅ browser-image-compression 외부 스크립트 허용
                                 "https://vercel.live",
                                 "https://*.vercel.live",
                                 "https://oapi.map.naver.com",
@@ -32,19 +32,22 @@ const nextConfig = {
                                 "https://*.pstatic.net",
                                 "https://www.googletagmanager.com",
                                 "https://www.google-analytics.com",
-                                "https://t1.kakaocdn.net", // 👈 카카오 SDK 추가
-                                "https://developers.kakao.com", // 👈 카카오 개발자 추가
+                                "https://t1.kakaocdn.net",
+                                "https://developers.kakao.com",
                                 ...(isDev ? ["http://oapi.map.naver.com", "http://nrbe.map.naver.net"] : []),
                             ].join(" ");
+
                             const styleSrc = [
                                 "'self'",
                                 "'unsafe-inline'",
                                 "https://ssl.pstatic.net",
                                 "https://cdn.jsdelivr.net",
                             ].join(" ");
+
                             const imgSrc = ["'self'", "data:", "blob:", "https:", ...(isDev ? ["http:"] : [])].join(
                                 " "
                             );
+
                             const connectSrc = [
                                 "'self'",
                                 "https://vercel.live",
@@ -60,9 +63,9 @@ const nextConfig = {
                                 "https://analytics.google.com",
                                 "https://stats.g.doubleclick.net",
                                 "https://region1.google-analytics.com",
-                                "https://*.kakao.com", // 👈 카카오 API 추가
-                                "https://kauth.kakao.com", // 👈 카카오 인증 추가
-                                "https://t1.kakaocdn.net", // 👈 카카오 CDN 추가
+                                "https://*.kakao.com",
+                                "https://kauth.kakao.com",
+                                "https://t1.kakaocdn.net",
                                 "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com",
                                 "https://*.amazonaws.com",
                                 ...(isDev
@@ -73,19 +76,24 @@ const nextConfig = {
                                       ]
                                     : []),
                             ].join(" ");
+
                             const fontSrc = ["'self'", "data:", "https://cdn.jsdelivr.net"].join(" ");
                             const frameSrc = ["'self'", "https://vercel.live", "https://www.googletagmanager.com"].join(
                                 " "
                             );
-                            return (
-                                `default-src 'self'; ` +
-                                `script-src ${scriptSrc}; ` +
-                                `style-src ${styleSrc}; ` +
-                                `img-src ${imgSrc}; ` +
-                                `connect-src ${connectSrc}; ` +
-                                `font-src ${fontSrc}; ` +
-                                `frame-src ${frameSrc};`
-                            );
+                            const workerSrc = ["'self'", "blob:"].join(" ");
+
+                            // ✅ 정확히 한 줄로 합치기 (세미콜론 + 공백 필수)
+                            return [
+                                `default-src 'self'`,
+                                `script-src ${scriptSrc}`,
+                                `style-src ${styleSrc}`,
+                                `img-src ${imgSrc}`,
+                                `connect-src ${connectSrc}`,
+                                `font-src ${fontSrc}`,
+                                `frame-src ${frameSrc}`,
+                                `worker-src ${workerSrc}`,
+                            ].join("; "); // ✅ 세미콜론 뒤 반드시 공백
                         })(),
                     },
                 ],
@@ -97,12 +105,6 @@ const nextConfig = {
             { protocol: "https", hostname: "images.unsplash.com" },
             { protocol: "https", hostname: "stylemap-seoul.s3.ap-northeast-2.amazonaws.com" },
             { protocol: "https", hostname: "stylemap-images.s3.ap-southeast-2.amazonaws.com" },
-            ...(process.env.NEXT_IMAGE_EXTRA_DOMAINS
-                ? process.env.NEXT_IMAGE_EXTRA_DOMAINS.split(",")
-                      .map((d) => d.trim())
-                      .filter(Boolean)
-                      .map((host) => ({ protocol: "https", hostname: host }))
-                : []),
         ],
         unoptimized: true,
     },

@@ -34,7 +34,13 @@ export async function GET(
                 benefits: true,
                 courseNotices: true,
                 coursePlaces: {
-                    include: { place: true },
+                    include: {
+                        place: {
+                            include: {
+                                closed_days: true,
+                            },
+                        },
+                    },
                     orderBy: { order_index: "asc" },
                 },
                 _count: { select: { coursePlaces: true } },
@@ -95,6 +101,7 @@ export async function GET(
                       latitude: cp.place.latitude ? Number(cp.place.latitude) : null,
                       longitude: cp.place.longitude ? Number(cp.place.longitude) : null,
                       imageUrl: cp.place.imageUrl?.trim() ? cp.place.imageUrl : "",
+                      closed_days: (cp.place as any).closed_days || [],
                   }
                 : null,
         }));

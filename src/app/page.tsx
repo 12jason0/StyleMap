@@ -181,7 +181,10 @@ export default function Home() {
         return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
     }, []);
 
-    const fetchAndSetWeekStamps = async (): Promise<{ stamps: boolean[]; todayChecked: boolean } | null> => {
+    const fetchAndSetWeekStamps = async (): Promise<{
+        stamps: boolean[];
+        todayChecked: boolean;
+    } | null> => {
         const result = await fetchWeekStamps();
         if (!result) return null;
         const { stamps, todayChecked } = result;
@@ -198,8 +201,10 @@ export default function Home() {
 
             const todayKey = getLocalTodayKey();
             const shownDateAtStart = localStorage.getItem("checkinModalShownDate");
-            if (hasShownCheckinModalRef.current && shownDateAtStart === todayKey) return;
+            // 모달이 이미 열려있지 않을 때만 early return (데이터는 항상 최신으로 가져옴)
+            if (hasShownCheckinModalRef.current && shownDateAtStart === todayKey && !showCheckinModal) return;
 
+            // 항상 최신 데이터를 가져옴
             const result = await fetchAndSetWeekStamps();
             const already = Boolean(result?.todayChecked);
             const shownDate = localStorage.getItem("checkinModalShownDate");
@@ -542,8 +547,21 @@ export default function Home() {
                                                     setStampCompleted(true);
                                                     return;
                                                 }
+                                                // 서버에서 받은 weekStamps를 사용
+                                                if (Array.isArray(data.weekStamps)) {
+                                                    setWeekStamps(data.weekStamps as boolean[]);
+                                                }
+                                                if (typeof data.weekCount === "number") {
+                                                    setCycleProgress((data.weekCount % 7) as number);
+                                                }
+                                                if (typeof (data as any).streak === "number") {
+                                                    setStreak((data as any).streak);
+                                                }
+
                                                 // 애니메이션: 현재 채워진 개수 기준 다음 칸에 도장
-                                                const filled = weekStamps.filter(Boolean).length;
+                                                const filled = Array.isArray(data.weekStamps)
+                                                    ? data.weekStamps.filter(Boolean).length
+                                                    : weekStamps.filter(Boolean).length;
                                                 const targetIdx = Math.min(6, filled);
 
                                                 setAnimStamps([false, false, false, false, false, false, false]);
@@ -554,13 +572,10 @@ export default function Home() {
                                                         return next;
                                                     });
                                                     setTimeout(() => {
-                                                        // 서버에서 전체 배열을 내려줘도 UI에서는 '하나만 추가'로 확정 반영
-                                                        setWeekStamps((prev) => {
-                                                            const next = [...prev];
-                                                            next[targetIdx] = true;
-                                                            return next;
-                                                        });
-                                                        setCycleProgress(((filled + 1) % 7) as number);
+                                                        // 서버에서 받은 배열을 그대로 사용
+                                                        if (Array.isArray(data.weekStamps)) {
+                                                            setWeekStamps(data.weekStamps as boolean[]);
+                                                        }
                                                         setAnimStamps(null);
                                                         setIsStamping(false);
                                                         setStampCompleted(true);

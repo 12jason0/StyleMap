@@ -3,6 +3,28 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "@/components/ImageFallback";
+import { getPlaceStatus } from "@/lib/placeStatus";
+
+type PlaceClosedDay = {
+    day_of_week: number | null;
+    specific_date: Date | string | null;
+    note?: string | null;
+};
+
+type Place = {
+    id: number;
+    name: string;
+    imageUrl?: string;
+    latitude?: number;
+    longitude?: number;
+    opening_hours?: string | null;
+    closed_days?: PlaceClosedDay[];
+};
+
+type CoursePlace = {
+    order_index: number;
+    place: Place | null;
+};
 
 type Course = {
     id: string;
@@ -16,6 +38,7 @@ type Course = {
     location?: string;
     price?: string;
     duration?: string;
+    coursePlaces?: CoursePlace[];
 };
 
 const activities = [
@@ -39,6 +62,12 @@ export default function NearbyPage() {
     // 되돌림: 페이징 상태 제거
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hideClosedPlaces, setHideClosedPlaces] = useState(false);
+
+    // 페이지 로드 시 스크롤을 맨 위로
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -69,6 +98,36 @@ export default function NearbyPage() {
 
     // 되돌림: 필터 변경에 따른 페이징 초기화 제거
 
+    // 휴무인 장소가 있는 코스인지 확인하는 함수
+    const hasClosedPlace = useMemo(() => {
+        return (course: Course): boolean => {
+            if (!course.coursePlaces || course.coursePlaces.length === 0) return false;
+
+            return course.coursePlaces.some((cp) => {
+                const place = cp.place;
+                if (!place) return false;
+
+                const status = getPlaceStatus(place.opening_hours || null, place.closed_days || []);
+                return status.status === "휴무";
+            });
+        };
+    }, []);
+
+    // 휴무인 장소 개수를 계산하는 함수
+    const getClosedPlaceCount = useMemo(() => {
+        return (course: Course): number => {
+            if (!course.coursePlaces || course.coursePlaces.length === 0) return 0;
+
+            return course.coursePlaces.filter((cp) => {
+                const place = cp.place;
+                if (!place) return false;
+
+                const status = getPlaceStatus(place.opening_hours || null, place.closed_days || []);
+                return status.status === "휴무";
+            }).length;
+        };
+    }, []);
+
     const filtered = useMemo(() => {
         return courses.filter((c) => {
             if (selectedActivities.length > 0 && !selectedActivities.some((a) => (c.concept || "").includes(a))) {
@@ -78,9 +137,13 @@ export default function NearbyPage() {
                 const loc = (c.location || c.region || "").toLowerCase();
                 if (!selectedRegions.some((r) => loc.includes(r.toLowerCase()))) return false;
             }
+            // 휴무인 장소가 있는 코스 필터링
+            if (hideClosedPlaces && hasClosedPlace(c)) {
+                return false;
+            }
             return true;
         });
-    }, [courses, selectedActivities, selectedRegions]);
+    }, [courses, selectedActivities, selectedRegions, hideClosedPlaces, hasClosedPlace]);
 
     const toggle = (arr: string[], v: string, set: (n: string[]) => void) => {
         if (arr.includes(v)) set(arr.filter((x) => x !== v));
@@ -95,10 +158,7 @@ export default function NearbyPage() {
 
     return (
         <div className="min-h-screen bg-white text-black">
-            <section
-                className="max-w-[500px] mx-auto px-4 pt-5 pb-12 overflow-y-auto overscroll-contain no-scrollbar scrollbar-hide"
-                style={{ maxHeight: "calc(100vh - 80px)" }}
-            >
+            <section className="max-w-[500px] mx-auto px-4 pt-5 pb-12">
                 <div className="flex flex-col gap-6">
                     {/* Left: Control panel */}
                     <aside className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
@@ -143,6 +203,19 @@ export default function NearbyPage() {
                             </div>
                         </div>
 
+                        {/* 휴무 장소 필터 체크박스 */}
+                        <div className="mb-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={hideClosedPlaces}
+                                    onChange={(e) => setHideClosedPlaces(e.target.checked)}
+                                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                                />
+                                <span className="text-sm text-gray-700">휴무 코스 제외</span>
+                            </label>
+                        </div>
+
                         {/* 예산 기능 제거 */}
                     </aside>
 
@@ -182,6 +255,26 @@ export default function NearbyPage() {
                                                     fill
                                                     className="object-cover"
                                                 />
+                                                {/* 휴무 장소 경고 배지 */}
+                                                {hasClosedPlace(c) && (
+                                                    <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                                                        <svg
+                                                            className="w-3 h-3"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            viewBox="0 0 24 24"
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                        >
+                                                            <path
+                                                                strokeLinecap="round"
+                                                                strokeLinejoin="round"
+                                                                strokeWidth={2}
+                                                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                                            />
+                                                        </svg>
+                                                        <span>{getClosedPlaceCount(c)}곳 휴무</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{c.title}</h3>
                                             <div className="text-xs text-gray-500 flex flex-wrap gap-3">

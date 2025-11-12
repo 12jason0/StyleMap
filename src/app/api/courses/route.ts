@@ -76,6 +76,14 @@ export async function GET(request: NextRequest) {
                                 imageUrl: true,
                                 latitude: true,
                                 longitude: true,
+                                opening_hours: true,
+                                closed_days: {
+                                    select: {
+                                        day_of_week: true,
+                                        specific_date: true,
+                                        note: true,
+                                    },
+                                },
                             },
                         },
                     },
@@ -120,6 +128,28 @@ export async function GET(request: NextRequest) {
                 view_count: course.view_count || 0,
                 viewCount: course.view_count || 0,
                 createdAt: course.createdAt,
+                coursePlaces: Array.isArray(course.coursePlaces)
+                    ? course.coursePlaces.map((cp: any) => ({
+                          order_index: cp.order_index,
+                          place: cp.place
+                              ? {
+                                    id: cp.place.id,
+                                    name: cp.place.name,
+                                    imageUrl: cp.place.imageUrl,
+                                    latitude: cp.place.latitude ? Number(cp.place.latitude) : undefined,
+                                    longitude: cp.place.longitude ? Number(cp.place.longitude) : undefined,
+                                    opening_hours: cp.place.opening_hours || null,
+                                    closed_days: Array.isArray(cp.place.closed_days)
+                                        ? cp.place.closed_days.map((cd: any) => ({
+                                              day_of_week: cd.day_of_week,
+                                              specific_date: cd.specific_date,
+                                              note: cd.note || null,
+                                          }))
+                                        : [],
+                                }
+                              : null,
+                      }))
+                    : [],
             };
         });
 

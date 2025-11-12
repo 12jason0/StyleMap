@@ -139,8 +139,8 @@ export async function GET(request: NextRequest) {
         const checkinsExcludingToday = checkins.filter((c: { date: Date }) => new Date(c.date) < todayStart);
         const streak = computeEffectiveStreak(checkinsExcludingToday, now);
 
-        // 1번 칸부터 순서대로 채우는 단순 배열 생성
-        const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, streak)));
+        // 실제 출석 날짜를 기반으로 올바른 배열 생성
+        const weekStamps = buildCycleStamps(checkins, now);
         const weekCount = Math.min(7, Math.max(0, streak));
 
         return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps });
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
                 take: 120,
             });
             const streak = computeEffectiveStreak(recent, now);
-            const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, streak)));
+            const weekStamps = buildCycleStamps(recent, now);
             const weekCount = Math.min(7, Math.max(0, streak));
             return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak, weekStamps, weekCount });
         }
@@ -185,8 +185,8 @@ export async function POST(request: NextRequest) {
             take: 120,
         });
         const effectiveStreak = computeEffectiveStreak(recent, now);
-        // 1번 칸부터 순서대로 채우는 배열 및 카운트 (오늘 포함)
-        const weekStamps = Array.from({ length: 7 }, (_, i) => i < Math.min(7, Math.max(0, effectiveStreak)));
+        // 실제 출석 날짜를 기반으로 올바른 배열 생성 (오늘 포함)
+        const weekStamps = buildCycleStamps(recent, now);
         const weekCount = Math.min(7, Math.max(0, effectiveStreak));
         const todayStart = startOfDayKST(now);
         const hasRewardedToday = recent.some(

@@ -1,8 +1,30 @@
 "use client";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import Image from "@/components/ImageFallback";
+import { getPlaceStatus } from "@/lib/placeStatus";
+
+type PlaceClosedDay = {
+    day_of_week: number | null;
+    specific_date: Date | string | null;
+    note?: string | null;
+};
+
+type Place = {
+    id: number;
+    name: string;
+    imageUrl?: string;
+    latitude?: number;
+    longitude?: number;
+    opening_hours?: string | null;
+    closed_days?: PlaceClosedDay[];
+};
+
+type CoursePlace = {
+    order_index: number;
+    place: Place | null;
+};
 
 interface Course {
     id: string;
@@ -20,6 +42,7 @@ interface Course {
         id: string;
         name: string;
     };
+    coursePlaces?: CoursePlace[];
 }
 
 function CoursesPageInner() {
@@ -31,6 +54,7 @@ function CoursesPageInner() {
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [hideClosedPlaces, setHideClosedPlaces] = useState(false);
 
     // 페이지 로드 시 스크롤을 맨 위로
     useEffect(() => {
@@ -103,6 +127,27 @@ function CoursesPageInner() {
         fetchCourses();
     }, [concept]);
 
+    // 휴무인 장소가 있는 코스인지 확인하는 함수
+    const hasClosedPlace = useMemo(() => {
+        return (course: Course): boolean => {
+            if (!course.coursePlaces || course.coursePlaces.length === 0) return false;
+
+            return course.coursePlaces.some((cp) => {
+                const place = cp.place;
+                if (!place) return false;
+
+                const status = getPlaceStatus(place.opening_hours || null, place.closed_days || []);
+                return status.status === "휴무";
+            });
+        };
+    }, []);
+
+    // 필터링된 코스 목록
+    const filteredCourses = useMemo(() => {
+        if (!hideClosedPlaces) return courses;
+        return courses.filter((course) => !hasClosedPlace(course));
+    }, [courses, hideClosedPlaces, hasClosedPlace]);
+
     // ✅ "코스 시작하기" 버튼 핸들러
     const handleStartCourse = (e: React.MouseEvent, courseId: string) => {
         e.stopPropagation();
@@ -145,10 +190,10 @@ function CoursesPageInner() {
             {/* 헤더 */}
             <div className="bg-white shadow-sm">
                 <div className="max-w-[500px] mx-auto px-4 py-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-4">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 font-brand">
-                                {recommended ? "추천 코스" : concept ? `${concept} 코스` : "모든 코스"}
+                                {recommended ? "추천 코스" : concept ? `${concept} 코스` : "오늘 뭐하지"}
                             </h1>
                             <p className="text-gray-600 mt-2">
                                 {recommended
@@ -159,13 +204,23 @@ function CoursesPageInner() {
                             </p>
                         </div>
                     </div>
+                    {/* 휴무 장소 필터 체크박스 */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={hideClosedPlaces}
+                            onChange={(e) => setHideClosedPlaces(e.target.checked)}
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                        />
+                        <span className="text-sm text-gray-700">휴무인 장소가 있는 코스 숨기기</span>
+                    </label>
                 </div>
             </div>
 
             {/* 코스 목록 */}
             <div className="max-w-[500px] mx-auto px-4 py-8">
                 <div className="grid grid-cols-1 gap-6">
-                    {courses.map((course, idx) => (
+                    {filteredCourses.map((course, idx) => (
                         <div
                             key={course.id}
                             className="bg-white rounded-2xl border border-green-100 shadow-sm hover:shadow-md transition-all cursor-pointer block"
@@ -253,7 +308,22 @@ function CoursesPageInner() {
                 </div>
 
                 {/* 코스 없을 때 */}
-                {courses.length === 0 && concept && (
+                {filteredCourses.length === 0 && courses.length > 0 && (
+                    <div className="text-center py-16">
+                        <div className="text-6xl mb-4">🔍</div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">필터링된 코스가 없습니다</h3>
+                        <p className="text-gray-600 mb-6">
+                            휴무인 장소가 있는 코스를 숨기는 필터를 해제하면 더 많은 코스를 볼 수 있습니다.
+                        </p>
+                        <button
+                            onClick={() => setHideClosedPlaces(false)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-medium transition-colors"
+                        >
+                            필터 해제하기
+                        </button>
+                    </div>
+                )}
+                {filteredCourses.length === 0 && courses.length === 0 && concept && (
                     <div className="text-center py-16">
                         <div className="text-6xl mb-4">🚧</div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">{concept} 코스 준비중입니다</h3>
@@ -277,7 +347,7 @@ function CoursesPageInner() {
                     </div>
                 )}
 
-                {courses.length === 0 && !concept && (
+                {filteredCourses.length === 0 && courses.length === 0 && !concept && (
                     <div className="text-center py-16">
                         <div className="text-6xl mb-4">🚧</div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">코스를 찾을 수 없습니다</h3>

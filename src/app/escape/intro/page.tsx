@@ -1129,25 +1129,28 @@ function EscapeIntroPageInner() {
         ];
     })();
 
-    const mapPlaces = userLocation
-        ? [{ id: -1, name: "현재 위치", latitude: userLocation.lat, longitude: userLocation.lng }, ...currentPlace]
-        : currentPlace;
+    // NaverMap 컴포넌트가 userLocation prop으로 자기 위치 핀을 자동으로 생성하므로,
+    // mapPlaces에는 자기 위치를 추가하지 않음 (중복 방지)
+    const mapPlaces = currentPlace;
 
     useEffect(() => {
         if (animationFinished && mountMapAfterOpen && currentChapter && chapters.length > 0) {
             const t = setTimeout(() => {
                 setDialogueStep(0);
-                // 항상 1챕터에서 편지를 보여줍니다 (한 번만 표시 로직 제거)
-                if (currentChapter.chapter_number === 1) {
+                // 편지는 맨 처음(prologue)에만 표시
+                // prologue 단계이고 첫 챕터일 때는 항상 편지 표시 (처음 진입 시)
+                if (currentChapter.chapter_number === 1 && flowStep === "prologue") {
                     setIsDialogueActive(true);
                 } else {
                     setIsDialogueActive(false);
-                    setIsLetterOpened(true);
+                    if (currentChapter.chapter_number !== 1 || flowStep !== "prologue") {
+                        setIsLetterOpened(true);
+                    }
                 }
             }, 80);
             return () => clearTimeout(t);
         }
-    }, [animationFinished, mountMapAfterOpen, currentChapter, chapters.length, storyId]);
+    }, [animationFinished, mountMapAfterOpen, currentChapter, chapters.length, storyId, flowStep]);
 
     const handleCloseBook = () => {
         setEndingStep(null);
@@ -1640,7 +1643,6 @@ function EscapeIntroPageInner() {
         }
     };
 
-
     const handleShareToKakao = async () => {
         try {
             setToast("템플릿을 생성하는 중...");
@@ -1664,8 +1666,7 @@ function EscapeIntroPageInner() {
                 } catch {}
             }
 
-            const landingUrl =
-                typeof window !== "undefined" ? `${window.location.origin}/mypage` : "https://dona.app";
+            const landingUrl = typeof window !== "undefined" ? `${window.location.origin}/mypage` : "https://dona.app";
 
             // Kakao JS SDK 로드/초기화
             const ensureKakao = () =>
@@ -1932,26 +1933,30 @@ function EscapeIntroPageInner() {
                 // 미션 완료 시: 다음 카테고리로 즉시 전환
                 setPiecesCollected((n) => n + 1);
                 setPendingNextChapterIdx(nextIdx);
-                // 완료 카테고리 반영은 서버 저장 성공 이후(현재 시점)에서만 처리
-                try {
-                    // 선택된 장소의 카테고리를 완료 처리하여 해당 카테고리만 비활성화
-                    const place = (currentChapter?.placeOptions || []).find(
-                        (p: any) => Number(p.id) === Number(selectedPlaceId)
-                    );
-                    const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
-                    if (catKey) {
-                        setCompletedCategories((prev) => {
-                            const next = Array.from(new Set([...(prev || []), catKey]));
-                            try {
-                                const raw = localStorage.getItem(STORAGE_KEY);
-                                const obj = raw ? JSON.parse(raw) : {};
-                                obj.__completedCategories = next;
-                                localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-                            } catch {}
-                            return next;
-                        });
-                    }
-                } catch {}
+                // ✅ 미션이 2개 완료되었을 때만 카테고리 완료 처리
+                // canProceed가 true인지 확인 (미션 2개 완료 조건)
+                if (canProceed) {
+                    // 완료 카테고리 반영은 서버 저장 성공 이후(현재 시점)에서만 처리
+                    try {
+                        // 선택된 장소의 카테고리를 완료 처리하여 해당 카테고리만 비활성화
+                        const place = (currentChapter?.placeOptions || []).find(
+                            (p: any) => Number(p.id) === Number(selectedPlaceId)
+                        );
+                        const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
+                        if (catKey) {
+                            setCompletedCategories((prev) => {
+                                const next = Array.from(new Set([...(prev || []), catKey]));
+                                try {
+                                    const raw = localStorage.getItem(STORAGE_KEY);
+                                    const obj = raw ? JSON.parse(raw) : {};
+                                    obj.__completedCategories = next;
+                                    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                } catch {}
+                                return next;
+                            });
+                        }
+                    } catch {}
+                }
                 // ✅ 다음 카테고리로 이동하되, 미션 완료 상태는 유지
                 changeFlowStep("category", { resetMission: true, resetPlace: true });
                 setCurrentChapterIdx(nextIdx);
@@ -2002,9 +2007,16 @@ function EscapeIntroPageInner() {
 
     const goToPrevChapter = () => {
         if (currentChapterIdx > 0) {
-            setCurrentChapterIdx((prev) => prev - 1);
+            const prevIdx = currentChapterIdx - 1;
+            const prevChapter = chapters[prevIdx];
+            setCurrentChapterIdx(prevIdx);
             setDialogueStep(0);
-            setIsDialogueActive(true);
+            // 편지는 prologue 단계에서만 표시
+            if (prevChapter?.chapter_number === 1 && flowStep === "prologue") {
+                setIsDialogueActive(true);
+            } else {
+                setIsDialogueActive(false);
+            }
         }
     };
 
@@ -2212,8 +2224,11 @@ function EscapeIntroPageInner() {
     const useNewIntroUI = true;
     if (useNewIntroUI) {
         const bgUrl = story?.imageUrl || "https://stylemap-images.s3.ap-southeast-2.amazonaws.com/homepage.png";
-        // 처음 진입 시에는 편지만 뜨도록, 챕터 번호와 무관하게 '열림 여부'만으로 게이트 판단
-        const letterGateActive = !isLetterOpened;
+        // 편지는 맨 처음(prologue)과 맨 마지막(epilogue)에만 표시
+        // prologue 단계이고 첫 챕터일 때는 편지 표시 (처음 진입 시)
+        // 단, 카테고리에서 뒤로 가기로 돌아온 경우는 제외 (flowStep이 "category"로 변경되면 편지 안 보임)
+        // isDialogueActive가 true이면 편지가 활성화된 상태이므로 letterGateActive도 true
+        const letterGateActive = flowStep === "prologue" && currentChapter?.chapter_number === 1 && isDialogueActive;
         return (
             <div className="relative min-h-screen overflow-hidden">
                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }} />
@@ -2381,7 +2396,7 @@ function EscapeIntroPageInner() {
                                             return list.map((p: any, idx: number) => (
                                                 <div
                                                     key={p.id}
-                                                    className={`p-3 rounded-xl border shadow cursor-pointer ${
+                                                    className={`p-3 rounded-xl border shadow mb-2 ${
                                                         selectedPlaceConfirm === p.id
                                                             ? "bg-emerald-50 border-emerald-300"
                                                             : "bg-white/85 hover:bg-white border-gray-200"
@@ -2989,7 +3004,7 @@ function EscapeIntroPageInner() {
                                 setLetterEverShown(true);
                             } catch {}
                         }}
-                        letterMode={currentChapter?.chapter_number === 1}
+                        letterMode={currentChapter?.chapter_number === 1 && flowStep === "prologue" && isDialogueActive}
                         onLetterOpened={(opened) => {
                             // 열릴 때는 무시, 닫을 때만 UI 표시 + 프롤로그 건너뛰기
                             if (!opened) {
@@ -3084,7 +3099,7 @@ function EscapeIntroPageInner() {
                                     selectedPlace={null}
                                     onPlaceClick={() => {}}
                                     className="w-full h-full"
-                                    drawPath={mapPlaces.length >= 2}
+                                    drawPath={userLocation !== null && mapPlaces.length >= 1}
                                     routeMode={isMobile ? "walking" : "driving"}
                                 />
                             </div>
@@ -3304,30 +3319,63 @@ function EscapeIntroPageInner() {
                                                                             [Number(activeMission.id)]: true,
                                                                         }));
                                                                     }
-                                                                    // ✅ 완료된 장소의 카테고리를 비활성화 목록에 반영
-                                                                    try {
-                                                                        const catKey = normalizeCategory(
-                                                                            (place as any)?.category ||
-                                                                                (place as any)?.type ||
-                                                                                ""
-                                                                        );
-                                                                        if (catKey) {
-                                                                            setCompletedCategories((prev) => {
-                                                                                const next = Array.from(
-                                                                                    new Set([...(prev || []), catKey])
-                                                                                );
-                                                                                const raw =
-                                                                                    localStorage.getItem(STORAGE_KEY);
-                                                                                const obj = raw ? JSON.parse(raw) : {};
-                                                                                obj.__completedCategories = next;
-                                                                                localStorage.setItem(
-                                                                                    STORAGE_KEY,
-                                                                                    JSON.stringify(obj)
-                                                                                );
-                                                                                return next;
-                                                                            });
+                                                                    // ✅ 미션이 2개 완료되었을 때만 카테고리 완료 처리
+                                                                    // 현재 장소의 미션 완료 개수 확인
+                                                                    const placeMissions: any[] = Array.isArray(
+                                                                        (place as any)?.missions
+                                                                    )
+                                                                        ? (place as any).missions
+                                                                        : [];
+                                                                    const placeMissionIds: number[] =
+                                                                        placeMissions.length > 0
+                                                                            ? placeMissions
+                                                                                  .map((m: any) => Number(m.id))
+                                                                                  .filter(Number.isFinite)
+                                                                            : [];
+                                                                    const placeClearedCount = placeMissionIds.filter(
+                                                                        (mid) => {
+                                                                            if (mid === Number(activeMission?.id))
+                                                                                return true; // 방금 완료한 미션
+                                                                            return (
+                                                                                clearedMissions[mid] ||
+                                                                                solvedMissionIds.includes(mid)
+                                                                            );
                                                                         }
-                                                                    } catch {}
+                                                                    ).length;
+
+                                                                    // 미션이 2개 완료되었을 때만 카테고리 완료 처리
+                                                                    if (placeClearedCount >= 2) {
+                                                                        try {
+                                                                            const catKey = normalizeCategory(
+                                                                                (place as any)?.category ||
+                                                                                    (place as any)?.type ||
+                                                                                    ""
+                                                                            );
+                                                                            if (catKey) {
+                                                                                setCompletedCategories((prev) => {
+                                                                                    const next = Array.from(
+                                                                                        new Set([
+                                                                                            ...(prev || []),
+                                                                                            catKey,
+                                                                                        ])
+                                                                                    );
+                                                                                    const raw =
+                                                                                        localStorage.getItem(
+                                                                                            STORAGE_KEY
+                                                                                        );
+                                                                                    const obj = raw
+                                                                                        ? JSON.parse(raw)
+                                                                                        : {};
+                                                                                    obj.__completedCategories = next;
+                                                                                    localStorage.setItem(
+                                                                                        STORAGE_KEY,
+                                                                                        JSON.stringify(obj)
+                                                                                    );
+                                                                                    return next;
+                                                                                });
+                                                                            }
+                                                                        } catch {}
+                                                                    }
 
                                                                     // ✅ 편지 게이트가 다시 열리지 않도록 강제 고정
                                                                     try {
