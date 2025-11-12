@@ -2,12 +2,7 @@ import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import PlaceStatusBadge from "@/components/PlaceStatusBadge";
 import Image from "@/components/ImageFallback";
-import dynamicImport from "next/dynamic";
-
-const NaverMap = dynamicImport(() => import("@/components/NaverMap"), {
-    ssr: false,
-    loading: () => <div className="w-full h-64 bg-gray-100 rounded-lg" />,
-});
+import NaverMap from "@/components/NaverMap";
 
 interface PageProps {
     params: {
