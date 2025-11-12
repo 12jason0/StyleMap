@@ -18,10 +18,6 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   mbti               String?             @db.VarChar(20)
-  // 신규: 연락처/생년월일/연령대
-  phone              String?             @db.VarChar(30)
-  birthday           DateTime?
-  ageRange           String?             @db.VarChar(20)
   age                Int?
   coinBalance        Int                 @default(0)
   couponCount        Int                 @default(0)
@@ -30,12 +26,18 @@ model User {
   level              Int                 @default(1)
   location           String?             @db.VarChar(100)
   preferredTags      String[]
+  totalWaterGiven    Int                 @default(0)
+  waterStock         Int                 @default(0)
+  ageRange           String?             @db.VarChar(20)
+  birthday           DateTime?
+  phone              String?             @db.VarChar(30)
   completedCourses   CompletedCourse[]
   completedEscapes   CompletedEscape[]
   bookings           Booking[]
   courses            Course[]
   garden             Garden?
   missionSubmissions MissionSubmission[]
+  pushTokens         PushToken?
   reviews            Review[]
   trees              Tree[]
   userBadges         UserBadge[]
@@ -47,9 +49,6 @@ model User {
   rewards            UserReward[]
   userStoryProgress  UserStoryProgress[]
   waterLogs          WaterLog[]
-  waterStock         Int      @default(0)  // ✅ 현재 보유한 물의 양
-  totalWaterGiven    Int      @default(0)  // ✅ 지금까지 준 누적 물의 횟수 (통계용)
-  pushTokens         PushToken[] 
 
   @@index([provider, socialId])
   @@map("users")
@@ -101,18 +100,15 @@ model UserPreference {
   @@map("user_preferences")
 }
 
-// 알람
-
 model PushToken {
-  id        String   @id @default(cuid())
-  userId    Int      @unique
-  token     String
-  platform  String   @default("expo")
+  id         String   @id @default(cuid())
+  userId     Int      @unique
+  token      String
+  platform   String   @default("expo")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   subscribed Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("push_tokens")
@@ -167,8 +163,8 @@ model Place {
   created_at           DateTime         @default(now())
   updated_at           DateTime         @updatedAt
   tags                 String?
-  closed_days          PlaceClosedDay[]
   coursePlaces         CoursePlace[]
+  closed_days          PlaceClosedDay[]
 
   @@map("places")
 }
@@ -379,7 +375,7 @@ model CoursePlace {
 model PlaceClosedDay {
   id            Int       @id @default(autoincrement())
   place_id      Int
-  day_of_week   Int?      // 0=일요일, 1=월요일, ..., 6=토요일
+  day_of_week   Int?
   specific_date DateTime? @db.Date
   note          String?   @db.VarChar(200)
   created_at    DateTime  @default(now())
@@ -605,7 +601,7 @@ enum TreeStatus {
 
 enum WaterSource {
   course
-  escape  
+  escape
   admin
   bonus
 }
