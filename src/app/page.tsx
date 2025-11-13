@@ -47,6 +47,7 @@ export default function Home() {
     const [todayIndex, setTodayIndex] = useState(0);
     const [streak, setStreak] = useState<number>(0);
     const [userId, setUserId] = useState<number | null>(null);
+    const [hasPreferences, setHasPreferences] = useState<boolean>(false);
     const router = useRouter();
     const hasShownCheckinModalRef = useRef(false);
 
@@ -56,16 +57,20 @@ export default function Home() {
         window.scrollTo(0, 0);
     }, []);
 
-    // 출석 스트릭 및 userId 조회
+    // 출석 스트릭 및 userId 조회, 선호도 확인
     useEffect(() => {
         (async () => {
             try {
                 const token = localStorage.getItem("authToken");
                 if (!token) return;
 
-                const [profileRes, checkinRes] = await Promise.all([
+                const [profileRes, checkinRes, preferencesRes] = await Promise.all([
                     fetch("/api/users/profile", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
                     fetch("/api/users/checkins", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+                    fetch("/api/users/preferences", {
+                        headers: { Authorization: `Bearer ${token}` },
+                        cache: "no-store",
+                    }),
                 ]);
                 if (profileRes.ok) {
                     const p = await profileRes.json().catch(() => ({}));
@@ -79,6 +84,21 @@ export default function Home() {
                 if (checkinRes.ok) {
                     const c = await checkinRes.json().catch(() => ({}));
                     if (Number.isFinite(Number(c?.streak))) setStreak(Number(c.streak));
+                }
+                if (preferencesRes.ok) {
+                    const prefs = await preferencesRes.json().catch(() => ({}));
+                    // API가 { preferences: {...} } 형태로 반환하거나 직접 preferences 객체를 반환할 수 있음
+                    const prefData = prefs?.preferences ?? prefs ?? {};
+                    // 선호도가 설정되었는지 확인 (새로운 구조 기준)
+                    const hasPrefs =
+                        prefData &&
+                        typeof prefData === "object" &&
+                        Object.keys(prefData).length > 0 &&
+                        ((prefData.concept && Array.isArray(prefData.concept) && prefData.concept.length > 0) ||
+                            (prefData.companion && prefData.companion !== "") ||
+                            (prefData.mood && Array.isArray(prefData.mood) && prefData.mood.length > 0) ||
+                            (prefData.regions && Array.isArray(prefData.regions) && prefData.regions.length > 0));
+                    setHasPreferences(hasPrefs);
                 }
             } catch {}
         })();
@@ -198,19 +218,19 @@ export default function Home() {
             const todayKey = getLocalTodayKey();
             const shownDate = localStorage.getItem("checkinModalShownDate");
             const checkinButtonPressed = localStorage.getItem(`checkinButtonPressed_${todayKey}`) === "true";
-            
+
             // 오늘 이미 출석체크 버튼을 눌렀거나, 오늘 이미 모달을 표시했으면 표시하지 않음 (하루에 한 번만)
             if (checkinButtonPressed || (shownDate === todayKey && !showCheckinModal)) {
                 return;
             }
-            
+
             // 항상 최신 데이터를 가져옴
             const result = await fetchAndSetWeekStamps();
             if (!result) return;
-            
+
             const already = Boolean(result.todayChecked);
             const dismissedDate = localStorage.getItem("checkinModalDismissedDate");
-            
+
             setAnimStamps(null);
 
             // 오늘 출석했지만 출석체크 버튼을 안 눌렀으면 표시
@@ -255,7 +275,7 @@ export default function Home() {
             }
         };
         initAuth();
-        
+
         // 페이지 포커스 시에도 출석체크 모달 확인 (메인으로 돌아올 때마다)
         const handleFocus = () => {
             const token = localStorage.getItem("authToken");
@@ -291,18 +311,43 @@ export default function Home() {
         .slice(0, 8);
 
     const [recs, setRecs] = useState<any[]>([]);
+    const [isLoadingRecs, setIsLoadingRecs] = useState(true);
+    const [isLoggedInForRecs, setIsLoggedInForRecs] = useState(false);
+
+    const fetchRecommendations = async () => {
+        try {
+            setIsLoadingRecs(true);
+            const token = localStorage.getItem("authToken");
+            setIsLoggedInForRecs(!!token);
+            const res = await fetch("/api/recommendations", {
+                cache: "no-store",
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            const data = await res.json().catch(() => ({}));
+            if (Array.isArray(data?.recommendations)) {
+                setRecs(data.recommendations);
+            } else {
+                // API 실패 시 빈 배열로 설정 (섹션은 표시되지만 내용 없음)
+                setRecs([]);
+            }
+        } catch {
+            setRecs([]);
+        } finally {
+            setIsLoadingRecs(false);
+        }
+    };
+
     useEffect(() => {
-        (async () => {
-            try {
-                const token = localStorage.getItem("authToken");
-                const res = await fetch("/api/recommendations", {
-                    cache: "no-store",
-                    headers: token ? { Authorization: `Bearer ${token}` } : {},
-                });
-                const data = await res.json().catch(() => ({}));
-                if (Array.isArray(data?.recommendations)) setRecs(data.recommendations);
-            } catch {}
-        })();
+        fetchRecommendations();
+    }, []);
+
+    // 로그인 상태 변경 시 추천 다시 가져오기
+    useEffect(() => {
+        const handleAuthChange = () => {
+            fetchRecommendations();
+        };
+        window.addEventListener("authTokenChange", handleAuthChange as EventListener);
+        return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
     }, []);
 
     const handleStartOnboarding = () => {
@@ -534,8 +579,9 @@ export default function Home() {
                                                 }
 
                                                 // 애니메이션: 오늘 날짜에 해당하는 인덱스에만 도장 찍기
-                                                const targetIdx = typeof data.todayIndex === "number" ? data.todayIndex : null;
-                                                
+                                                const targetIdx =
+                                                    typeof data.todayIndex === "number" ? data.todayIndex : null;
+
                                                 // 오늘 날짜 인덱스가 없으면 애니메이션 없이 바로 완료
                                                 if (targetIdx === null) {
                                                     if (Array.isArray(data.weekStamps)) {
@@ -567,7 +613,10 @@ export default function Home() {
                                                         // 출석체크 버튼을 눌렀을 때만 dismissedDate 저장 및 버튼 눌림 표시
                                                         const todayKey = getLocalTodayKey();
                                                         localStorage.setItem("checkinModalDismissedDate", todayKey);
-                                                        localStorage.setItem(`checkinButtonPressed_${todayKey}`, "true");
+                                                        localStorage.setItem(
+                                                            `checkinButtonPressed_${todayKey}`,
+                                                            "true"
+                                                        );
                                                     }, 800);
                                                 }, 50);
                                             } catch {
@@ -614,22 +663,29 @@ export default function Home() {
                     }))}
                 />
                 <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
-                {recs.length > 0 && (
-                    <section>
-                        <div className="max-w-7xl mx-auto px-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-black flex items-center gap-2">
-                                    <span className="text-2xl">🌿</span>
-                                    당신을 위한 추천
-                                </h2>
-                                <Link
-                                    href="/courses?recommended=1"
-                                    aria-label="코스 더 보기"
-                                    className="w-8 h-8 flex items-center justify-center rounded-full border border-green-300 text-green-700 hover:bg-green-50"
-                                >
-                                    ›
-                                </Link>
+                {/* 당신을 위한 추천: 로그인 여부와 관계없이 항상 표시 */}
+                <section>
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-bold text-black flex items-center gap-2">
+                                <span className="text-2xl">🌿</span>
+                                {isLoggedInForRecs ? "당신을 위한 추천" : "인기 코스"}
+                            </h2>
+                            <Link
+                                href={isLoggedInForRecs ? "/courses?recommended=1" : "/courses?sort=popular"}
+                                aria-label="코스 더 보기"
+                                className="w-8 h-8 flex items-center justify-center rounded-full border border-green-300 text-green-700 hover:bg-green-50"
+                            >
+                                ›
+                            </Link>
+                        </div>
+                        {isLoadingRecs ? (
+                            <div className="flex gap-4 overflow-x-auto pb-2">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="min-w-[200px] bg-gray-100 rounded-xl h-40 animate-pulse" />
+                                ))}
                             </div>
+                        ) : recs.length > 0 ? (
                             <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar scrollbar-hide">
                                 {recs.slice(0, 3).map((c) => (
                                     <Link
@@ -659,9 +715,11 @@ export default function Home() {
                                     </Link>
                                 ))}
                             </div>
-                        </div>
-                    </section>
-                )}
+                        ) : (
+                            <div className="text-center py-8 text-gray-500">추천 코스를 불러올 수 없습니다.</div>
+                        )}
+                    </div>
+                </section>
 
                 {/* 출석 위젯: 테마별과 당신을 위한 추천 사이 */}
                 <section className="py-6">
@@ -672,24 +730,25 @@ export default function Home() {
                                     aria-label="출석 탭으로 이동"
                                     onClick={async () => {
                                         const todayKey = getLocalTodayKey();
-                                        const checkinButtonPressed = localStorage.getItem(`checkinButtonPressed_${todayKey}`) === "true";
+                                        const checkinButtonPressed =
+                                            localStorage.getItem(`checkinButtonPressed_${todayKey}`) === "true";
                                         const shownDate = localStorage.getItem("checkinModalShownDate");
                                         const result = await fetchAndSetWeekStamps();
                                         const already = Boolean(result?.todayChecked);
-                                        
+
                                         // 오늘 이미 출석체크 버튼을 눌렀으면 마이페이지로 이동
                                         if (checkinButtonPressed) {
                                             router.push("/mypage?tab=checkins");
                                             return;
                                         }
-                                        
+
                                         // 오늘 출석 안 했거나, 출석했지만 버튼을 안 눌렀으면 모달 열기
                                         // 단, 오늘 이미 모달을 표시했으면 마이페이지로 이동 (하루에 한 번만 표시)
                                         if (shownDate === todayKey && showCheckinModal === false) {
                                             router.push("/mypage?tab=checkins");
                                             return;
                                         }
-                                        
+
                                         if (!already || (already && !checkinButtonPressed)) {
                                             setShowCheckinModal(true);
                                             hasShownCheckinModalRef.current = true;
@@ -727,7 +786,7 @@ export default function Home() {
                         </div>
                     </div>
                 </section>
-                <OnboardingSection onStart={handleStartOnboarding} />
+                {!hasPreferences && <OnboardingSection onStart={handleStartOnboarding} />}
             </>
         </>
     );

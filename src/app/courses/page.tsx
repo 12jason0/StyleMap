@@ -212,7 +212,7 @@ function CoursesPageInner() {
                             onChange={(e) => setHideClosedPlaces(e.target.checked)}
                             className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
                         />
-                        <span className="text-sm text-gray-700">휴무인 장소가 있는 코스 숨기기</span>
+                        <span className="text-sm text-gray-700">휴무 코스 제외</span>
                     </label>
                 </div>
             </div>

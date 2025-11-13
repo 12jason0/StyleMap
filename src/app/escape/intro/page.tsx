@@ -665,6 +665,7 @@ function EscapeIntroPageInner() {
 
     const [photoFiles, setPhotoFiles] = useState<File[]>([]);
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [isSharing, setIsSharing] = useState<boolean>(false);
     const [photoUploaded, setPhotoUploaded] = useState<boolean>(false);
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
     const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
@@ -1682,39 +1683,28 @@ function EscapeIntroPageInner() {
     };
 
     const handleShareToKakao = async () => {
-        // 전체 함수를 try-catch로 감싸서 모든 에러를 잡기
         try {
-            console.log("[카카오 공유] 시작");
-            setToast("카카오톡 공유 준비 중...");
-            
+            setIsSharing(true);
+
             // 선택된 이미지 확인
             if (selectedGallery.length !== 4) {
                 setToast("사진 4장을 선택해주세요");
+                setIsSharing(false);
                 return;
             }
 
             setToast("템플릿을 생성하는 중...");
-            let blob: Blob | null = null;
-            try {
-                blob = await getCollageBlob();
-            } catch (blobError) {
-                console.error("[카카오 공유] 이미지 생성 에러:", blobError);
-                setToast("이미지 생성 중 오류가 발생했습니다");
-                return;
-            }
-            
+            const blob = await getCollageBlob();
             if (!blob) {
-                console.error("[카카오 공유] 이미지 생성 실패");
                 setToast("이미지 생성에 실패했습니다");
+                setIsSharing(false);
                 return;
             }
-            console.log("[카카오 공유] 이미지 생성 완료, 크기:", blob.size);
-            setToast("이미지 업로드 중...");
 
-            // 업로드하여 공개 이미지 URL 확보
+            setToast("이미지 업로드 중...");
             let imageUrl = await autoSaveCollage();
             if (!imageUrl) {
-                console.log("[카카오 공유] autoSaveCollage 실패, 수동 업로드 시도");
+                // 수동 업로드 시도
                 try {
                     const form = new FormData();
                     form.append("photos", new File([blob], "collage.jpg", { type: "image/jpeg" }));
@@ -1722,228 +1712,94 @@ function EscapeIntroPageInner() {
                     if (up.ok) {
                         const ur = await up.json();
                         imageUrl = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
-                        console.log("[카카오 공유] 수동 업로드 성공:", imageUrl);
-                    } else {
-                        console.error("[카카오 공유] 업로드 실패:", up.status);
                     }
-                } catch (uploadError) {
-                    console.error("[카카오 공유] 업로드 에러:", uploadError);
-                }
-            } else {
-                console.log("[카카오 공유] autoSaveCollage 성공:", imageUrl);
+                } catch {}
             }
 
             if (!imageUrl) {
                 setToast("이미지 업로드에 실패했습니다");
+                setIsSharing(false);
                 return;
             }
 
             const landingUrl = typeof window !== "undefined" ? `${window.location.origin}/mypage` : "https://dona.app";
-            console.log("[카카오 공유] 공유 URL:", landingUrl);
-            console.log("[카카오 공유] 이미지 URL:", imageUrl);
 
-            // Kakao JS SDK 로드/초기화
-            setToast("카카오 SDK 로드 중...");
+            // Kakao JS SDK 로드 및 초기화
             const ensureKakao = () =>
                 new Promise<void>((resolve, reject) => {
                     const w = window as any;
-                    if (w.Kakao) {
-                        console.log("[카카오 공유] SDK 이미 로드됨");
-                        return resolve();
-                    }
-                    console.log("[카카오 공유] SDK 로드 시작");
+                    if (w.Kakao) return resolve();
                     const s = document.createElement("script");
                     s.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
                     s.async = true;
-                    s.onload = () => {
-                        console.log("[카카오 공유] SDK 로드 완료");
-                        resolve();
-                    };
-                    s.onerror = () => {
-                        console.error("[카카오 공유] SDK 로드 실패");
-                        reject(new Error("Kakao SDK load failed"));
-                    };
+                    s.onload = () => resolve();
+                    s.onerror = () => reject(new Error("Kakao SDK load failed"));
                     document.head.appendChild(s);
                 });
 
-            try {
-                await ensureKakao();
-            } catch (sdkLoadError) {
-                console.error("[카카오 공유] SDK 로드 에러:", sdkLoadError);
-                setToast("카카오 SDK를 불러올 수 없습니다. 네트워크를 확인해주세요.");
-                return;
-            }
-            
+            await ensureKakao();
             const w = window as any;
             const Kakao = w.Kakao;
-            
+
             if (!Kakao) {
-                console.error("[카카오 공유] Kakao 객체 없음");
                 setToast("카카오 SDK를 불러올 수 없습니다");
+                setIsSharing(false);
                 return;
             }
-            
-            setToast("카카오 공유 설정 중...");
-            
-            // 환경 변수 확인 (서버에서 가져오기 시도)
-            // Next.js에서는 클라이언트에서 process.env 접근이 제한적일 수 있으므로
-            // 항상 서버 API에서 가져오는 것을 우선시
+
+            // JS Key 가져오기 (서버 API 우선, 없으면 클라이언트 환경 변수)
             let jsKey: string | undefined = undefined;
-            
             try {
                 const configRes = await fetch("/api/config/kakao-js-key");
                 if (configRes.ok) {
                     const configData = await configRes.json();
                     jsKey = configData.jsKey;
-                    console.log("[카카오 공유] 서버에서 JS Key 가져옴:", !!jsKey);
                 }
-            } catch (apiError) {
-                console.warn("[카카오 공유] 서버 API 호출 실패, 클라이언트 환경 변수 시도:", apiError);
-            }
-            
-            // 서버 API에서 가져오지 못한 경우에만 클라이언트 환경 변수 시도
+            } catch {}
+
             if (!jsKey) {
-                jsKey = 
+                jsKey =
                     (process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined) ||
                     (process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY as string | undefined);
-                console.log("[카카오 공유] 클라이언트 환경 변수에서 JS Key:", !!jsKey);
-            }
-            
-            console.log("[카카오 공유] 최종 JS Key 존재:", !!jsKey);
-            
-            // 환경 변수가 없으면 템플릿 이미지 URL을 클립보드에 복사하고 카카오톡 링크 생성
-            if (!jsKey) {
-                console.log("[카카오 공유] 환경 변수 없음, 템플릿 URL 공유로 대체");
-                try {
-                    // 템플릿 이미지 URL을 클립보드에 복사
-                    await navigator.clipboard.writeText(imageUrl);
-                    setToast("템플릿 이미지 URL이 복사되었습니다! 카카오톡에 붙여넣기 해주세요.");
-                    
-                    // 카카오톡 앱 열기 시도 (이미지 URL 포함)
-                    const kakaoLink = `https://kakaotalk://sendurl?url=${encodeURIComponent(imageUrl)}`;
-                    setTimeout(() => {
-                        window.location.href = kakaoLink;
-                    }, 500);
-                } catch (clipError) {
-                    console.error("[카카오 공유] 클립보드 복사 실패:", clipError);
-                    setToast(`템플릿 이미지 URL: ${imageUrl}`);
-                }
-                
-                // 보상 및 완료 처리
-                try {
-                    const token = localStorage.getItem("authToken");
-                    await fetch("/api/forest/water", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                        },
-                        credentials: "include",
-                        body: JSON.stringify({ source: "escape" }),
-                    });
-                } catch {}
-                await awardBadgeAndComplete();
-                return;
             }
 
-            // 카카오 SDK 초기화 (작동하는 코드와 동일한 패턴 사용)
-            if (!Kakao) {
-                console.error("[카카오 공유] Kakao 객체 없음");
-                setToast("카카오 SDK를 불러올 수 없습니다");
-                return;
-            }
-            
             if (!jsKey) {
-                console.error("[카카오 공유] JS Key가 없어서 초기화 불가");
                 setToast("카카오 공유 설정이 완료되지 않았습니다");
+                setIsSharing(false);
                 return;
-            }
-            
-            // 초기화되지 않았으면 초기화
-            if (!Kakao.isInitialized()) {
-                console.log("[카카오 공유] SDK 초기화 시작");
-                try {
-                    Kakao.init(jsKey);
-                    console.log("[카카오 공유] SDK 초기화 완료");
-                } catch (initError: any) {
-                    console.error("[카카오 공유] SDK 초기화 실패:", initError);
-                    // 초기화 실패 시 템플릿 URL 공유로 대체
-                    try {
-                        await navigator.clipboard.writeText(imageUrl);
-                        setToast("템플릿 이미지 URL이 복사되었습니다!");
-                    } catch {}
-                    return;
-                }
-            } else {
-                console.log("[카카오 공유] SDK 이미 초기화됨");
             }
 
-            // 이미지 URL이 공개적으로 접근 가능한지 확인
-            if (!imageUrl || !imageUrl.startsWith("http")) {
-                console.error("[카카오 공유] 유효하지 않은 이미지 URL:", imageUrl);
-                setToast("이미지 URL이 유효하지 않습니다");
-                return;
+            // SDK 초기화
+            if (!Kakao.isInitialized()) {
+                Kakao.init(jsKey);
             }
-            
-            // 카카오톡 공유 API 호출 (템플릿 이미지 포함)
-            console.log("[카카오 공유] sendDefault 호출 시작", {
-                imageUrl,
-                landingUrl,
-                isInitialized: Kakao.isInitialized(),
-            });
-            
+
+            // 카카오톡 공유 실행 (JS SDK만 사용 - 무료 방식)
             setToast("카카오톡 공유 창을 여는 중...");
-            
-            try {
-                // 카카오톡 공유 실행 (작동하는 코드와 동일한 패턴)
-                Kakao.Share.sendDefault({
-                    objectType: "feed",
-                    content: {
-                        title: "DoNa Escape 콜라주",
-                        description: "나의 콜라주를 카카오톡으로 공유해요",
-                        imageUrl: imageUrl, // 템플릿 이미지 URL (공개 URL이어야 함)
+            Kakao.Share.sendDefault({
+                objectType: "feed",
+                content: {
+                    title: "DoNa Escape 콜라주",
+                    description: "나의 콜라주를 카카오톡으로 공유해요",
+                    imageUrl: imageUrl,
+                    link: {
+                        mobileWebUrl: landingUrl,
+                        webUrl: landingUrl,
+                    },
+                },
+                buttons: [
+                    {
+                        title: "열어보기",
                         link: {
                             mobileWebUrl: landingUrl,
                             webUrl: landingUrl,
                         },
                     },
-                    buttons: [
-                        {
-                            title: "열어보기",
-                            link: {
-                                mobileWebUrl: landingUrl,
-                                webUrl: landingUrl,
-                            },
-                        },
-                    ],
-                });
-                
-                console.log("[카카오 공유] sendDefault 호출 완료");
-                setToast("카카오톡 공유 창이 열렸어요!");
-                
-                // 이미지 URL도 클립보드에 복사 (사용자 편의)
-                try {
-                    await navigator.clipboard.writeText(imageUrl);
-                } catch {}
-            } catch (shareError: any) {
-                console.error("[카카오 공유] sendDefault 에러:", shareError);
-                console.error("[카카오 공유] 에러 상세:", {
-                    message: shareError?.message,
-                    stack: shareError?.stack,
-                    name: shareError?.name,
-                });
-                
-                // 공유 실패 시 템플릿 URL 복사로 대체
-                try {
-                    await navigator.clipboard.writeText(imageUrl);
-                    setToast("공유 실패. 이미지 URL이 복사되었습니다. 카카오톡에 붙여넣기 해주세요.");
-                } catch (clipError) {
-                    console.error("[카카오 공유] 클립보드 복사 실패:", clipError);
-                    setToast(`공유 실패. 이미지 URL: ${imageUrl.substring(0, 50)}...`);
-                }
-                return;
-            }
-            
+                ],
+            });
+
+            setToast("카카오톡 공유 창이 열렸어요!");
+
             // 보상 및 완료 처리
             try {
                 const token = localStorage.getItem("authToken");
@@ -1959,40 +1815,12 @@ function EscapeIntroPageInner() {
             } catch {}
             await awardBadgeAndComplete();
         } catch (error: any) {
-            // 전체 함수의 모든 에러를 잡기
-            console.error("[카카오 공유] 전체 에러:", error);
-            console.error("[카카오 공유] 에러 상세:", {
-                message: error?.message,
-                stack: error?.stack,
-                name: error?.name,
-            });
-            
-            // 사용자에게 명확한 피드백 제공
-            let errorMessage = "카카오톡 공유 중 오류가 발생했습니다";
-            
-            if (error?.message?.includes("SDK")) {
-                errorMessage = "카카오 SDK를 불러올 수 없습니다. 네트워크를 확인해주세요.";
-            } else if (error?.message?.includes("Key")) {
-                errorMessage = "카카오 공유 설정이 완료되지 않았습니다.";
-            } else if (error?.message?.includes("이미지") || error?.message?.includes("image")) {
-                errorMessage = "이미지 처리 중 오류가 발생했습니다.";
-            }
-            
-            setToast(errorMessage);
-            
-            // 에러 발생 시에도 이미지 URL을 복사해주려고 시도
-            try {
-                const imageUrl = await autoSaveCollage();
-                if (imageUrl) {
-                    await navigator.clipboard.writeText(imageUrl);
-                    setTimeout(() => {
-                        setToast(`${errorMessage} 이미지 URL이 복사되었습니다.`);
-                    }, 2000);
-                }
-            } catch {}
+            console.error("[카카오 공유] 에러:", error);
+            setToast("카카오톡 공유 중 오류가 발생했습니다");
+        } finally {
+            setIsSharing(false);
         }
     };
-
 
     const handleCheckAnswer = () => {
         if (!currentChapter) return;
@@ -2148,34 +1976,28 @@ function EscapeIntroPageInner() {
                     };
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
                 } catch {}
-                
+
                 // ✅ 미션 완료 처리 (해당 미션만 완료 표시)
                 if (activeMission?.id != null) {
-                    setSolvedMissionIds((prev) =>
-                        Array.from(new Set([...prev, Number(activeMission.id)]))
-                    );
+                    setSolvedMissionIds((prev) => Array.from(new Set([...prev, Number(activeMission.id)])));
                     setClearedMissions((prev) => ({
                         ...prev,
                         [Number(activeMission.id)]: true,
                     }));
                 }
-                
+
                 // ✅ 미션이 2개 완료되었는지 확인
                 const place = (currentChapter?.placeOptions || []).find(
                     (p: any) => Number(p.id) === Number(selectedPlaceId)
                 );
-                const placeMissions: any[] = Array.isArray((place as any)?.missions)
-                    ? (place as any).missions
-                    : [];
+                const placeMissions: any[] = Array.isArray((place as any)?.missions) ? (place as any).missions : [];
                 const placeMissionIds: number[] =
-                    placeMissions.length > 0
-                        ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
-                        : [];
+                    placeMissions.length > 0 ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite) : [];
                 const placeClearedCount = placeMissionIds.filter((mid) => {
                     if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
                     return clearedMissions[mid] || solvedMissionIds.includes(mid);
                 }).length;
-                
+
                 // ✅ 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
                 if (placeClearedCount >= 2) {
                     try {
@@ -2193,7 +2015,7 @@ function EscapeIntroPageInner() {
                             });
                         }
                     } catch {}
-                    
+
                     // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
                     setMissionModalOpen(false);
                     setActiveMission(null);
@@ -2212,7 +2034,7 @@ function EscapeIntroPageInner() {
                     setPhotoUploaded(false);
                     setToast("미션 완료!");
                 }
-                
+
                 setIsSubmitting(false);
                 return;
             } else if (missionType === "PUZZLE_ANSWER") {
@@ -2223,34 +2045,28 @@ function EscapeIntroPageInner() {
                     textAnswer: puzzleAnswer,
                 });
                 if (!r.success) throw new Error(r.error || "미션 저장 실패");
-                
+
                 // ✅ 미션 완료 처리 (해당 미션만 완료 표시)
                 if (activeMission?.id != null) {
-                    setSolvedMissionIds((prev) =>
-                        Array.from(new Set([...prev, Number(activeMission.id)]))
-                    );
+                    setSolvedMissionIds((prev) => Array.from(new Set([...prev, Number(activeMission.id)])));
                     setClearedMissions((prev) => ({
                         ...prev,
                         [Number(activeMission.id)]: true,
                     }));
                 }
-                
+
                 // ✅ 미션이 2개 완료되었는지 확인
                 const place = (currentChapter?.placeOptions || []).find(
                     (p: any) => Number(p.id) === Number(selectedPlaceId)
                 );
-                const placeMissions: any[] = Array.isArray((place as any)?.missions)
-                    ? (place as any).missions
-                    : [];
+                const placeMissions: any[] = Array.isArray((place as any)?.missions) ? (place as any).missions : [];
                 const placeMissionIds: number[] =
-                    placeMissions.length > 0
-                        ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
-                        : [];
+                    placeMissions.length > 0 ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite) : [];
                 const placeClearedCount = placeMissionIds.filter((mid) => {
                     if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
                     return clearedMissions[mid] || solvedMissionIds.includes(mid);
                 }).length;
-                
+
                 // ✅ 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
                 if (placeClearedCount >= 2) {
                     try {
@@ -2268,7 +2084,7 @@ function EscapeIntroPageInner() {
                             });
                         }
                     } catch {}
-                    
+
                     // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
                     setMissionModalOpen(false);
                     setActiveMission(null);
@@ -2281,7 +2097,7 @@ function EscapeIntroPageInner() {
                     setModalAnswer("");
                     setToast("미션 완료!");
                 }
-                
+
                 setIsSubmitting(false);
                 return;
             } else {
@@ -2531,7 +2347,14 @@ function EscapeIntroPageInner() {
         // isDialogueActive가 true이면 편지가 활성화된 상태이므로 letterGateActive도 true
         const letterGateActive = flowStep === "prologue" && currentChapter?.chapter_number === 1 && isDialogueActive;
         return (
-            <div className="relative min-h-screen overflow-hidden">
+            <div
+                className="relative overflow-hidden"
+                style={{
+                    minHeight: "100dvh",
+                    paddingTop: "env(safe-area-inset-top)",
+                    paddingBottom: "env(safe-area-inset-bottom)",
+                }}
+            >
                 <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }} />
                 <div
                     className={`absolute inset-0 ${
@@ -2551,7 +2374,12 @@ function EscapeIntroPageInner() {
                         />
                     )}
                 </div>
-                <div className="absolute inset-x-0 bottom-10 max-w-[980px] mx-auto px-4 pb-6">
+                <div
+                    className="absolute inset-x-0 bottom-2 md:bottom-10 max-w-[980px] mx-auto px-4 pb-2 md:pb-4"
+                    style={{
+                        paddingBottom: `calc(0.5rem + env(safe-area-inset-bottom, 0px))`,
+                    }}
+                >
                     {/* 편지 닫기 전에는 상단 버튼 등 UI 숨김 */}
                     {!letterGateActive && (flowStep as unknown as string) !== "done" ? (
                         <div className="flex justify-center gap-3 mb-4 absolute inset-x-0 bottom-[100%] md:static md:mb-4">
@@ -3183,10 +3011,10 @@ function EscapeIntroPageInner() {
                                                 </button>
                                                 <button
                                                     onClick={handleShareToKakao}
-                                                    disabled={selectedGallery.length !== 4}
+                                                    disabled={selectedGallery.length !== 4 || isSharing}
                                                     className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md bg-gradient-to-r from-green-500 to-green-600"
                                                 >
-                                                    카카오톡으로 공유
+                                                    {isSharing ? "공유 준비 중..." : "카카오톡으로 공유"}
                                                 </button>
                                             </div>
                                         </div>
@@ -3315,7 +3143,7 @@ function EscapeIntroPageInner() {
                                             return clearedMissions[mid] || solvedMissionIds.includes(mid);
                                         }).length;
                                         const canProceedToNext = placeClearedCount >= 2;
-                                        
+
                                         return (
                                             <button
                                                 onClick={advanceToNextCategory}
@@ -3328,7 +3156,10 @@ function EscapeIntroPageInner() {
                                                     ? currentChapterIdx + 1 >= chapters.length
                                                         ? "엔딩 보기"
                                                         : "다음 카테고리로 →"
-                                                    : `스토리 조각 ${Math.max(0, 2 - placeClearedCount)}개 더 완료 필요`}
+                                                    : `스토리 조각 ${Math.max(
+                                                          0,
+                                                          2 - placeClearedCount
+                                                      )}개 더 완료 필요`}
                                             </button>
                                         );
                                     })()}
@@ -3482,10 +3313,12 @@ function EscapeIntroPageInner() {
                                 // 통합 확인 핸들러: PHOTO와 PUZZLE_ANSWER 처리
                                 const handleConfirm = async () => {
                                     try {
+                                        setIsSubmitting(true);
                                         if (t === "PHOTO") {
                                             const files = photoFiles || [];
                                             if (files.length < 2) {
                                                 setValidationError("사진 2장을 업로드해 주세요.");
+                                                setIsSubmitting(false);
                                                 return;
                                             }
                                             setToast("사진을 압축하고 있어요...");
@@ -3508,12 +3341,18 @@ function EscapeIntroPageInner() {
                                                 body: formData,
                                                 cache: "no-store",
                                             });
-                                            if (!uploadResponse.ok) throw new Error(await uploadResponse.text());
+                                            if (!uploadResponse.ok) {
+                                                setIsSubmitting(false);
+                                                throw new Error(await uploadResponse.text());
+                                            }
                                             const uploadResult = await uploadResponse.json();
                                             const urls: string[] = Array.isArray(uploadResult.photo_urls)
                                                 ? uploadResult.photo_urls
                                                 : [];
-                                            if (urls.length === 0) throw new Error("업로드된 사진 URL이 없습니다.");
+                                            if (urls.length === 0) {
+                                                setIsSubmitting(false);
+                                                throw new Error("업로드된 사진 URL이 없습니다.");
+                                            }
 
                                             setToast("미션 결과 저장 중...");
                                             const r = await submitMission({
@@ -3522,12 +3361,16 @@ function EscapeIntroPageInner() {
                                                 photoUrls: urls,
                                                 isCorrect: true,
                                             });
-                                            if (!r.success) throw new Error(r.error || "미션 저장 실패");
+                                            if (!r.success) {
+                                                setIsSubmitting(false);
+                                                throw new Error(r.error || "미션 저장 실패");
+                                            }
                                         } else if (t === "PUZZLE_ANSWER") {
                                             const ok = isCorrectForPayload(payload, modalAnswer);
                                             if (!ok) {
                                                 setModalWrongOnce(true);
                                                 setModalError("정답이 아니에요");
+                                                setIsSubmitting(false);
                                                 return;
                                             }
                                             setModalError(null);
@@ -3550,7 +3393,7 @@ function EscapeIntroPageInner() {
                                                 [Number(activeMission.id)]: true,
                                             }));
                                         }
-                                        
+
                                         // ✅ 미션이 2개 완료되었는지 확인 (TEXT와 동일한 로직)
                                         const place = (currentChapter?.placeOptions || []).find(
                                             (p: any) => Number(p.id) === Number(selectedPlaceId)
@@ -3566,12 +3409,14 @@ function EscapeIntroPageInner() {
                                             if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
                                             return clearedMissions[mid] || solvedMissionIds.includes(mid);
                                         }).length;
-                                        
+
                                         // 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
                                         if (placeClearedCount >= 2) {
                                             // 카테고리 완료 처리
                                             try {
-                                                const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
+                                                const catKey = normalizeCategory(
+                                                    (place as any)?.category || (place as any)?.type || ""
+                                                );
                                                 if (catKey) {
                                                     setCompletedCategories((prev) => {
                                                         const next = Array.from(new Set([...(prev || []), catKey]));
@@ -3585,7 +3430,7 @@ function EscapeIntroPageInner() {
                                                     });
                                                 }
                                             } catch {}
-                                            
+
                                             // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
                                             setMissionModalOpen(false);
                                             setActiveMission(null);
@@ -3614,7 +3459,9 @@ function EscapeIntroPageInner() {
                                         }
                                     } catch (e: any) {
                                         setValidationError(e?.message || "오류가 발생했습니다.");
+                                        setIsSubmitting(false);
                                     } finally {
+                                        setIsSubmitting(false);
                                         setToast(null);
                                     }
                                 };
@@ -3652,7 +3499,11 @@ function EscapeIntroPageInner() {
                                                         isSubmitting ? "bg-gray-400" : "bg-blue-600"
                                                     } disabled:opacity-50`}
                                                 >
-                                                    {isSubmitting ? "처리 중..." : "확인"}
+                                                    {isSubmitting
+                                                        ? t === "PHOTO"
+                                                            ? "업로드 중..."
+                                                            : "처리 중..."
+                                                        : "확인"}
                                                 </button>
                                             </div>
                                         )}
@@ -3678,64 +3529,95 @@ function EscapeIntroPageInner() {
                                                             try {
                                                                 // 서버 저장
                                                                 const r = await submitMission({
-                                                                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                                                    chapterId: Number(
+                                                                        selectedPlaceId ?? currentChapter?.id
+                                                                    ),
                                                                     missionType: t,
                                                                     isCorrect: true,
                                                                     textAnswer: text,
                                                                 });
-                                                                if (!r.success) throw new Error(r.error || "미션 저장 실패");
+                                                                if (!r.success)
+                                                                    throw new Error(r.error || "미션 저장 실패");
 
                                                                 // 공통 후처리 (PHOTO/PUZZLE_ANSWER와 동일한 로직)
                                                                 if (activeMission?.id != null) {
                                                                     setSolvedMissionIds((prev) =>
-                                                                        Array.from(new Set([...prev, Number(activeMission.id)]))
+                                                                        Array.from(
+                                                                            new Set([...prev, Number(activeMission.id)])
+                                                                        )
                                                                     );
                                                                     setClearedMissions((prev) => ({
                                                                         ...prev,
                                                                         [Number(activeMission.id)]: true,
                                                                     }));
                                                                 }
-                                                                
+
                                                                 // ✅ 미션이 2개 완료되었는지 확인 (PHOTO/PUZZLE_ANSWER와 동일한 로직)
                                                                 const place = (currentChapter?.placeOptions || []).find(
                                                                     (p: any) => Number(p.id) === Number(selectedPlaceId)
                                                                 );
-                                                                const placeMissions: any[] = Array.isArray((place as any)?.missions)
+                                                                const placeMissions: any[] = Array.isArray(
+                                                                    (place as any)?.missions
+                                                                )
                                                                     ? (place as any).missions
                                                                     : [];
                                                                 const placeMissionIds: number[] =
                                                                     placeMissions.length > 0
-                                                                        ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
+                                                                        ? placeMissions
+                                                                              .map((m: any) => Number(m.id))
+                                                                              .filter(Number.isFinite)
                                                                         : [];
-                                                                const placeClearedCount = placeMissionIds.filter((mid) => {
-                                                                    if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
-                                                                    return clearedMissions[mid] || solvedMissionIds.includes(mid);
-                                                                }).length;
-                                                                
+                                                                const placeClearedCount = placeMissionIds.filter(
+                                                                    (mid) => {
+                                                                        if (mid === Number(activeMission?.id))
+                                                                            return true; // 방금 완료한 미션
+                                                                        return (
+                                                                            clearedMissions[mid] ||
+                                                                            solvedMissionIds.includes(mid)
+                                                                        );
+                                                                    }
+                                                                ).length;
+
                                                                 // 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
                                                                 if (placeClearedCount >= 2) {
                                                                     // 카테고리 완료 처리
                                                                     try {
-                                                                        const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
+                                                                        const catKey = normalizeCategory(
+                                                                            (place as any)?.category ||
+                                                                                (place as any)?.type ||
+                                                                                ""
+                                                                        );
                                                                         if (catKey) {
                                                                             setCompletedCategories((prev) => {
-                                                                                const next = Array.from(new Set([...(prev || []), catKey]));
+                                                                                const next = Array.from(
+                                                                                    new Set([...(prev || []), catKey])
+                                                                                );
                                                                                 try {
-                                                                                    const raw = localStorage.getItem(STORAGE_KEY);
-                                                                                    const obj = raw ? JSON.parse(raw) : {};
+                                                                                    const raw =
+                                                                                        localStorage.getItem(
+                                                                                            STORAGE_KEY
+                                                                                        );
+                                                                                    const obj = raw
+                                                                                        ? JSON.parse(raw)
+                                                                                        : {};
                                                                                     obj.__completedCategories = next;
-                                                                                    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                                                                    localStorage.setItem(
+                                                                                        STORAGE_KEY,
+                                                                                        JSON.stringify(obj)
+                                                                                    );
                                                                                 } catch {}
                                                                                 return next;
                                                                             });
                                                                         }
                                                                     } catch {}
-                                                                    
+
                                                                     // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
                                                                     setMissionModalOpen(false);
                                                                     setActiveMission(null);
                                                                     setModalAnswer("");
-                                                                    setToast("미션 완료! 다음 카테고리로 버튼을 눌러주세요.");
+                                                                    setToast(
+                                                                        "미션 완료! 다음 카테고리로 버튼을 눌러주세요."
+                                                                    );
                                                                 } else {
                                                                     // 미션이 2개 미완료인 경우: 모달만 닫고 미션 목록으로 돌아감
                                                                     setMissionModalOpen(false);
@@ -3744,7 +3626,9 @@ function EscapeIntroPageInner() {
                                                                     setToast("미션 완료!");
                                                                 }
                                                             } catch (err: any) {
-                                                                setModalError(err?.message || "저장 중 오류가 발생했어요.");
+                                                                setModalError(
+                                                                    err?.message || "저장 중 오류가 발생했어요."
+                                                                );
                                                             }
                                                         }}
                                                         className="px-3 py-2 rounded text-sm text-white bg-blue-600 hover:bg-blue-700"
@@ -3850,7 +3734,6 @@ function EscapeIntroPageInner() {
                         </div>
                     </div>
                 )}
-                
             </div>
         );
     }

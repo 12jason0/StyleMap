@@ -123,6 +123,7 @@ model Course {
   region               String?              @db.VarChar(50)
   duration             String?              @db.VarChar(45)
   concept              String?              @db.VarChar(45)
+  tags                 Json?                 // AI 추천용 태그: { concept, mood, target, time, budget(예산), theme }
   isPopular            Boolean              @default(false)
   rating               Float                @default(0.0)
   current_participants Int                  @default(0)

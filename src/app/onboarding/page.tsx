@@ -1,36 +1,125 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 interface UserPreferences {
-    travelStyle: string[];
-    budgetRange: string;
-    timePreference: string[];
-    foodPreference: string[];
-    activityLevel: string;
-    groupSize: string;
-    interests: string[];
-    ageGroup: string;
-    locationPreferences: string[];
+    concept: string[]; // 감성·힐링, 활동적·체험, 카페/브런치, 인생샷·사진, 맛집 탐방, 쇼핑, 야경·밤 산책, 이색 데이트
+    companion: string; // 연인, 썸, 소개팅, 친구, 혼자
+    mood: string[]; // 조용한, 트렌디한, 프리미엄, 활기찬, 깔끔한, 감성적, 빈티지
+    regions: string[]; // 성수, 한남, 홍대, 강남, 서초, 여의도, 종로/북촌, 잠실, 신촌, 가로수길 등
 }
 
 const AIOnboarding = () => {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(1);
     const [preferences, setPreferences] = useState<UserPreferences>({
-        travelStyle: [],
-        budgetRange: "",
-        timePreference: [],
-        foodPreference: [],
-        activityLevel: "",
-        groupSize: "",
-        interests: [],
-        ageGroup: "",
-        locationPreferences: [],
+        concept: [],
+        companion: "",
+        mood: [],
+        regions: [],
     });
 
-    const totalSteps = 8;
+    const totalSteps = 4; // 3~4단계로 축소
+    const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isSavingRef = useRef(false);
+
+    // 선호도 자동 저장 함수 (debounce 적용)
+    const savePreferences = useCallback(async (prefsToSave: UserPreferences, silent = true) => {
+        if (isSavingRef.current) return;
+
+        try {
+            const token = localStorage.getItem("authToken");
+            if (!token) return;
+
+            isSavingRef.current = true;
+            const response = await fetch("/api/users/preferences", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    preferences: prefsToSave,
+                }),
+            });
+
+            if (response.ok) {
+                if (!silent) {
+                    console.log("선호도가 저장되었습니다.");
+                }
+            } else {
+                console.error("Failed to save preferences");
+            }
+        } catch (error) {
+            console.error("Failed to save preferences:", error);
+        } finally {
+            isSavingRef.current = false;
+        }
+    }, []);
+
+    // preferences 변경 시 자동 저장 (debounce)
+    useEffect(() => {
+        // 빈 상태가 아닐 때만 저장
+        const hasAnyData =
+            preferences.concept.length > 0 ||
+            preferences.companion !== "" ||
+            preferences.mood.length > 0 ||
+            preferences.regions.length > 0;
+
+        if (!hasAnyData) return;
+
+        // 이전 타이머 취소
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        // 1초 후 자동 저장
+        saveTimeoutRef.current = setTimeout(() => {
+            savePreferences(preferences, true);
+        }, 1000);
+
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, [preferences, savePreferences]);
+
+    // 페이지를 떠날 때 저장
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            const hasAnyData =
+                preferences.concept.length > 0 ||
+                preferences.companion !== "" ||
+                preferences.mood.length > 0 ||
+                preferences.regions.length > 0;
+
+            if (hasAnyData && !isSavingRef.current) {
+                // 페이지를 떠날 때 저장 (keepalive 옵션 사용)
+                const token = localStorage.getItem("authToken");
+                if (token) {
+                    // keepalive 옵션으로 페이지 종료 후에도 요청이 완료되도록 보장
+                    fetch("/api/users/preferences", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                            preferences,
+                        }),
+                        keepalive: true,
+                    }).catch(() => {});
+                }
+            }
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+        };
+    }, [preferences]);
 
     // 전체 화면 고정: 온보딩 동안 스크롤 제거 및 높이 고정
     useEffect(() => {
@@ -52,21 +141,25 @@ const AIOnboarding = () => {
         } catch {}
     }, []);
 
-    const handleMultiSelect = (key: keyof UserPreferences, value: string) => {
-        const currentValues = preferences[key] as string[];
-        const newValues = currentValues.includes(value)
-            ? currentValues.filter((v) => v !== value)
-            : [...currentValues, value];
-
-        setPreferences({ ...preferences, [key]: newValues });
+    const handleSingleSelect = (key: keyof UserPreferences, value: string | boolean) => {
+        setPreferences((prev) => ({ ...prev, [key]: value }));
     };
 
-    const handleSingleSelect = (key: keyof UserPreferences, value: string) => {
-        setPreferences({ ...preferences, [key]: value });
+    const handleMultiSelect = (key: "concept" | "mood" | "regions", value: string) => {
+        setPreferences((prev) => {
+            const currentArray = (prev[key] as string[]) || [];
+            const isSelected = currentArray.includes(value);
+            return {
+                ...prev,
+                [key]: isSelected ? currentArray.filter((item) => item !== value) : [...currentArray, value],
+            };
+        });
     };
 
     const nextStep = () => {
         if (currentStep < totalSteps) {
+            // 단계 변경 전에 현재까지의 데이터 저장
+            savePreferences(preferences, true);
             setCurrentStep(currentStep + 1);
         } else {
             handleComplete();
@@ -75,11 +168,14 @@ const AIOnboarding = () => {
 
     const prevStep = () => {
         if (currentStep > 1) {
+            // 단계 변경 전에 현재까지의 데이터 저장
+            savePreferences(preferences, true);
             setCurrentStep(currentStep - 1);
         }
     };
 
     const handleComplete = async () => {
+        // 완료 시 최종 저장 (명시적으로 저장 후 리다이렉트)
         try {
             const token = localStorage.getItem("authToken");
             if (!token) {
@@ -99,79 +195,88 @@ const AIOnboarding = () => {
             });
 
             if (response.ok) {
-                router.push("/");
+                // 저장 성공 후 메인 페이지로 이동 (새로고침하여 선호도 상태 업데이트)
+                window.location.href = "/";
             } else {
-                console.error("Failed to save preferences");
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Failed to save preferences:", errorData);
+                alert("선호도 저장에 실패했습니다. 다시 시도해주세요.");
             }
         } catch (error) {
             console.error("Failed to save preferences:", error);
+            alert("선호도 저장 중 오류가 발생했습니다. 다시 시도해주세요.");
         }
     };
 
     const renderStep = () => {
         switch (currentStep) {
             case 1:
+                // Step 1: 기본 취향 콘셉트 (다중 선택)
                 return (
-                    <div className="text-center text-black">
+                    <div className="text-center text-black w-full">
                         <div className="text-4xl md:text-6xl mb-4 md:mb-6">🎯</div>
                         <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            나만의 여행 스타일을 찾아보세요
+                            어떤 취향을 가지고 계신가요?
                         </h2>
-                        <p className="text-black mb-6 md:mb-8">
-                            몇 가지 질문에 답해주시면, AI가 당신에게 완벽한 코스를 추천해드려요
-                        </p>
+                        <p className="text-black mb-6 md:mb-8">원하는 콘셉트를 모두 선택해주세요 (복수 선택 가능)</p>
 
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-4">
-                            {["힐링 & 휴식", "액티브한 모험", "문화 탐방", "맛집 투어", "쇼핑"].map(
-                                (style) => (
-                                    <button
-                                        key={style}
-                                        onClick={() => handleMultiSelect("travelStyle", style)}
-                                        className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                            preferences.travelStyle.includes(style)
-                                                ? "border-blue-500 bg-blue-50 text-blue-700"
-                                                : "border-gray-200 hover:border-gray-300"
-                                        }`}
-                                    >
-                                        {style}
-                                    </button>
-                                )
-                            )}
+                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-4 max-w-3xl mx-auto">
+                            {[
+                                { value: "감성·힐링", label: "감성·힐링", icon: "🌿" },
+                                { value: "활동적·체험", label: "활동적·체험", icon: "⚡" },
+                                { value: "카페/브런치", label: "카페/브런치", icon: "☕" },
+                                { value: "인생샷·사진", label: "인생샷·사진", icon: "📸" },
+                                { value: "맛집 탐방", label: "맛집 탐방", icon: "🍽️" },
+                                { value: "쇼핑", label: "쇼핑", icon: "🛍️" },
+                                { value: "야경·밤 산책", label: "야경·밤 산책", icon: "🌙" },
+                                { value: "이색 데이트", label: "이색 데이트", icon: "✨" },
+                            ].map((concept) => (
+                                <button
+                                    key={concept.value}
+                                    onClick={() => handleMultiSelect("concept", concept.value)}
+                                    className={`p-4 md:p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
+                                        preferences.concept.includes(concept.value)
+                                            ? "border-blue-500 bg-blue-50"
+                                            : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                >
+                                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{concept.icon}</div>
+                                    <div className="font-medium text-sm md:text-base text-black">{concept.label}</div>
+                                </button>
+                            ))}
                         </div>
                     </div>
                 );
 
             case 2:
+                // Step 2: 동반자 타입 (단일 선택)
                 return (
-                    <div className="text-center">
-                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">💰</div>
+                    <div className="text-center text-black w-full">
+                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">👥</div>
                         <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            예산은 어느 정도 생각하고 계신가요?
+                            누구와 함께 여행하시나요?
                         </h2>
-                        <p className="text-black mb-6 md:mb-8">1인 기준 하루 예산을 선택해주세요</p>
+                        <p className="text-black mb-6 md:mb-8">가장 일반적인 여행 동반자를 선택해주세요</p>
 
-                        <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-4 max-w-2xl mx-auto">
                             {[
-                                { value: "budget", label: "5만원 미만", desc: "가성비 위주" },
-                                { value: "moderate", label: "5 ~ 10만원", desc: "적당한 수준" },
-                                { value: "premium", label: "10 ~ 20만원", desc: "프리미엄 경험" },
-                                { value: "luxury", label: "20만원 이상", label2: "럭셔리 여행" },
-                            ].map((option) => (
+                                { value: "연인", label: "연인", icon: "💑" },
+                                { value: "썸", label: "썸", icon: "💕" },
+                                { value: "소개팅", label: "소개팅", icon: "👋" },
+                                { value: "친구", label: "친구", icon: "👯" },
+                                { value: "혼자", label: "혼자", icon: "🧑" },
+                            ].map((companion) => (
                                 <button
-                                    key={option.value}
-                                    onClick={() => handleSingleSelect("budgetRange", option.value)}
-                                    className={`p-6 rounded-xl border-2 transition-all text-left cursor-pointer text-black min-w-0 ${
-                                        preferences.budgetRange === option.value
+                                    key={companion.value}
+                                    onClick={() => handleSingleSelect("companion", companion.value)}
+                                    className={`p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
+                                        preferences.companion === companion.value
                                             ? "border-blue-500 bg-blue-50"
                                             : "border-gray-200 hover:border-gray-300"
                                     }`}
                                 >
-                                    <div className="font-bold text-base md:text-lg text-black truncate">
-                                        {option.label}
-                                    </div>
-                                    <div className="text-gray-500 text-xs md:text-sm truncate">
-                                        {option.desc || option.label2}
-                                    </div>
+                                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{companion.icon}</div>
+                                    <div className="font-medium text-base md:text-lg text-black">{companion.label}</div>
                                 </button>
                             ))}
                         </div>
@@ -179,33 +284,36 @@ const AIOnboarding = () => {
                 );
 
             case 3:
+                // Step 3: 분위기 스타일 (다중 선택)
                 return (
-                    <div className="text-center">
-                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">⏰</div>
+                    <div className="text-center text-black w-full">
+                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">✨</div>
                         <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            언제 여행하는 걸 선호하시나요?
+                            어떤 분위기를 선호하시나요?
                         </h2>
-                        <p className="text-black mb-6 md:mb-8">선호하는 시간대를 모두 선택해주세요</p>
+                        <p className="text-black mb-6 md:mb-8">원하는 분위기를 모두 선택해주세요 (복수 선택 가능)</p>
 
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-4">
+                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-4 max-w-3xl mx-auto">
                             {[
-                                { value: "morning", label: "오전", icon: "🌅", time: "6-12시" },
-                                { value: "afternoon", label: "오후", icon: "☀️", time: "12-18시" },
-                                { value: "evening", label: "저녁", icon: "🌆", time: "18-22시" },
-                                { value: "night", label: "밤", icon: "🌙", time: "22시 이후" },
-                            ].map((time) => (
+                                { value: "조용한", label: "조용한", icon: "🤫" },
+                                { value: "트렌디한", label: "트렌디한", icon: "🔥" },
+                                { value: "프리미엄", label: "프리미엄", icon: "👑" },
+                                { value: "활기찬", label: "활기찬", icon: "⚡" },
+                                { value: "깔끔한", label: "깔끔한", icon: "✨" },
+                                { value: "감성적", label: "감성적", icon: "💕" },
+                                { value: "빈티지", label: "빈티지", icon: "📻" },
+                            ].map((mood) => (
                                 <button
-                                    key={time.value}
-                                    onClick={() => handleMultiSelect("timePreference", time.value)}
-                                    className={`p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                        preferences.timePreference.includes(time.value)
+                                    key={mood.value}
+                                    onClick={() => handleMultiSelect("mood", mood.value)}
+                                    className={`p-4 md:p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
+                                        preferences.mood.includes(mood.value)
                                             ? "border-blue-500 bg-blue-50"
                                             : "border-gray-200 hover:border-gray-300"
                                     }`}
                                 >
-                                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{time.icon}</div>
-                                    <div className="font-bold text-base md:text-lg text-black">{time.label}</div>
-                                    <div className="text-xs md:text-sm text-gray-500">{time.time}</div>
+                                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{mood.icon}</div>
+                                    <div className="font-medium text-sm md:text-base text-black">{mood.label}</div>
                                 </button>
                             ))}
                         </div>
@@ -213,194 +321,41 @@ const AIOnboarding = () => {
                 );
 
             case 4:
+                // Step 4: 자주 가는 지역 (다중 선택)
                 return (
-                    <div className="text-center">
-                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">🍽️</div>
-                        <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            어떤 음식을 좋아하시나요?
-                        </h2>
-                        <p className="text-black mb-6 md:mb-8">선호하는 음식 종류를 모두 선택해주세요</p>
-
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-4">
-                            {[
-                                { value: "korean", label: "한식", icon: "🍚" },
-                                { value: "western", label: "양식", icon: "🍝" },
-                                { value: "japanese", label: "일식", icon: "🍜" },
-                                { value: "chinese", label: "중식", icon: "🥟" },
-                                { value: "street", label: "길거리 음식", icon: "🌭" },
-                                { value: "dessert", label: "디저트 & 카페", icon: "🧁" },
-                            ].map((food) => (
-                                <button
-                                    key={food.value}
-                                    onClick={() => handleMultiSelect("foodPreference", food.value)}
-                                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                        preferences.foodPreference.includes(food.value)
-                                            ? "border-blue-500 bg-blue-50"
-                                            : "border-gray-200 hover:border-gray-300"
-                                    }`}
-                                >
-                                    <div className="text-xl md:text-2xl mb-1 md:mb-2">{food.icon}</div>
-                                    <div className="font-medium text-sm md:text-base text-black">{food.label}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                );
-
-            case 5:
-                return (
-                    <div className="text-center">
-                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">🏃</div>
-                        <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            활동 강도는 어느 정도를 원하시나요?
-                        </h2>
-                        <p className="text-black mb-6 md:mb-8">선호하는 활동 수준을 선택해주세요</p>
-
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-4 max-w-4xl mx-auto">
-                            {[
-                                {
-                                    value: "low",
-                                    label: "여유롭게",
-                                    desc: "카페, 전시관람, 쇼핑 위주",
-                                    icon: "🛋️",
-                                },
-                                {
-                                    value: "medium",
-                                    label: "적당히 활동적",
-                                    desc: "도보 이동, 간단한 체험활동",
-                                    icon: "🚶",
-                                },
-                                {
-                                    value: "high",
-                                    label: "매우 활동적",
-                                    desc: "하이킹, 스포츠, 모험활동",
-                                    icon: "🏔️",
-                                },
-                            ].map((level) => (
-                                <button
-                                    key={level.value}
-                                    onClick={() => handleSingleSelect("activityLevel", level.value)}
-                                    className={`p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                        preferences.activityLevel === level.value
-                                            ? "border-blue-500 bg-blue-50"
-                                            : "border-gray-200 hover:border-gray-300"
-                                    }`}
-                                >
-                                    <div className="text-3xl md:text-4xl mb-2 md:mb-3">{level.icon}</div>
-                                    <div className="font-bold text-base md:text-lg mb-1 md:mb-2 text-black">
-                                        {level.label}
-                                    </div>
-                                    <div className="text-xs md:text-sm text-gray-500">{level.desc}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                );
-
-            case 6:
-                return (
-                    <div className="text-center">
-                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">👥</div>
-                        <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            주로 몇 명과 함께 여행하시나요?
-                        </h2>
-                        <p className="text-black mb-6 md:mb-8">가장 일반적인 여행 인원을 선택해주세요</p>
-
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-4">
-                            {[
-                                { value: "solo", label: "혼자", icon: "🧑" },
-                                { value: "couple", label: "커플/둘이", icon: "👫" },
-                                { value: "small", label: "소그룹 (3-5명)", icon: "👨‍👩‍👧" },
-                                { value: "large", label: "대그룹 (6명+)", icon: "👨‍👩‍👧‍👦" },
-                            ].map((size) => (
-                                <button
-                                    key={size.value}
-                                    onClick={() => handleSingleSelect("groupSize", size.value)}
-                                    className={`p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                        preferences.groupSize === size.value
-                                            ? "border-blue-500 bg-blue-50"
-                                            : "border-gray-200 hover:border-gray-300"
-                                    }`}
-                                >
-                                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{size.icon}</div>
-                                    <div className="font-medium text-base md:text-lg text-black">{size.label}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                );
-
-            case 7:
-                return (
-                    <div className="text-center">
-                        <div className="text-4xl md:text-6xl mb-4 md:mb-6">🎨</div>
-                        <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            어떤 분야에 관심이 있으신가요?
-                        </h2>
-                        <p className="text-black mb-6 md:mb-8">관심 분야를 모두 선택해주세요</p>
-
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {[
-                                { value: "art", label: "예술/문화", icon: "🎭" },
-                                { value: "history", label: "역사/전통", icon: "🏛️" },
-                                { value: "nature", label: "자연/풍경", icon: "🌲" },
-                                { value: "music", label: "음악/공연", icon: "🎵" },
-                                { value: "sports", label: "스포츠", icon: "⚽" },
-                                { value: "technology", label: "과학/기술", icon: "🔬" },
-                                { value: "fashion", label: "패션/뷰티", icon: "👗" },
-                                { value: "photography", label: "사진/영상", icon: "📸" },
-                            ].map((interest) => (
-                                <button
-                                    key={interest.value}
-                                    onClick={() => handleMultiSelect("interests", interest.value)}
-                                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                        preferences.interests.includes(interest.value)
-                                            ? "border-blue-500 bg-blue-50"
-                                            : "border-gray-200 hover:border-gray-300"
-                                    }`}
-                                >
-                                    <div className="text-xl md:text-2xl mb-1 md:mb-2">{interest.icon}</div>
-                                    <div className="font-medium text-sm md:text-base text-black">{interest.label}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                );
-
-            case 8:
-                return (
-                    <div className="text-center">
+                    <div className="text-center text-black w-full">
                         <div className="text-4xl md:text-6xl mb-4 md:mb-6">📍</div>
                         <h2 className="text-xl md:text-3xl font-bold mb-3 md:mb-4 text-black">
-                            어느 지역을 자주 방문하시나요?
+                            자주 가는 지역은 어디인가요?
                         </h2>
-                        <p className="text-black mb-6 md:mb-8">선호하는 지역을 모두 선택해주세요</p>
+                        <p className="text-black mb-6 md:mb-8">선호하는 지역을 모두 선택해주세요 (복수 선택 가능)</p>
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-4 max-w-3xl mx-auto">
                             {[
-                                "강남",
-                                "홍대",
-                                "명동",
-                                "이태원",
-                                "성수동",
-                                "건대",
-                                "신촌",
-                                "압구정",
-                                "청담",
-                                "종로",
-                                "인사동",
-                                "남산",
-                            ].map((location) => (
+                                { value: "성수", label: "성수", icon: "🏭" },
+                                { value: "한남", label: "한남", icon: "🏛️" },
+                                { value: "홍대", label: "홍대", icon: "🎨" },
+                                { value: "강남", label: "강남", icon: "💼" },
+                                { value: "서초", label: "서초", icon: "🏢" },
+                                { value: "여의도", label: "여의도", icon: "🌆" },
+                                { value: "종로/북촌", label: "종로/북촌", icon: "🏮" },
+                                { value: "잠실", label: "잠실", icon: "🎢" },
+                                { value: "신촌", label: "신촌", icon: "🎓" },
+                                { value: "가로수길", label: "가로수길", icon: "🌳" },
+                                { value: "이태원", label: "이태원", icon: "🌏" },
+                                { value: "압구정", label: "압구정", icon: "🛍️" },
+                            ].map((region) => (
                                 <button
-                                    key={location}
-                                    onClick={() => handleMultiSelect("locationPreferences", location)}
-                                    className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-black ${
-                                        preferences.locationPreferences.includes(location)
+                                    key={region.value}
+                                    onClick={() => handleMultiSelect("regions", region.value)}
+                                    className={`p-4 md:p-6 rounded-xl border-2 transition-all cursor-pointer text-black ${
+                                        preferences.regions.includes(region.value)
                                             ? "border-blue-500 bg-blue-50"
                                             : "border-gray-200 hover:border-gray-300"
                                     }`}
                                 >
-                                    📍 <span className="text-sm md:text-base text-black">{location}</span>
+                                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{region.icon}</div>
+                                    <div className="font-medium text-sm md:text-base text-black">{region.label}</div>
                                 </button>
                             ))}
                         </div>
@@ -415,33 +370,25 @@ const AIOnboarding = () => {
     const isStepValid = () => {
         switch (currentStep) {
             case 1:
-                return preferences.travelStyle.length > 0;
+                return preferences.concept.length > 0;
             case 2:
-                return preferences.budgetRange !== "";
+                return preferences.companion !== "";
             case 3:
-                return preferences.timePreference.length > 0;
+                return preferences.mood.length > 0;
             case 4:
-                return preferences.foodPreference.length > 0;
-            case 5:
-                return preferences.activityLevel !== "";
-            case 6:
-                return preferences.groupSize !== "";
-            case 7:
-                return preferences.interests.length > 0;
-            case 8:
-                return preferences.locationPreferences.length > 0;
+                return preferences.regions.length > 0;
             default:
                 return true;
         }
     };
 
     return (
-        <div className="h-[100dvh] min-h-[100dvh] bg-gradient-to-br from-blue-50 via-white to-purple-50 py-4 md:py-8 flex flex-col">
+        <div className="h-[100dvh] bg-gradient-to-br from-blue-50 via-white to-purple-50 py-4 md:py-8 flex flex-col overflow-hidden">
             <div className="max-w-4xl mx-auto px-4 w-full flex flex-col flex-1 min-h-0">
                 {/* 진행률 바 */}
-                <div className="mb-4 md:mb-8 flex-shrink-0">
-                    <div className="flex items-center justify-between mb-4">
-                        <h1 className="text-2xl font-bold text-gray-900">AI 개인화 설정</h1>
+                <div className="mb-3 md:mb-8 flex-shrink-0">
+                    <div className="flex items-center justify-between mb-2 md:mb-4">
+                        <h1 className="text-xl md:text-2xl font-bold text-gray-900">AI 개인화 설정</h1>
                         <span className="text-sm text-gray-500">
                             {currentStep}/{totalSteps}
                         </span>
@@ -454,13 +401,17 @@ const AIOnboarding = () => {
                     </div>
                 </div>
 
-                {/* 단계별 컨텐츠 */}
-                <div className="bg-white rounded-2xl shadow-xl p-3 md:p-4 mb-4 md:mb-8 flex-1 min-h-0 overflow-y-auto md:overflow-visible no-scrollbar scrollbar-hide overscroll-contain">
-                    <div className="md:hidden grid gap-2" style={{ gridTemplateColumns: "1fr" }}>
-                        {/* 모바일: 스크롤 없이 한 화면에 담기도록 요소 간격과 폰트 사이즈 축소 */}
-                        <div className="text-center space-y-2 text-sm leading-relaxed">{renderStep()}</div>
+                {/* 단계별 컨텐츠 - 고정 크기, 내부 스크롤 */}
+                <div
+                    className="bg-white rounded-2xl shadow-xl mb-4 md:mb-8 flex-shrink-0 flex flex-col"
+                    style={{ height: "calc(100dvh - 300px)", maxHeight: "600px" }}
+                >
+                    <div
+                        className="p-4 md:p-6 overflow-y-auto flex-1 min-h-0"
+                        style={{ WebkitOverflowScrolling: "touch" }}
+                    >
+                        {renderStep()}
                     </div>
-                    <div className="hidden md:block">{renderStep()}</div>
                 </div>
 
                 {/* 네비게이션 버튼 */}
@@ -468,7 +419,7 @@ const AIOnboarding = () => {
                     <button
                         onClick={prevStep}
                         disabled={currentStep === 1}
-                        className="px-4  py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-100 cursor-pointer"
+                        className="px-4 py-2.5 md:py-3 rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:bg-gray-100 cursor-pointer text-sm md:text-base"
                     >
                         이전
                     </button>
@@ -476,17 +427,17 @@ const AIOnboarding = () => {
                     <button
                         onClick={nextStep}
                         disabled={!isStepValid()}
-                        className="px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className="px-4 py-2.5 md:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm md:text-base"
                     >
                         {currentStep === totalSteps ? "완료" : "다음"}
                     </button>
                 </div>
 
                 {/* 건너뛰기 옵션 */}
-                <div className="text-center mt-3 md:mt-6 mb-2 md:mb-6 flex-shrink-0">
+                <div className="text-center mb-2 md:mb-6 flex-shrink-0">
                     <button
                         onClick={() => router.push("/")}
-                        className="text-gray-500 hover:text-gray-700 text-sm underline cursor-pointer"
+                        className="text-gray-500 hover:text-gray-700 text-xs md:text-sm underline cursor-pointer"
                     >
                         나중에 설정하기
                     </button>

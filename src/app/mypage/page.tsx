@@ -18,14 +18,10 @@ interface UserInfo {
 }
 
 interface UserPreferences {
-    travelStyle: string[];
-    budgetRange: string;
-    timePreference: string[];
-    foodPreference: string[];
-    activityLevel: string;
-    groupSize: string;
-    interests: string[];
-    locationPreferences: string[];
+    concept: string[]; // 감성·힐링, 활동적·체험, 카페/브런치, 인생샷·사진, 맛집 탐방, 쇼핑, 야경·밤 산책, 이색 데이트
+    companion: string; // 연인, 썸, 소개팅, 친구, 혼자
+    mood: string[]; // 조용한, 트렌디한, 프리미엄, 활기찬, 깔끔한, 감성적, 빈티지
+    regions: string[]; // 성수, 한남, 홍대, 강남, 서초, 여의도, 종로/북촌, 잠실, 신촌, 가로수길 등
 }
 
 interface Booking {
@@ -269,17 +265,26 @@ const MyPage = () => {
             });
             if (response.ok) {
                 const raw = await response.json();
+                // API 응답 구조: { preferences: {...} } 또는 직접 preferences 객체
                 const prefs: any = raw?.preferences ?? raw ?? {};
-                setUserPreferences({
-                    travelStyle: prefs.travelStyle || prefs.travel_style || [],
-                    budgetRange: prefs.budgetRange || prefs.budget_range || "",
-                    timePreference: prefs.timePreference || prefs.time_preference || [],
-                    foodPreference: prefs.foodPreference || prefs.food_preference || [],
-                    activityLevel: prefs.activityLevel || prefs.activity_level || "",
-                    groupSize: prefs.groupSize || prefs.group_size || "",
-                    interests: prefs.interests || [],
-                    locationPreferences: prefs.locationPreferences || prefs.location_preferences || [],
-                });
+                // preferences가 비어있지 않은지 확인 (새로운 구조 기준)
+                const hasPreferences =
+                    Object.keys(prefs).length > 0 &&
+                    ((prefs.concept && Array.isArray(prefs.concept) && prefs.concept.length > 0) ||
+                        prefs.companion ||
+                        (prefs.mood && Array.isArray(prefs.mood) && prefs.mood.length > 0) ||
+                        (prefs.regions && Array.isArray(prefs.regions) && prefs.regions.length > 0));
+
+                if (hasPreferences) {
+                    setUserPreferences({
+                        concept: Array.isArray(prefs.concept) ? prefs.concept : [],
+                        companion: prefs.companion || "",
+                        mood: Array.isArray(prefs.mood) ? prefs.mood : [],
+                        regions: Array.isArray(prefs.regions) ? prefs.regions : [],
+                    });
+                } else {
+                    setUserPreferences(null);
+                }
             }
         } catch (error) {
             console.error("Failed to fetch user preferences:", error);
@@ -630,49 +635,63 @@ const MyPage = () => {
                     </div>
                 )}
                 {userPreferences ? (
-                    <div className="space-y-6">
-                        {userPreferences.travelStyle && userPreferences.travelStyle.length > 0 && (
+                    <div className="grid grid-cols-2 gap-4 md:gap-6">
+                        {userPreferences.companion && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
-                                    여행 스타일
+                                    여행 동반자
+                                </h4>
+                                <span className="px-2.5 md:px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs md:text-sm">
+                                    {userPreferences.companion}
+                                </span>
+                            </div>
+                        )}
+                        {userPreferences.concept && userPreferences.concept.length > 0 && (
+                            <div>
+                                <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
+                                    선호 콘셉트
                                 </h4>
                                 <div className="flex flex-wrap gap-2">
-                                    {userPreferences.travelStyle.map((style) => (
+                                    {userPreferences.concept.map((c, idx) => (
                                         <span
-                                            key={style}
-                                            className="px-2.5 md:px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs md:text-sm"
+                                            key={idx}
+                                            className="px-2.5 md:px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs md:text-sm"
                                         >
-                                            {style}
+                                            {c}
                                         </span>
                                     ))}
                                 </div>
                             </div>
                         )}
-                        {userPreferences.budgetRange && (
+                        {userPreferences.mood && userPreferences.mood.length > 0 && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
-                                    예산 범위
+                                    선호 분위기
                                 </h4>
-                                <span className="px-2.5 md:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs md:text-sm">
-                                    {userPreferences.budgetRange === "budget" && "5만원 미만"}
-                                    {userPreferences.budgetRange === "moderate" && "5만원 ~ 10만원"}
-                                    {userPreferences.budgetRange === "premium" && "10만원 ~ 20만원"}
-                                    {userPreferences.budgetRange === "luxury" && "20만원 이상"}
-                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                    {userPreferences.mood.map((m, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="px-2.5 md:px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-xs md:text-sm"
+                                        >
+                                            {m}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                         )}
-                        {userPreferences.locationPreferences && userPreferences.locationPreferences.length > 0 && (
+                        {userPreferences.regions && userPreferences.regions.length > 0 && (
                             <div>
                                 <h4 className="text-base md:text-lg font-semibold text-gray-900 mb-2 md:mb-3">
                                     선호 지역
                                 </h4>
                                 <div className="flex flex-wrap gap-2">
-                                    {userPreferences.locationPreferences.map((location) => (
+                                    {userPreferences.regions.map((r, idx) => (
                                         <span
-                                            key={location}
-                                            className="px-2.5 md:px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs md:text-sm"
+                                            key={idx}
+                                            className="px-2.5 md:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs md:text-sm"
                                         >
-                                            📍 {location}
+                                            {r}
                                         </span>
                                     ))}
                                 </div>

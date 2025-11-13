@@ -1,14 +1,13 @@
 import React, { useCallback, useRef, useState, useEffect, useContext } from "react";
 import { BackHandler, Platform, StyleSheet, View, ActivityIndicator, Linking } from "react-native";
-
+import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
+
 import { loadAuthToken, saveAuthToken } from "../storage";
 import { PushTokenContext } from "../context/PushTokenContext";
 import { registerPushToken } from "../utils/registerPushToken";
 
-type Props = {
-    uri: string;
-};
+type Props = { uri: string };
 
 export default function WebScreen({ uri }: Props) {
     const webRef = useRef<WebView>(null);
@@ -17,224 +16,202 @@ export default function WebScreen({ uri }: Props) {
     const pushToken = useContext(PushTokenContext);
     const [initialScript, setInitialScript] = useState<string | null>(null);
 
-    const sameHost = useCallback(
-        (url: string) => {
-            try {
-                const base = new URL(uri);
-                const next = new URL(url);
-                return base.host === next.host;
-            } catch {
-                return false;
-            }
-        },
-        [uri]
-    );
-
     const handleAndroidBack = useCallback(() => {
         if (canGoBack && webRef.current) {
             webRef.current.goBack();
-            return true; // consume
+            return true;
         }
-        return false; // let OS handle (app-level back)
+        return false;
     }, [canGoBack]);
 
     useEffect(() => {
-        if (Platform.OS !== "android") return;
-        const sub = BackHandler.addEventListener("hardwareBackPress", handleAndroidBack);
-        return () => sub.remove();
+        if (Platform.OS === "android") {
+            const sub = BackHandler.addEventListener("hardwareBackPress", handleAndroidBack);
+            return () => sub.remove();
+        }
     }, [handleAndroidBack]);
 
-    // Build injected JS with latest tokens
+    // Build injected JS
     useEffect(() => {
         (async () => {
             const authToken = await loadAuthToken();
+            const isIntroPage = uri.includes("/escape/intro");
+            const isSplashPage = uri === "https://dona-two.vercel.app/" || uri === "https://dona-two.vercel.app";
+
             const lines: string[] = [];
             lines.push("(function(){");
-            lines.push(
-                "window.__nativeBridge = { post: function(type, payload){ try { window.ReactNativeWebView.postMessage(JSON.stringify({type:type, payload:payload})); } catch(e){} } };"
-            );
+
+            // 1) RN ↔ WebBridge
+            lines.push(`
+                window.__nativeBridge = {
+                    post: function(type, payload){
+                        try {
+                            window.ReactNativeWebView.postMessage(
+                                JSON.stringify({type:type, payload:payload})
+                            );
+                        } catch(e){}
+                    }
+                };
+            `);
+
+            // 2) inject tokens
             if (pushToken) {
                 lines.push(`try{ localStorage.setItem('expoPushToken', '${pushToken}'); }catch(e){}`);
             }
             if (authToken) {
                 lines.push(`try{ localStorage.setItem('authToken', '${authToken}'); }catch(e){}`);
             }
-            // Listen for token updates and login events from web
-            lines.push(`
-    try {
-        window.addEventListener('message', function(e) {
-            var d = e.data;
-            if (typeof d === 'string') {
-                try { d = JSON.parse(d); } catch(_) {}
-            }
-            
-            // 로그인 성공 시
-            if (d && d.type === 'loginSuccess' && d.userId) {
-                window.__nativeBridge.post('loginSuccess', { userId: d.userId });
-            }
-            
-            // 토큰 저장 확인
-            if (d && d.type === 'setAuthToken') {
-                window.__nativeBridge.post('setAuthTokenAck', true);
-            }
-        });
-    } catch(e) {}
-`);
-            // 웹 하단 탭바(고정 footer) 숨김: 앱 내 중복 하단바 제거
-            // 중복된 하단 탭바 중 아래쪽 것만 숨기기
-            lines.push(`
-    (function tuneBarsAndHeader(){
-        function hideOnlyDuplicateBar(){
-            try{
-                var nodes = Array.prototype.slice.call(document.querySelectorAll('*'));
-                var fixedBottom = [];
-                nodes.forEach(function(el){
-                    var cs = window.getComputedStyle(el);
-                    if (!cs) return;
-                    var pos = cs.position;
-                    var bottomVal = cs.bottom || 'auto';
-                    var bottom = parseInt(bottomVal === 'auto' ? '0' : bottomVal, 10);
-                    var rect = el.getBoundingClientRect();
-                    var atBottom = rect.bottom >= (window.innerHeight - 2) || bottom <= 2;
-                    var plausibleHeight = rect.height > 20 && rect.height < 140;
-                    var wideEnough = rect.width > (window.innerWidth * 0.5);
-                    if ((pos === 'fixed' || pos === 'sticky') && atBottom && plausibleHeight && wideEnough) {
-                        fixedBottom.push({el: el, bottom: rect.bottom, h: rect.height});
-                    }
-                });
-                
-                // 여러 개가 있으면 가장 아래에 있는 것만 숨기기
-                if (fixedBottom.length > 1) {
-                    fixedBottom.sort(function(a, b){ return b.bottom - a.bottom; });
-                    // 가장 아래쪽 탭바만 숨기기
-                    try{ fixedBottom[0].el.style.display = 'none'; }catch(e){}
-                }
-            }catch(e){}
-        }
-        
-        function fixHeader(){
-            try{
-                // 하단 네이티브 탭바와 겹침 방지용 여백
-                var style = document.createElement('style');
-                style.textContent = 'body{ padding-bottom: 100px !important; }';
-                document.head.appendChild(style);
-                var nodes = Array.prototype.slice.call(document.querySelectorAll('*'));
-                nodes.forEach(function(el){
-                    var cs = window.getComputedStyle(el);
-                    if (!cs) return;
-                    var pos = cs.position;
-                    var topVal = cs.top || 'auto';
-                    var top = parseInt(topVal === 'auto' ? '0' : topVal, 10);
-                    var rect = el.getBoundingClientRect();
-                    var nearTop = rect.top <= 2 || top <= 2;
-                    var plausibleHeight = rect.height > 40 && rect.height < 200;
-                    if (pos === 'fixed' && nearTop && plausibleHeight) {
-                        el.style.top = 'calc(env(safe-area-inset-top, 0px))';
-                    }
-                });
-            }catch(e){}
-        }
-        
-        document.addEventListener('DOMContentLoaded', hideOnlyDuplicateBar);
-        window.addEventListener('load', hideOnlyDuplicateBar);
-        setTimeout(hideOnlyDuplicateBar, 300);
-        setTimeout(hideOnlyDuplicateBar, 1000);
 
-        document.addEventListener('DOMContentLoaded', fixHeader);
-        window.addEventListener('load', fixHeader);
-        setTimeout(fixHeader, 300);
-        setTimeout(fixHeader, 1000);
-    })();
-`);
+            // 3) Safe-area 처리 수정
+            lines.push(`
+                (function applySafeArea(){
+                    function update(){
+                        try {
+                            const path = window.location.pathname;
+                            const href = window.location.href;
+                            
+                            // 인트로 페이지와 스플래시(민트색) 페이지는 풀스크린
+                            const isIntro = path.includes("/escape/intro");
+                            const isSplash = (href === "https://dona-two.vercel.app/" || 
+                                             href === "https://dona-two.vercel.app" ||
+                                             path === "/" && !document.querySelector('[class*="container"]'));
+
+                            if (isIntro || isSplash) {
+                                // 풀스크린 - safe-area 제거
+                                document.documentElement.style.paddingTop = "0px";
+                                document.body.style.paddingTop = "0px";
+                                document.documentElement.style.marginTop = "0px";
+                                document.body.style.marginTop = "0px";
+
+                                const old = document.getElementById("safe-area-style");
+                                if (old) old.remove();
+                                return;
+                            }
+
+                            // 나머지 페이지는 safe-area 없이 처리
+                            // React Native의 SafeAreaView가 이미 처리하므로 웹에서는 추가 padding 불필요
+                            document.documentElement.style.paddingTop = "0px";
+                            document.body.style.paddingTop = "0px";
+                            document.documentElement.style.marginTop = "0px";
+                            document.body.style.marginTop = "0px";
+                            
+                            const existing = document.getElementById("safe-area-style");
+                            if (existing) existing.remove();
+
+                        } catch(e){
+                            console.error('Safe area update error:', e);
+                        }
+                    }
+
+                    // 초기 실행
+                    update();
+
+                    document.addEventListener("DOMContentLoaded", update);
+                    window.addEventListener("load", update);
+
+                    // hydration, SPA 전환 대응
+                    setTimeout(update, 20);
+                    setTimeout(update, 200);
+                    setTimeout(update, 500);
+                    
+                    // 페이지 전환 감지
+                    let lastPath = window.location.pathname;
+                    setInterval(() => {
+                        if (window.location.pathname !== lastPath) {
+                            lastPath = window.location.pathname;
+                            update();
+                        }
+                    }, 200);
+                })();
+            `);
+
+            // 4) Escape footer 보정 (필요한 경우)
+            if (uri.includes("/escape")) {
+                lines.push(`
+                    (function(){
+                        function adjust(){
+                            try{
+                                const footer = document.querySelector('[class*="absolute"][class*="bottom"]');
+                                if (footer && !window.location.pathname.includes("/escape/intro")) {
+                                    footer.style.bottom = "calc(1rem + env(safe-area-inset-bottom, 0px))";
+                                    footer.style.paddingBottom = "calc(0.5rem + env(safe-area-inset-bottom, 0px))";
+                                }
+                            }catch(e){}
+                        }
+                        document.addEventListener("DOMContentLoaded", adjust);
+                        window.addEventListener("load", adjust);
+                        setTimeout(adjust, 200);
+                        setTimeout(adjust, 500);
+                    })();
+                `);
+            }
+
             lines.push("})();");
             setInitialScript(lines.join("\n"));
         })();
     }, [pushToken, uri]);
 
+    const isIntroPage = uri.includes("/escape/intro");
+    const isSplashPage = uri === "https://dona-two.vercel.app/" || uri === "https://dona-two.vercel.app";
+    const shouldUseFullScreen = isIntroPage || isSplashPage;
+
     return (
-        <View style={styles.container}>
-            {!!initialScript && (
-                <WebView
-                    ref={webRef}
-                    source={{ uri }}
-                    contentInsetAdjustmentBehavior="automatic"
-                    onLoadStart={() => setLoading(true)}
-                    onLoadEnd={() => setLoading(false)}
-                    onNavigationStateChange={(nav) => setCanGoBack(nav.canGoBack)}
-                    injectedJavaScriptBeforeContentLoaded={initialScript}
-                    onMessage={async (ev) => {
-                        try {
-                            const data = JSON.parse(String(ev.nativeEvent.data || ""));
+        <SafeAreaView
+            style={{ flex: 1, backgroundColor: "#fff" }}
+            edges={shouldUseFullScreen ? [] : ["top", "left", "right"]}
+        >
+            <View style={{ flex: 1 }}>
+                {!!initialScript && (
+                    <WebView
+                        ref={webRef}
+                        style={{ flex: 1 }}
+                        source={{ uri }}
+                        contentInset={{ top: 0, bottom: 0 }}
+                        contentInsetAdjustmentBehavior="never"
+                        onLoadStart={() => setLoading(true)}
+                        onLoadEnd={() => setLoading(false)}
+                        onNavigationStateChange={(nav) => setCanGoBack(nav.canGoBack)}
+                        injectedJavaScriptBeforeContentLoaded={initialScript}
+                        onMessage={async (ev) => {
+                            try {
+                                const data = JSON.parse(ev.nativeEvent.data || "{}");
 
-                            // 토큰 저장
-                            if (data?.type === "setAuthToken") {
-                                await saveAuthToken(String(data?.payload || ""));
-                            }
+                                if (data.type === "setAuthToken") {
+                                    await saveAuthToken(String(data.payload || ""));
+                                }
 
-                            // 로그인 성공 시 푸시 토큰 등록
-                            if (data?.type === "loginSuccess") {
-                                const userId = data?.payload?.userId ?? data?.userId ?? null;
-                                const tokenFromMsg = data?.token ?? data?.payload?.token ?? null;
-                                if (tokenFromMsg) {
-                                    await saveAuthToken(String(tokenFromMsg));
+                                if (data.type === "loginSuccess") {
+                                    const userId = data.payload?.userId;
+                                    const token = data.payload?.token;
+                                    if (token) await saveAuthToken(String(token));
+                                    if (userId && pushToken) {
+                                        await registerPushToken(userId, pushToken);
+                                    }
                                 }
-                                if (userId && pushToken) {
-                                    console.log("로그인 감지, 푸시 토큰 등록:", userId);
-                                    await registerPushToken(userId, pushToken);
-                                }
-                            }
-                        } catch (e) {
-                            console.error("WebView message 처리 오류:", e);
-                        }
-                    }}
-                    onFileDownload={({ nativeEvent }) => {
-                        const { downloadUrl } = nativeEvent;
-                        if (downloadUrl) {
-                            Linking.openURL(downloadUrl).catch(() => {});
-                        }
-                    }}
-                    incognito={false}
-                    allowsBackForwardNavigationGestures
-                    setSupportMultipleWindows={false}
-                    originWhitelist={["*"]}
-                    javaScriptEnabled
-                    domStorageEnabled
-                    startInLoadingState
-                    allowsInlineMediaPlayback
-                    mediaPlaybackRequiresUserAction={false}
-                    pullToRefreshEnabled={Platform.OS === "android"}
-                    onShouldStartLoadWithRequest={(req) => {
-                        const url = req.url || "";
-                        // OS가 처리해야 하는 스킴만 외부로 전달
-                        if (
-                            url.startsWith("tel:") ||
-                            url.startsWith("mailto:") ||
-                            url.startsWith("sms:") ||
-                            url.startsWith("intent:")
-                        ) {
-                            Linking.openURL(url).catch(() => {});
-                            return false;
-                        }
-                        // http/https 내비게이션은 모두 WebView 안에서 처리
-                        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("about:blank")) {
-                            return true;
-                        }
-                        // 나머지는 기본적으로 허용
-                        return true;
-                    }}
-                />
-            )}
-            {loading && (
-                <View style={styles.loading} pointerEvents="none">
-                    <ActivityIndicator size="small" color="#6db48c" />
-                </View>
-            )}
-        </View>
+                            } catch (e) {}
+                        }}
+                        onFileDownload={({ nativeEvent }) => {
+                            Linking.openURL(nativeEvent.downloadUrl).catch(() => {});
+                        }}
+                        originWhitelist={["*"]}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        allowsInlineMediaPlayback
+                        mediaPlaybackRequiresUserAction={false}
+                    />
+                )}
+
+                {loading && (
+                    <View style={styles.loading} pointerEvents="none">
+                        <ActivityIndicator size="small" color="#6db48c" />
+                    </View>
+                )}
+            </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#fff", paddingTop: Platform.OS === "ios" ? 44 : 0 },
     loading: {
         position: "absolute",
         top: 8,

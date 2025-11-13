@@ -53,67 +53,89 @@ interface Course {
     score?: number;
 }
 
-// 질문 시나리오
+// 질문 시나리오 (오늘 상황 기반)
 const questionFlow: Question[] = [
     {
         id: "greeting",
         type: "ai",
-        text: "안녕하세요! 🌟 AI가 당신의 취향을 완벽하게 분석해서 딱 맞는 여행 코스를 찾아드릴게요! 먼저 간단한 질문 몇 개만 답해주세요.",
+        text: "안녕하세요! 🌟 오늘 당신에게 딱 맞는 코스를 찾기 위해 간단한 질문 몇 개만 답해주세요.",
         options: [
-            { text: "네, 시작할게요! 🚀", value: "start", next: "concept" },
+            { text: "네, 시작할게요! 🚀", value: "start", next: "goal" },
             { text: "어떤 질문들인지 궁금해요", value: "preview", next: "preview" },
         ],
     },
     {
         id: "preview",
         type: "ai",
-        text: "총 3개의 간단한 질문을 드려요! 선호하는 콘셉트, 지역, 소요 시간을 물어볼 예정이에요. 각 질문은 30초 이내로 답하실 수 있어요 😊",
-        options: [{ text: "좋아요, 시작할게요!", value: "start", next: "concept" }],
+        text: "총 4개의 간단한 질문을 드려요! 오늘의 목적, 함께하는 사람, 원하는 분위기, 선호 지역을 물어볼 예정이에요. 각 질문은 30초 이내로 답하실 수 있어요 😊",
+        options: [{ text: "좋아요, 시작할게요!", value: "start", next: "goal" }],
     },
     {
-        id: "concept",
+        id: "goal",
         type: "ai",
-        text: "어떤 콘셉트를 원하시나요? 🎯",
+        text: "Q1. 오늘의 목적은 무엇인가요? 🎯",
         options: [
-            { text: "힐링", value: "힐링", next: "region" },
-            { text: "체험", value: "체험", next: "region" },
-            { text: "핫플레이스", value: "핫플레이스", next: "region" },
-            { text: "가성비", value: "가성비", next: "region" },
-            { text: "이색데이트", value: "이색데이트", next: "region" },
-            { text: "쇼핑", value: "쇼핑", next: "region" },
-            { text: "카페투어", value: "카페투어", next: "region" },
-            { text: "야경", value: "야경", next: "region" },
-            { text: "맛집탐방", value: "맛집탐방", next: "region" },
-            { text: "인생샷", value: "인생샷", next: "region" },
+            { text: "기념일", value: "기념일", next: "companion_today" },
+            { text: "데이트", value: "데이트", next: "companion_today" },
+            { text: "썸·소개팅", value: "썸·소개팅", next: "companion_today" },
+            { text: "힐링", value: "힐링", next: "companion_today" },
+            { text: "특별한 이벤트", value: "특별한 이벤트", next: "companion_today" },
+            { text: "사진 잘 나오는 코스", value: "사진 잘 나오는 코스", next: "companion_today" },
+            { text: "밤 데이트", value: "밤 데이트", next: "companion_today" },
         ],
     },
     {
-        id: "region",
+        id: "companion_today",
         type: "ai",
-        text: "어느 지역을 선호하시나요? 📍",
+        text: "Q2. 오늘 함께하는 사람은 누구인가요? 👥",
         options: [
-            { text: "강남/서초", value: "서초", next: "duration" },
-            { text: "성수/한남", value: "성수", next: "duration" },
-            { text: "홍대/연남", value: "홍대", next: "duration" },
-            { text: "종로/북촌", value: "종로", next: "duration" },
-            { text: "용산", value: "용산", next: "duration" },
-            { text: "여의도", value: "여의도", next: "duration" },
-            { text: "신촌", value: "신촌", next: "duration" },
-            { text: "영등포", value: "영등포", next: "duration" },
-            { text: "가로수길", value: "가로수길", next: "duration" },
-            { text: "송파/잠실", value: "송파", next: "duration" },
-            { text: "강서/마곡", value: "강서구", next: "duration" },
+            { text: "연인", value: "연인", next: "mood_today" },
+            { text: "썸 상대", value: "썸 상대", next: "mood_today" },
+            { text: "소개팅 상대", value: "소개팅 상대", next: "mood_today" },
+            { text: "친구", value: "친구", next: "mood_today" },
+            { text: "혼자", value: "혼자", next: "mood_today" },
         ],
     },
     {
-        id: "duration",
+        id: "mood_today",
         type: "ai",
-        text: "예상 소요 시간은 어느 정도가 좋나요? ⏱️",
+        text: "Q3. 오늘 원하는 분위기는 어떤가요? ✨",
         options: [
-            { text: "약 3시간", value: "3", next: "complete" },
-            { text: "약 4시간", value: "4", next: "complete" },
-            { text: "약 5시간", value: "5", next: "complete" },
-            { text: "약 6시간", value: "6", next: "complete" },
+            { text: "조용한", value: "조용한", next: "region_today" },
+            { text: "감성 가득한", value: "감성 가득한", next: "region_today" },
+            { text: "트렌디한", value: "트렌디한", next: "region_today" },
+            { text: "활동적인", value: "활동적인", next: "region_today" },
+            { text: "프리미엄", value: "프리미엄", next: "region_today" },
+            { text: "사진 잘 나오는", value: "사진 잘 나오는", next: "region_today" },
+            { text: "여유로운", value: "여유로운", next: "region_today" },
+        ],
+    },
+    {
+        id: "region_today",
+        type: "ai",
+        text: "Q4. 오늘의 선호 지역은 어디인가요? 📍",
+        options: [
+            { text: "성수", value: "성수", next: "payment_prompt" },
+            { text: "한남", value: "한남", next: "payment_prompt" },
+            { text: "홍대", value: "홍대", next: "payment_prompt" },
+            { text: "강남", value: "강남", next: "payment_prompt" },
+            { text: "서초", value: "서초", next: "payment_prompt" },
+            { text: "여의도", value: "여의도", next: "payment_prompt" },
+            { text: "종로/북촌", value: "종로/북촌", next: "payment_prompt" },
+            { text: "잠실", value: "잠실", next: "payment_prompt" },
+            { text: "신촌", value: "신촌", next: "payment_prompt" },
+            { text: "가로수길", value: "가로수길", next: "payment_prompt" },
+            { text: "이태원", value: "이태원", next: "payment_prompt" },
+            { text: "압구정", value: "압구정", next: "payment_prompt" },
+        ],
+    },
+    {
+        id: "payment_prompt",
+        type: "ai",
+        text: "좋아요! ✨\n\n지금까지 답변을 분석해보니,\n당신에게 딱 맞는 코스를 최대 2가지로 좁힐 수 있을 것 같아요.\n\nAI 맞춤 코스 추천은\n쿠폰 1개로 이용할 수 있어요 💡\n\n계속해서 추천 받아볼까요?",
+        options: [
+            { text: "네, 추천 받을게요! 🎉", value: "yes", next: "complete" },
+            { text: "나중에 할게요", value: "no", next: "greeting" },
         ],
     },
 ];
@@ -123,6 +145,7 @@ const AIRecommender = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [userName, setUserName] = useState("");
     const [nickname, setNickname] = useState("");
+    const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
     const [coupons, setCoupons] = useState(0);
     const [showLogin, setShowLogin] = useState(false);
     const [showPaywall, setShowPaywall] = useState(false);
@@ -140,6 +163,7 @@ const AIRecommender = () => {
     const [progress, setProgress] = useState(0);
     const [showUpsell, setShowUpsell] = useState(false);
     const [netError, setNetError] = useState<string | null>(null);
+    const [isUsingCoupon, setIsUsingCoupon] = useState(false); // 쿠폰 차감 중복 방지
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -158,6 +182,7 @@ const AIRecommender = () => {
             setIsLoggedIn(false);
             setUserName("");
             setNickname("");
+            setProfileImageUrl(null);
             setCoupons(0);
             return;
         }
@@ -174,6 +199,7 @@ const AIRecommender = () => {
                 const nick = userData.nickname || userData.name || userData.email?.split("@")[0] || "사용자";
                 setUserName(nick);
                 setNickname(nick);
+                setProfileImageUrl(userData.profileImage || userData.user?.profileImage || null);
                 setCoupons(userData.couponCount || 0);
                 localStorage.setItem("user", JSON.stringify(userData));
             } else {
@@ -195,6 +221,7 @@ const AIRecommender = () => {
                 setIsLoggedIn(false);
                 setUserName("");
                 setNickname("");
+                setProfileImageUrl(null);
                 setCoupons(0);
             }
         };
@@ -269,6 +296,7 @@ const AIRecommender = () => {
         setIsLoggedIn(false);
         setUserName("");
         setNickname("");
+        setProfileImageUrl(null);
         setCoupons(0);
         resetConversation();
         setConversationStarted(false);
@@ -293,13 +321,21 @@ const AIRecommender = () => {
         }
     };
 
-    // 쿠폰 사용 API
+    // 쿠폰 사용 API (중복 차감 방지)
     const useCoupon = async (): Promise<boolean> => {
+        // 이미 쿠폰 차감 중이면 중복 차감 방지
+        if (isUsingCoupon) {
+            console.log("쿠폰 차감이 이미 진행 중입니다.");
+            return false;
+        }
+
         const token = localStorage.getItem("authToken");
         if (!token) {
             setShowLogin(true);
             return false;
         }
+
+        setIsUsingCoupon(true); // 쿠폰 차감 시작 플래그 설정
 
         try {
             const response = await fetch("/api/ai-recommendation/use-ticket", {
@@ -310,9 +346,11 @@ const AIRecommender = () => {
             if (response.ok) {
                 const data = await response.json();
                 setCoupons(data.ticketsRemaining);
+                setIsUsingCoupon(false); // 쿠폰 차감 완료
                 return true;
             } else {
                 const errorData = await response.json();
+                setIsUsingCoupon(false); // 쿠폰 차감 실패
                 if (response.status === 400) {
                     setShowPaywall(true);
                 } else {
@@ -323,6 +361,7 @@ const AIRecommender = () => {
             }
         } catch (error) {
             console.error("쿠폰 사용 API 오류:", error);
+            setIsUsingCoupon(false); // 쿠폰 차감 실패
             alert("네트워크 오류");
             setNetError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
             return false;
@@ -354,23 +393,41 @@ const AIRecommender = () => {
 
     // 답변 처리
     const handleAnswer = async (option: QuestionOption) => {
-        const isFirstAnswer = Object.keys(userAnswers).length === 0;
+        // payment_prompt에서 "yes"를 선택하면 쿠폰 차감 및 추천 생성
+        if (currentQuestion.id === "payment_prompt") {
+            if (option.value === "yes") {
+                if (!isLoggedIn) {
+                    setShowLogin(true);
+                    return;
+                }
+                if (coupons < 1) {
+                    setShowPaywall(true);
+                    return;
+                }
+                const couponUsed = await useCoupon();
+                if (!couponUsed) {
+                    return;
+                }
 
-        if (isFirstAnswer) {
-            if (!isLoggedIn) {
-                setShowLogin(true);
+                setMessages((prev) => [...prev, { type: "user", text: option.text }]);
+                setIsTyping(true);
+                setIsGenerating(true);
+                setShowRecommendations(true);
+
+                setTimeout(async () => {
+                    setIsTyping(false);
+                    await generateRecommendations(userAnswers);
+                    setIsGenerating(false);
+                }, 600);
                 return;
-            }
-            if (coupons < 1) {
-                setShowPaywall(true);
-                return;
-            }
-            const couponUsed = await useCoupon();
-            if (!couponUsed) {
+            } else if (option.value === "no") {
+                // 나중에 할게요 선택 시 대화 초기화
+                resetConversation();
                 return;
             }
         }
 
+        // 첫 답변 시 로그인/쿠폰 체크는 하지 않음 (payment_prompt에서 처리)
         setMessages((prev) => [...prev, { type: "user", text: option.text }]);
 
         const newAnswers = { ...userAnswers, [currentQuestion.id]: option.value };
@@ -381,24 +438,23 @@ const AIRecommender = () => {
         setTimeout(async () => {
             setIsTyping(false);
 
-            const progressKeys = ["concept", "region", "duration"];
+            // 진행률 계산 (goal, companion_today, mood_today, region_today)
+            const progressKeys = ["goal", "companion_today", "mood_today", "region_today"];
             const answered = Object.keys(newAnswers).filter((k) => progressKeys.includes(k)).length;
-            const totalSteps = 3;
+            const totalSteps = 4;
             const pct = Math.min(100, Math.round((answered / totalSteps) * 100));
             setProgress(pct);
-            setShowUpsell(pct >= 75 && pct < 100);
 
+            // complete로 가면 추천 생성 (payment_prompt에서 처리하므로 여기서는 처리 안 함)
             if (option.next === "complete") {
-                setShowRecommendations(true);
-                setIsGenerating(true);
-                await generateRecommendations(newAnswers);
-                setIsGenerating(false);
-            } else {
-                const nextQuestion = questionFlow.find((q) => q.id === option.next);
-                if (nextQuestion) {
-                    setCurrentQuestion(nextQuestion);
-                    setMessages((prev) => [...prev, { type: "ai", text: nextQuestion.text }]);
-                }
+                // 이미 payment_prompt에서 처리됨
+                return;
+            }
+
+            const nextQuestion = questionFlow.find((q) => q.id === option.next);
+            if (nextQuestion) {
+                setCurrentQuestion(nextQuestion);
+                setMessages((prev) => [...prev, { type: "ai", text: nextQuestion.text }]);
             }
         }, 600);
     };
@@ -442,32 +498,48 @@ const AIRecommender = () => {
             }
         };
 
-        const wantsConcept = answers.concept || "";
-        const wantsRegion = answers.region || "";
-        const wantsDuration = answers.duration || "";
+        // 새로운 질문 구조에 맞게 추천 API 호출
+        const goal = answers.goal || "";
+        const companionToday = answers.companion_today || "";
+        const moodToday = answers.mood_today || "";
+        const regionToday = answers.region_today || "";
 
-        let list = await fetchCourses({
-            ...(wantsConcept ? { concept: wantsConcept } : {}),
-            ...(wantsRegion ? { region: wantsRegion } : {}),
-        });
-        if (wantsDuration) {
-            list = list.filter((c) => String(c.duration || "").includes(wantsDuration));
+        let list: Course[] = [];
+
+        // 추천 API 호출 (새로운 알고리즘 사용)
+        try {
+            const token = localStorage.getItem("authToken");
+            const params = new URLSearchParams({
+                goal,
+                companion_today: companionToday,
+                mood_today: moodToday,
+                region_today: regionToday,
+                limit: "2",
+            }).toString();
+
+            const res = await fetch(`/api/recommendations?${params}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                cache: "no-store",
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.recommendations && Array.isArray(data.recommendations)) {
+                    list = buildList(data.recommendations);
+                }
+            }
+        } catch (error) {
+            console.error("추천 API 오류:", error);
+            hadNetworkError = true;
         }
 
-        if (list.length === 0 && wantsRegion) {
-            let regionOnly = await fetchCourses({ region: wantsRegion });
-            if (wantsDuration) regionOnly = regionOnly.filter((c) => String(c.duration || "").includes(wantsDuration));
-            list = regionOnly;
+        // 폴백: 기존 방식으로 필터링
+        if (list.length === 0) {
+            let fallbackList = await fetchCourses({
+                ...(regionToday ? { region: regionToday } : {}),
+            });
+            list = fallbackList.slice(0, 2);
         }
-
-        if (list.length === 0 && wantsConcept) {
-            let conceptOnly = await fetchCourses({ concept: wantsConcept });
-            if (wantsDuration)
-                conceptOnly = conceptOnly.filter((c) => String(c.duration || "").includes(wantsDuration));
-            list = conceptOnly;
-        }
-
-        list = list.slice(0, 3);
 
         // 결과 없거나 네트워크 오류 시 환불 및 오류 표시
         if (list.length === 0) {
@@ -486,7 +558,9 @@ const AIRecommender = () => {
                 type: "ai",
                 text:
                     list.length > 0
-                        ? `완벽해요! 🎉 ${nickname}님의 취향을 분석해 현재 데이터로 최적의 코스를 찾았어요!`
+                        ? `완벽해요! 🎉 ${nickname}님의 취향을 분석해 ${
+                              list.length === 1 ? "1가지" : "2가지"
+                          } 코스를 찾았어요!`
                         : hadNetworkError
                         ? `네트워크 오류로 추천을 가져오지 못했어요. 쿠폰은 복구해드렸습니다. 잠시 후 다시 시도해 주세요.`
                         : `조건에 맞는 코스를 찾지 못했어요. 사용하신 쿠폰은 바로 복구해드렸습니다. 다른 조건으로 다시 시도해볼까요?`,
@@ -494,16 +568,9 @@ const AIRecommender = () => {
         ]);
     };
 
-    // 다른 추천
+    // 다른 추천 (쿠폰 차감 없이 재시작)
     const handleResetAndRecommend = async () => {
-        if (coupons < 1) {
-            setShowPaywall(true);
-            return;
-        }
-        const couponUsed = await useCoupon();
-        if (couponUsed) {
-            resetConversation();
-        }
+        resetConversation();
     };
 
     // ... (결제, 모달, 카드 등 나머지 UI 컴포넌트는 기존과 동일)
@@ -813,56 +880,106 @@ const AIRecommender = () => {
                 )}
 
                 <div className="w-full max-w-4xl flex flex-col">
-                    {/* AI 추천 헤더 */}
-                    <header className="bg-[#1E2A44] rounded-3xl shadow-2xl p-6 sm:p-8 mb-6 flex-shrink-0 border border-white/10">
-                        <div className="flex flex-col justify-between gap-4">
-                            <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+                    {/* AI 추천 헤더 - 이미지 스타일 */}
+                    <div className="flex flex-col gap-4 mb-6">
+                        {/* 상단 카드: AI 추천 카드 */}
+                        <div className="bg-white rounded-2xl shadow-lg p-6 flex-shrink-0">
+                            <div className="flex items-center space-x-4 mb-4">
                                 <div className="relative">
-                                    <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                                        <Sparkles className="w-8 h-8 text-white" />
-                                    </div>
-                                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center border-2 border-purple-300">
-                                        <Zap className="w-4 h-4 text-black" />
+                                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                                        <img
+                                            src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"
+                                            alt="DoNa"
+                                            className="w-full h-full object-cover"
+                                        />
                                     </div>
                                 </div>
-                                <div className="text-white">
-                                    <h1 className="font-brand text-2xl sm:text-3xl font-bold cursor-pointer">
-                                        AI 여행 코스 추천
-                                    </h1>
-                                    <p className="text-white/90 text-sm font-brand">98.7% 만족도 · 32명이 이용 중</p>
+                                <div className="flex-1">
+                                    <h1 className="text-2xl font-bold text-black mb-1">두나의 AI 코스 추천</h1>
+                                    <p className="text-sm text-gray-500">98.7% 만족도 · 32명 사용 중</p>
                                 </div>
                             </div>
+                            <button
+                                onClick={startConversation}
+                                className="w-full bg-gray-100 hover:bg-gray-200 rounded-xl py-3 px-4 flex items-center justify-center text-black font-medium transition-all active:scale-95"
+                            >
+                                <span>AI 추천 시작하기</span>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="ml-2"
+                                >
+                                    <path d="m9 18 6-6-6-6" />
+                                </svg>
+                            </button>
+                        </div>
 
-                            <div className="text-white w-full flex justify-end items-end">
-                                {isLoggedIn ? (
-                                    <div className="flex items-center gap-4 bg-white/10 p-3 rounded-xl backdrop-blur-sm w-full lg:w-auto justify-between lg:justify-start">
-                                        <div className="text-left min-w-0">
-                                            <p className="text-sm opacity-90 whitespace-nowrap truncate">
+                        {/* 하단 카드: 사용자 정보 카드 */}
+                        <div className="bg-white rounded-2xl shadow-lg p-6 flex-shrink-0">
+                            {isLoggedIn ? (
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                                            <img
+                                                src={
+                                                    profileImageUrl ||
+                                                    "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/profileLogo.png"
+                                                }
+                                                alt={nickname || "사용자"}
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="text-base font-medium text-black">
                                                 안녕하세요, {nickname && nickname.trim() ? nickname : "사용자"}님
                                             </p>
-                                            <div className="flex items-center space-x-2 whitespace-nowrap">
-                                                <Ticket className="w-5 h-5" />
-                                                <span className="text-xl font-bold">{coupons}개</span>
+                                            <div className="flex items-center space-x-2 mt-1">
+                                                <Ticket className="w-5 h-5 text-gray-400" />
+                                                <span className="text-lg font-bold text-black">쿠폰 {coupons}개</span>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={handleLogout}
-                                            className="p-2.5 bg-white/20 rounded-lg hover:bg-white/30 transition-all active:scale-95 cursor-pointer"
-                                        >
-                                            <LogOut className="w-5 h-5" />
-                                        </button>
                                     </div>
-                                ) : (
+                                    <button
+                                        onClick={handleLogout}
+                                        className="p-2 hover:bg-gray-100 rounded-lg transition-all active:scale-95"
+                                    >
+                                        <LogOut className="w-5 h-5 text-gray-600" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                                            <img
+                                                src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/profileLogo.png"
+                                                alt="기본 프로필"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div>
+                                            <p className="text-base font-medium text-black">로그인이 필요해요</p>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                로그인하면 무료 쿠폰 1개를 드려요! 🎁
+                                            </p>
+                                        </div>
+                                    </div>
                                     <button
                                         onClick={() => setShowLogin(true)}
-                                        className="hover:cursor-pointer px-6 py-3 bg-white/15 text-white rounded-xl font-semibold hover:bg-white/25 transition-all active:scale-95 w-full lg:w-auto"
+                                        className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all active:scale-95 text-sm font-semibold"
                                     >
-                                        로그인하기
+                                        로그인
                                     </button>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
-                    </header>
+                    </div>
 
                     {/* 채팅 및 추천 결과가 표시되는 메인 영역 */}
                     <main className="flex-1 overflow-y-auto rounded-3xl">
@@ -934,8 +1051,12 @@ const AIRecommender = () => {
                                             }`}
                                         >
                                             {message.type === "ai" && (
-                                                <div className="w-8 h-8 rounded-full bg-[#1E2A44] text-white flex items-center justify-center flex-shrink-0">
-                                                    <Sparkles className="w-5 h-5" />
+                                                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                                                    <img
+                                                        src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"
+                                                        alt="DoNa"
+                                                        className="w-full h-full object-cover"
+                                                    />
                                                 </div>
                                             )}
                                             <div
@@ -952,8 +1073,12 @@ const AIRecommender = () => {
 
                                     {isTyping && (
                                         <div className="flex items-end gap-2 justify-start">
-                                            <div className="w-8 h-8 rounded-full bg-[#1E2A44] text-white flex items-center justify-center flex-shrink-0">
-                                                <Sparkles className="w-5 h-5" />
+                                            <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                                                <img
+                                                    src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png"
+                                                    alt="DoNa"
+                                                    className="w-full h-full object-cover"
+                                                />
                                             </div>
                                             <div className="bg-gray-100 px-5 py-4 rounded-2xl rounded-bl-none">
                                                 <div className="flex space-x-1.5">
@@ -1008,7 +1133,7 @@ const AIRecommender = () => {
                                                 className="cursor-pointer px-6 py-3 bg-white border-2 border-[#2A3B5F] text-[#1E2A44] rounded-2xl font-bold text-base hover:bg-white transition-all transform hover:scale-105 active:scale-95 flex items-center mx-auto"
                                             >
                                                 <RefreshCw className="w-5 h-5 mr-2" />
-                                                다른 추천 받기 (쿠폰 1개 사용)
+                                                다른 추천 받기
                                             </button>
                                         </div>
                                     </>
