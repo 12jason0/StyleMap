@@ -75,7 +75,7 @@ function computeEffectiveStreak(sortedDescCheckins: { date: Date; rewarded?: boo
 }
 
 // 보상일 기반 7칸 사이클 도장 배열 생성
-function buildCycleStamps(sortedDescCheckins: { date: Date; rewarded?: boolean }[], now: Date): boolean[] {
+function buildCycleStamps(sortedDescCheckins: { date: Date; rewarded?: boolean }[], now: Date): { stamps: boolean[]; todayIndex: number | null } {
     const todayStart = startOfDayKST(now);
     const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
 
@@ -103,14 +103,20 @@ function buildCycleStamps(sortedDescCheckins: { date: Date; rewarded?: boolean }
         return `${y}-${m}-${day}`;
     };
     const checkedDaySet = new Set(sortedDescCheckins.map((c) => dayKey(new Date(c.date))));
+    const todayKey = dayKey(todayStart);
 
+    let todayIndex: number | null = null;
     const stamps = Array.from({ length: 7 }, (_, i) => {
         const dt = new Date(cycleStart);
         dt.setDate(cycleStart.getDate() + i);
-        return checkedDaySet.has(dayKey(dt));
+        const dtKey = dayKey(dt);
+        if (dtKey === todayKey) {
+            todayIndex = i;
+        }
+        return checkedDaySet.has(dtKey);
     });
 
-    return stamps;
+    return { stamps, todayIndex };
 }
 
 export async function GET(request: NextRequest) {
@@ -140,10 +146,10 @@ export async function GET(request: NextRequest) {
         const streak = computeEffectiveStreak(checkinsExcludingToday, now);
 
         // 실제 출석 날짜를 기반으로 올바른 배열 생성
-        const weekStamps = buildCycleStamps(checkins, now);
+        const { stamps: weekStamps, todayIndex } = buildCycleStamps(checkins, now);
         const weekCount = Math.min(7, Math.max(0, streak));
 
-        return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps });
+        return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps, todayIndex });
     } catch (e) {
         return NextResponse.json({ success: false, error: "SERVER_ERROR" }, { status: 500 });
     }
@@ -171,9 +177,9 @@ export async function POST(request: NextRequest) {
                 take: 120,
             });
             const streak = computeEffectiveStreak(recent, now);
-            const weekStamps = buildCycleStamps(recent, now);
+            const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now);
             const weekCount = Math.min(7, Math.max(0, streak));
-            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak, weekStamps, weekCount });
+            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak, weekStamps, weekCount, todayIndex });
         }
 
         const created = await (prisma as any).userCheckin.create({ data: { userId, date: now, rewarded: false } });
@@ -186,7 +192,7 @@ export async function POST(request: NextRequest) {
         });
         const effectiveStreak = computeEffectiveStreak(recent, now);
         // 실제 출석 날짜를 기반으로 올바른 배열 생성 (오늘 포함)
-        const weekStamps = buildCycleStamps(recent, now);
+        const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now);
         const weekCount = Math.min(7, Math.max(0, effectiveStreak));
         const todayStart = startOfDayKST(now);
         const hasRewardedToday = recent.some(
@@ -227,6 +233,7 @@ export async function POST(request: NextRequest) {
             streak: effectiveStreak,
             weekCount,
             weekStamps,
+            todayIndex,
             rewardAmount: awarded ? 3 : 0,
         });
     } catch (e) {

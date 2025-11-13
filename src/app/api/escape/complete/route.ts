@@ -61,8 +61,9 @@ export async function POST(request: NextRequest) {
         });
 
         return NextResponse.json({ success: true, item: created });
-    } catch (e) {
-        return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });
+    } catch (e: any) {
+        console.error("[/api/escape/complete] POST error:", e);
+        return NextResponse.json({ error: "SERVER_ERROR", message: e?.message || String(e) }, { status: 500 });
     }
 }
 
@@ -79,7 +80,8 @@ export async function GET(request: NextRequest) {
 
         const existing = await prisma.completedEscape.findFirst({ where: { userId, storyId } });
         return NextResponse.json({ completed: !!existing, item: existing || null });
-    } catch (e) {
-        return NextResponse.json({ error: "SERVER_ERROR" }, { status: 500 });
+    } catch (e: any) {
+        console.error("[/api/escape/complete] GET error:", e);
+        return NextResponse.json({ error: "SERVER_ERROR", message: e?.message || String(e) }, { status: 500 });
     }
 }

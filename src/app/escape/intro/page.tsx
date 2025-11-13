@@ -1222,6 +1222,44 @@ function EscapeIntroPageInner() {
         } catch {}
     }, []);
 
+    // 브라우저 뒤로가기 처리
+    useEffect(() => {
+        const handlePopState = () => {
+            // 카테고리 화면에서 뒤로가기를 누른 경우
+            if (flowStep === "category" && selectedCategory) {
+                setSelectedCategory(null);
+                setSelectedPlaceId(null);
+                setSelectedPlaceIndex(null);
+                setSelectedPlaceConfirm(null);
+                setMissionUnlocked(false);
+                setInSelectedRange(false);
+                setFlowStep("category");
+            }
+            // 장소 목록 화면에서 뒤로가기를 누른 경우
+            else if (flowStep === "placeList" && selectedCategory) {
+                setSelectedCategory(null);
+                setSelectedPlaceId(null);
+                setSelectedPlaceIndex(null);
+                setSelectedPlaceConfirm(null);
+                setMissionUnlocked(false);
+                setInSelectedRange(false);
+                setFlowStep("category");
+            }
+            // 미션 화면에서 뒤로가기를 누른 경우
+            else if (flowStep === "mission") {
+                setMissionUnlocked(false);
+                setSelectedPlaceId(null);
+                setSelectedPlaceIndex(null);
+                setSelectedPlaceConfirm(null);
+                setInSelectedRange(false);
+                setFlowStep("placeList");
+            }
+        };
+
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    }, [flowStep, selectedCategory]);
+
     // 스텝 전환 효과 및 오디오 전환
     useEffect(() => {
         if (flowStep === "category") {
@@ -1259,10 +1297,10 @@ function EscapeIntroPageInner() {
         }
     }, [flowStep]);
 
-    // 엔딩 화면 기본값 보장: done 단계에서 endingStep이 비어 있고, 별도 플로우 시작 표시가 없을 때만 갤러리로 세팅
+    // 엔딩 화면 기본값 보장: done 단계에서 endingStep이 비어 있고, 별도 플로우 시작 표시가 없을 때만 epilogue로 세팅
     useEffect(() => {
         if (flowStep === "done" && !endingStep && !endingFlowStarted) {
-            setEndingStep("gallery");
+            setEndingStep("epilogue");
         }
     }, [flowStep, endingStep, endingFlowStarted]);
 
@@ -1644,17 +1682,39 @@ function EscapeIntroPageInner() {
     };
 
     const handleShareToKakao = async () => {
+        // 전체 함수를 try-catch로 감싸서 모든 에러를 잡기
         try {
+            console.log("[카카오 공유] 시작");
+            setToast("카카오톡 공유 준비 중...");
+            
+            // 선택된 이미지 확인
+            if (selectedGallery.length !== 4) {
+                setToast("사진 4장을 선택해주세요");
+                return;
+            }
+
             setToast("템플릿을 생성하는 중...");
-            const blob = await getCollageBlob();
+            let blob: Blob | null = null;
+            try {
+                blob = await getCollageBlob();
+            } catch (blobError) {
+                console.error("[카카오 공유] 이미지 생성 에러:", blobError);
+                setToast("이미지 생성 중 오류가 발생했습니다");
+                return;
+            }
+            
             if (!blob) {
+                console.error("[카카오 공유] 이미지 생성 실패");
                 setToast("이미지 생성에 실패했습니다");
                 return;
             }
+            console.log("[카카오 공유] 이미지 생성 완료, 크기:", blob.size);
+            setToast("이미지 업로드 중...");
 
             // 업로드하여 공개 이미지 URL 확보
             let imageUrl = await autoSaveCollage();
             if (!imageUrl) {
+                console.log("[카카오 공유] autoSaveCollage 실패, 수동 업로드 시도");
                 try {
                     const form = new FormData();
                     form.append("photos", new File([blob], "collage.jpg", { type: "image/jpeg" }));
@@ -1662,59 +1722,113 @@ function EscapeIntroPageInner() {
                     if (up.ok) {
                         const ur = await up.json();
                         imageUrl = Array.isArray(ur?.photo_urls) ? ur.photo_urls[0] : undefined;
+                        console.log("[카카오 공유] 수동 업로드 성공:", imageUrl);
+                    } else {
+                        console.error("[카카오 공유] 업로드 실패:", up.status);
                     }
-                } catch {}
+                } catch (uploadError) {
+                    console.error("[카카오 공유] 업로드 에러:", uploadError);
+                }
+            } else {
+                console.log("[카카오 공유] autoSaveCollage 성공:", imageUrl);
+            }
+
+            if (!imageUrl) {
+                setToast("이미지 업로드에 실패했습니다");
+                return;
             }
 
             const landingUrl = typeof window !== "undefined" ? `${window.location.origin}/mypage` : "https://dona.app";
+            console.log("[카카오 공유] 공유 URL:", landingUrl);
+            console.log("[카카오 공유] 이미지 URL:", imageUrl);
 
             // Kakao JS SDK 로드/초기화
+            setToast("카카오 SDK 로드 중...");
             const ensureKakao = () =>
                 new Promise<void>((resolve, reject) => {
                     const w = window as any;
-                    if (w.Kakao) return resolve();
+                    if (w.Kakao) {
+                        console.log("[카카오 공유] SDK 이미 로드됨");
+                        return resolve();
+                    }
+                    console.log("[카카오 공유] SDK 로드 시작");
                     const s = document.createElement("script");
                     s.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js";
                     s.async = true;
-                    s.onload = () => resolve();
-                    s.onerror = () => reject(new Error("Kakao SDK load failed"));
+                    s.onload = () => {
+                        console.log("[카카오 공유] SDK 로드 완료");
+                        resolve();
+                    };
+                    s.onerror = () => {
+                        console.error("[카카오 공유] SDK 로드 실패");
+                        reject(new Error("Kakao SDK load failed"));
+                    };
                     document.head.appendChild(s);
                 });
 
-            await ensureKakao();
+            try {
+                await ensureKakao();
+            } catch (sdkLoadError) {
+                console.error("[카카오 공유] SDK 로드 에러:", sdkLoadError);
+                setToast("카카오 SDK를 불러올 수 없습니다. 네트워크를 확인해주세요.");
+                return;
+            }
+            
             const w = window as any;
             const Kakao = w.Kakao;
-            const jsKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined;
-            if (!Kakao?.isInitialized?.()) {
-                if (!jsKey) throw new Error("NEXT_PUBLIC_KAKAO_JS_KEY missing");
-                Kakao.init(jsKey);
+            
+            if (!Kakao) {
+                console.error("[카카오 공유] Kakao 객체 없음");
+                setToast("카카오 SDK를 불러올 수 없습니다");
+                return;
             }
-
-            // 카카오톡 공유
+            
+            setToast("카카오 공유 설정 중...");
+            
+            // 환경 변수 확인 (서버에서 가져오기 시도)
+            // Next.js에서는 클라이언트에서 process.env 접근이 제한적일 수 있으므로
+            // 항상 서버 API에서 가져오는 것을 우선시
+            let jsKey: string | undefined = undefined;
+            
             try {
-                Kakao.Share.sendDefault({
-                    objectType: "feed",
-                    content: {
-                        title: "DoNa Escape 콜라주",
-                        description: "나의 콜라주를 카카오톡으로 공유해요",
-                        imageUrl: imageUrl || undefined,
-                        link: {
-                            mobileWebUrl: landingUrl,
-                            webUrl: landingUrl,
-                        },
-                    },
-                    buttons: [
-                        {
-                            title: "열어보기",
-                            link: {
-                                mobileWebUrl: landingUrl,
-                                webUrl: landingUrl,
-                            },
-                        },
-                    ],
-                });
-
-                setToast("카카오톡 공유 창이 열렸어요!");
+                const configRes = await fetch("/api/config/kakao-js-key");
+                if (configRes.ok) {
+                    const configData = await configRes.json();
+                    jsKey = configData.jsKey;
+                    console.log("[카카오 공유] 서버에서 JS Key 가져옴:", !!jsKey);
+                }
+            } catch (apiError) {
+                console.warn("[카카오 공유] 서버 API 호출 실패, 클라이언트 환경 변수 시도:", apiError);
+            }
+            
+            // 서버 API에서 가져오지 못한 경우에만 클라이언트 환경 변수 시도
+            if (!jsKey) {
+                jsKey = 
+                    (process.env.NEXT_PUBLIC_KAKAO_JS_KEY as string | undefined) ||
+                    (process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY as string | undefined);
+                console.log("[카카오 공유] 클라이언트 환경 변수에서 JS Key:", !!jsKey);
+            }
+            
+            console.log("[카카오 공유] 최종 JS Key 존재:", !!jsKey);
+            
+            // 환경 변수가 없으면 템플릿 이미지 URL을 클립보드에 복사하고 카카오톡 링크 생성
+            if (!jsKey) {
+                console.log("[카카오 공유] 환경 변수 없음, 템플릿 URL 공유로 대체");
+                try {
+                    // 템플릿 이미지 URL을 클립보드에 복사
+                    await navigator.clipboard.writeText(imageUrl);
+                    setToast("템플릿 이미지 URL이 복사되었습니다! 카카오톡에 붙여넣기 해주세요.");
+                    
+                    // 카카오톡 앱 열기 시도 (이미지 URL 포함)
+                    const kakaoLink = `https://kakaotalk://sendurl?url=${encodeURIComponent(imageUrl)}`;
+                    setTimeout(() => {
+                        window.location.href = kakaoLink;
+                    }, 500);
+                } catch (clipError) {
+                    console.error("[카카오 공유] 클립보드 복사 실패:", clipError);
+                    setToast(`템플릿 이미지 URL: ${imageUrl}`);
+                }
+                
                 // 보상 및 완료 처리
                 try {
                     const token = localStorage.getItem("authToken");
@@ -1730,34 +1844,155 @@ function EscapeIntroPageInner() {
                 } catch {}
                 await awardBadgeAndComplete();
                 return;
-            } catch {}
+            }
 
-            // 폴백: 시스템 공유 시트 또는 링크 복사
-            const navAny = navigator as any;
-            try {
-                if (navAny?.share) {
-                    await navAny.share({
-                        title: "DoNa Escape 콜라주",
-                        text: "DoNa에서 만든 콜라주를 확인해 보세요",
-                        url: landingUrl,
-                    });
-                    setToast("공유 완료!");
-                    await awardBadgeAndComplete();
+            // 카카오 SDK 초기화 (작동하는 코드와 동일한 패턴 사용)
+            if (!Kakao) {
+                console.error("[카카오 공유] Kakao 객체 없음");
+                setToast("카카오 SDK를 불러올 수 없습니다");
+                return;
+            }
+            
+            if (!jsKey) {
+                console.error("[카카오 공유] JS Key가 없어서 초기화 불가");
+                setToast("카카오 공유 설정이 완료되지 않았습니다");
+                return;
+            }
+            
+            // 초기화되지 않았으면 초기화
+            if (!Kakao.isInitialized()) {
+                console.log("[카카오 공유] SDK 초기화 시작");
+                try {
+                    Kakao.init(jsKey);
+                    console.log("[카카오 공유] SDK 초기화 완료");
+                } catch (initError: any) {
+                    console.error("[카카오 공유] SDK 초기화 실패:", initError);
+                    // 초기화 실패 시 템플릿 URL 공유로 대체
+                    try {
+                        await navigator.clipboard.writeText(imageUrl);
+                        setToast("템플릿 이미지 URL이 복사되었습니다!");
+                    } catch {}
                     return;
                 }
-            } catch {}
-            try {
-                await navigator.clipboard.writeText(landingUrl);
-                setToast("링크가 복사되었습니다.");
-                await awardBadgeAndComplete();
-            } catch {
-                setToast("공유에 실패했습니다. 잠시 후 다시 시도해주세요.");
+            } else {
+                console.log("[카카오 공유] SDK 이미 초기화됨");
             }
+
+            // 이미지 URL이 공개적으로 접근 가능한지 확인
+            if (!imageUrl || !imageUrl.startsWith("http")) {
+                console.error("[카카오 공유] 유효하지 않은 이미지 URL:", imageUrl);
+                setToast("이미지 URL이 유효하지 않습니다");
+                return;
+            }
+            
+            // 카카오톡 공유 API 호출 (템플릿 이미지 포함)
+            console.log("[카카오 공유] sendDefault 호출 시작", {
+                imageUrl,
+                landingUrl,
+                isInitialized: Kakao.isInitialized(),
+            });
+            
+            setToast("카카오톡 공유 창을 여는 중...");
+            
+            try {
+                // 카카오톡 공유 실행 (작동하는 코드와 동일한 패턴)
+                Kakao.Share.sendDefault({
+                    objectType: "feed",
+                    content: {
+                        title: "DoNa Escape 콜라주",
+                        description: "나의 콜라주를 카카오톡으로 공유해요",
+                        imageUrl: imageUrl, // 템플릿 이미지 URL (공개 URL이어야 함)
+                        link: {
+                            mobileWebUrl: landingUrl,
+                            webUrl: landingUrl,
+                        },
+                    },
+                    buttons: [
+                        {
+                            title: "열어보기",
+                            link: {
+                                mobileWebUrl: landingUrl,
+                                webUrl: landingUrl,
+                            },
+                        },
+                    ],
+                });
+                
+                console.log("[카카오 공유] sendDefault 호출 완료");
+                setToast("카카오톡 공유 창이 열렸어요!");
+                
+                // 이미지 URL도 클립보드에 복사 (사용자 편의)
+                try {
+                    await navigator.clipboard.writeText(imageUrl);
+                } catch {}
+            } catch (shareError: any) {
+                console.error("[카카오 공유] sendDefault 에러:", shareError);
+                console.error("[카카오 공유] 에러 상세:", {
+                    message: shareError?.message,
+                    stack: shareError?.stack,
+                    name: shareError?.name,
+                });
+                
+                // 공유 실패 시 템플릿 URL 복사로 대체
+                try {
+                    await navigator.clipboard.writeText(imageUrl);
+                    setToast("공유 실패. 이미지 URL이 복사되었습니다. 카카오톡에 붙여넣기 해주세요.");
+                } catch (clipError) {
+                    console.error("[카카오 공유] 클립보드 복사 실패:", clipError);
+                    setToast(`공유 실패. 이미지 URL: ${imageUrl.substring(0, 50)}...`);
+                }
+                return;
+            }
+            
+            // 보상 및 완료 처리
+            try {
+                const token = localStorage.getItem("authToken");
+                await fetch("/api/forest/water", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    credentials: "include",
+                    body: JSON.stringify({ source: "escape" }),
+                });
+            } catch {}
+            await awardBadgeAndComplete();
         } catch (error: any) {
-            console.error("Kakao 공유 오류:", error);
-            setToast("공유에 실패했습니다. 잠시 후 다시 시도해주세요.");
+            // 전체 함수의 모든 에러를 잡기
+            console.error("[카카오 공유] 전체 에러:", error);
+            console.error("[카카오 공유] 에러 상세:", {
+                message: error?.message,
+                stack: error?.stack,
+                name: error?.name,
+            });
+            
+            // 사용자에게 명확한 피드백 제공
+            let errorMessage = "카카오톡 공유 중 오류가 발생했습니다";
+            
+            if (error?.message?.includes("SDK")) {
+                errorMessage = "카카오 SDK를 불러올 수 없습니다. 네트워크를 확인해주세요.";
+            } else if (error?.message?.includes("Key")) {
+                errorMessage = "카카오 공유 설정이 완료되지 않았습니다.";
+            } else if (error?.message?.includes("이미지") || error?.message?.includes("image")) {
+                errorMessage = "이미지 처리 중 오류가 발생했습니다.";
+            }
+            
+            setToast(errorMessage);
+            
+            // 에러 발생 시에도 이미지 URL을 복사해주려고 시도
+            try {
+                const imageUrl = await autoSaveCollage();
+                if (imageUrl) {
+                    await navigator.clipboard.writeText(imageUrl);
+                    setTimeout(() => {
+                        setToast(`${errorMessage} 이미지 URL이 복사되었습니다.`);
+                    }, 2000);
+                }
+            } catch {}
         }
     };
+
 
     const handleCheckAnswer = () => {
         if (!currentChapter) return;
@@ -1901,47 +2136,49 @@ function EscapeIntroPageInner() {
                     isCorrect: true,
                 });
                 if (!r.success) throw new Error(r.error || "미션 저장 실패");
-            } else if (missionType === "PUZZLE_ANSWER") {
-                const r = await submitMission({
-                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
-                    missionType,
-                    isCorrect: true,
-                    textAnswer: puzzleAnswer,
-                });
-                if (!r.success) throw new Error(r.error || "미션 저장 실패");
-            } else {
+
+                // ✅ 사진 업로드 성공 후 상태 저장
+                setPhotoUploaded(true);
                 try {
-                    console.log("[DEBUG-NON-PHOTO] missionType branch:", missionType);
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    const obj = raw ? JSON.parse(raw) : {};
+                    obj[String(currentChapter.chapter_number)] = {
+                        ...obj[String(currentChapter.chapter_number)],
+                        photo: true,
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
                 } catch {}
-            }
-
-            // 저장 완료 안내
-            setToast("미션 완료!");
-
-            setToast("미션 완료!");
-
-            const raw = localStorage.getItem(STORAGE_KEY);
-            const obj = raw ? JSON.parse(raw) : {};
-            obj[String(currentChapter.chapter_number)] = {
-                ...obj[String(currentChapter.chapter_number)],
-                completed: true,
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-
-            const nextIdx = currentChapterIdx + 1;
-            if (nextIdx < chapters.length) {
-                // 미션 완료 시: 다음 카테고리로 즉시 전환
-                setPiecesCollected((n) => n + 1);
-                setPendingNextChapterIdx(nextIdx);
-                // ✅ 미션이 2개 완료되었을 때만 카테고리 완료 처리
-                // canProceed가 true인지 확인 (미션 2개 완료 조건)
-                if (canProceed) {
-                    // 완료 카테고리 반영은 서버 저장 성공 이후(현재 시점)에서만 처리
+                
+                // ✅ 미션 완료 처리 (해당 미션만 완료 표시)
+                if (activeMission?.id != null) {
+                    setSolvedMissionIds((prev) =>
+                        Array.from(new Set([...prev, Number(activeMission.id)]))
+                    );
+                    setClearedMissions((prev) => ({
+                        ...prev,
+                        [Number(activeMission.id)]: true,
+                    }));
+                }
+                
+                // ✅ 미션이 2개 완료되었는지 확인
+                const place = (currentChapter?.placeOptions || []).find(
+                    (p: any) => Number(p.id) === Number(selectedPlaceId)
+                );
+                const placeMissions: any[] = Array.isArray((place as any)?.missions)
+                    ? (place as any).missions
+                    : [];
+                const placeMissionIds: number[] =
+                    placeMissions.length > 0
+                        ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
+                        : [];
+                const placeClearedCount = placeMissionIds.filter((mid) => {
+                    if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
+                    return clearedMissions[mid] || solvedMissionIds.includes(mid);
+                }).length;
+                
+                // ✅ 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
+                if (placeClearedCount >= 2) {
                     try {
-                        // 선택된 장소의 카테고리를 완료 처리하여 해당 카테고리만 비활성화
-                        const place = (currentChapter?.placeOptions || []).find(
-                            (p: any) => Number(p.id) === Number(selectedPlaceId)
-                        );
                         const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
                         if (catKey) {
                             setCompletedCategories((prev) => {
@@ -1956,46 +2193,104 @@ function EscapeIntroPageInner() {
                             });
                         }
                     } catch {}
+                    
+                    // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
+                    setMissionModalOpen(false);
+                    setActiveMission(null);
+                    setPhotoFiles([]);
+                    setPhotoPreviewUrl(null);
+                    setPhotoPreviewUrls([]);
+                    setPhotoUploaded(false);
+                    setToast("미션 완료! 다음 카테고리로 버튼을 눌러주세요.");
+                } else {
+                    // 미션이 2개 미완료인 경우: 모달만 닫고 미션 목록으로 돌아감
+                    setMissionModalOpen(false);
+                    setActiveMission(null);
+                    setPhotoFiles([]);
+                    setPhotoPreviewUrl(null);
+                    setPhotoPreviewUrls([]);
+                    setPhotoUploaded(false);
+                    setToast("미션 완료!");
                 }
-                // ✅ 다음 카테고리로 이동하되, 미션 완료 상태는 유지
-                changeFlowStep("category", { resetMission: true, resetPlace: true });
-                setCurrentChapterIdx(nextIdx);
-                setDialogueStep(0);
-                setSelectedCategory(null);
-            } else {
-                if (endingFlowStarted) return;
-                setEndingFlowStarted(true);
-                setIsEndFlip(true);
-                setTimeout(async () => {
-                    setIsEndFlip(false);
+                
+                setIsSubmitting(false);
+                return;
+            } else if (missionType === "PUZZLE_ANSWER") {
+                const r = await submitMission({
+                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                    missionType,
+                    isCorrect: true,
+                    textAnswer: puzzleAnswer,
+                });
+                if (!r.success) throw new Error(r.error || "미션 저장 실패");
+                
+                // ✅ 미션 완료 처리 (해당 미션만 완료 표시)
+                if (activeMission?.id != null) {
+                    setSolvedMissionIds((prev) =>
+                        Array.from(new Set([...prev, Number(activeMission.id)]))
+                    );
+                    setClearedMissions((prev) => ({
+                        ...prev,
+                        [Number(activeMission.id)]: true,
+                    }));
+                }
+                
+                // ✅ 미션이 2개 완료되었는지 확인
+                const place = (currentChapter?.placeOptions || []).find(
+                    (p: any) => Number(p.id) === Number(selectedPlaceId)
+                );
+                const placeMissions: any[] = Array.isArray((place as any)?.missions)
+                    ? (place as any).missions
+                    : [];
+                const placeMissionIds: number[] =
+                    placeMissions.length > 0
+                        ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
+                        : [];
+                const placeClearedCount = placeMissionIds.filter((mid) => {
+                    if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
+                    return clearedMissions[mid] || solvedMissionIds.includes(mid);
+                }).length;
+                
+                // ✅ 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
+                if (placeClearedCount >= 2) {
                     try {
-                        const res = await fetch(`/api/escape/submissions?storyId=${storyId}`, {
-                            credentials: "include",
-                        });
-                        const data = await res.json();
-                        if (res.ok && Array.isArray(data?.urls)) setGalleryUrls(data.urls);
-                    } catch {}
-                    try {
-                        const br = await fetch(`/api/escape/badge?storyId=${storyId}`);
-                        const bd = await br.json();
-                        if (br.ok && bd?.badge) {
-                            setBadge(bd.badge);
-                            if (bd.badge.id) {
-                                const token = localStorage.getItem("authToken");
-                                await fetch("/api/users/badges", {
-                                    method: "POST",
-                                    headers: {
-                                        "Content-Type": "application/json",
-                                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                                    },
-                                    credentials: "include",
-                                    body: JSON.stringify({ badgeId: bd.badge.id }),
-                                });
-                            }
+                        const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
+                        if (catKey) {
+                            setCompletedCategories((prev) => {
+                                const next = Array.from(new Set([...(prev || []), catKey]));
+                                try {
+                                    const raw = localStorage.getItem(STORAGE_KEY);
+                                    const obj = raw ? JSON.parse(raw) : {};
+                                    obj.__completedCategories = next;
+                                    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                } catch {}
+                                return next;
+                            });
                         }
                     } catch {}
-                    setEndingStep("epilogue");
-                }, 800);
+                    
+                    // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
+                    setMissionModalOpen(false);
+                    setActiveMission(null);
+                    setModalAnswer("");
+                    setToast("미션 완료! 다음 카테고리로 버튼을 눌러주세요.");
+                } else {
+                    // 미션이 2개 미완료인 경우: 모달만 닫고 미션 목록으로 돌아감
+                    setMissionModalOpen(false);
+                    setActiveMission(null);
+                    setModalAnswer("");
+                    setToast("미션 완료!");
+                }
+                
+                setIsSubmitting(false);
+                return;
+            } else {
+                try {
+                    console.log("[DEBUG-NON-PHOTO] missionType branch:", missionType);
+                } catch {}
+                // 다른 미션 타입의 경우 기본 처리
+                setToast("미션 완료!");
+                setIsSubmitting(false);
             }
         } catch (error: any) {
             setValidationError(error.message || "오류가 발생했습니다.");
@@ -2059,7 +2354,7 @@ function EscapeIntroPageInner() {
         // 모든 카테고리 완료 → 엔딩 진입(가드 포함)
         if (endingFlowStarted) {
             setFlowStep("done");
-            setEndingStep((prev) => (prev ? prev : "gallery"));
+            setEndingStep((prev) => (prev ? prev : "epilogue"));
             return;
         }
         setEndingFlowStarted(true);
@@ -2091,7 +2386,7 @@ function EscapeIntroPageInner() {
                     }
                 }
             } catch {}
-            setEndingStep("gallery");
+            setEndingStep("epilogue");
         }, 800);
     };
     // 1️⃣ chapters를 useMemo로 감싸기
@@ -2130,11 +2425,17 @@ function EscapeIntroPageInner() {
             const saved = obj[String(currentChapter.chapter_number)] || {};
             setPuzzleAnswer(saved.answer || "");
             setSelectedOptionIndex(typeof saved.option === "number" ? saved.option : null);
-            setPhotoUploaded(!!saved.photo);
+            const wasPhotoUploaded = !!saved.photo;
+            setPhotoUploaded(wasPhotoUploaded);
+            // 사진이 이미 업로드된 경우가 아니면 사진 파일 초기화
+            // (사진 업로드 후 나갔다가 다시 들어온 경우를 위해)
+            if (!wasPhotoUploaded) {
+                setPhotoFiles([]);
+                setPhotoPreviewUrl(null);
+                setPhotoPreviewUrls([]);
+            }
         } finally {
             setAnswerChecked(false);
-            setPhotoPreviewUrl(null);
-            setPhotoFiles([]);
             setValidationError("");
         }
     }, [currentChapterIdx, memoChapters, STORAGE_KEY]);
@@ -2294,73 +2595,92 @@ function EscapeIntroPageInner() {
                             {/* 초기 대화(프로로그) 섹션은 숨김 처리 */}
 
                             {flowStep === "category" && (
-                                <div
-                                    className={`grid grid-cols-2 gap-3 ${
-                                        titlePopAnim ? "animate-[titlePop_400ms_ease-out]" : ""
-                                    } max-h-[56vh] overflow-auto pr-1`}
-                                >
-                                    {(() => {
-                                        const label = (k: string) =>
-                                            ((
-                                                {
-                                                    cafe: "☕ 카페",
-                                                    date: "🌳 산책",
-                                                    restaurant: "🍱 식사",
-                                                    dinner: "🍷 다이닝",
-                                                } as Record<string, string>
-                                            )[k] || k);
-                                        // 카테고리 우선순위: 기본 정렬 후 조건에 따라 야경/다이닝을 마지막으로 배치
-                                        let base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
-                                        const hasNight = base.some((c) => c.key === "night");
-                                        // 야경이 있으면 야경을, 없으면 다이닝을 가장 마지막으로
-                                        base = base.sort((a, b) => {
-                                            const lastKey = hasNight ? "night" : "dinner";
-                                            if (a.key === lastKey && b.key !== lastKey) return 1;
-                                            if (b.key === lastKey && a.key !== lastKey) return -1;
-                                            return 0;
-                                        });
-                                        return base.map((cat) => {
-                                            const disabled = completedCategories.includes(cat.key);
-                                            return (
-                                                <button
-                                                    key={cat.key}
-                                                    onClick={() => {
-                                                        if (disabled) return;
-                                                        setSelectedCategory(cat.key);
-                                                        try {
-                                                            const targetIdx = chapters.findIndex((ch: any) => {
-                                                                const first = (ch?.placeOptions || [])[0];
-                                                                const chCat = normalizeCategory(
-                                                                    first?.category || first?.type || ""
-                                                                );
-                                                                return chCat === cat.key;
-                                                            });
-                                                            if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
-                                                        } catch {}
-                                                        setSelectedPlaceId(null);
-                                                        setInSelectedRange(false);
-                                                        setMissionUnlocked(false);
-                                                        setFlowStep(inMission ? "mission" : "placeList");
-                                                    }}
-                                                    disabled={disabled}
-                                                    className={`px-4 py-3 rounded-xl text-gray-900 shadow ${
-                                                        disabled
-                                                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                                            : "bg-white/85 hover:bg-white"
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{cat.label}</span>
-                                                        {disabled && (
-                                                            <span className="ml-1 text-xs text-emerald-600">
-                                                                완료됨
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                            );
-                                        });
-                                    })()}
+                                <div className="space-y-3">
+                                    {/* 뒤로가기 버튼 - selectedCategory가 있을 때만 표시 */}
+                                    {selectedCategory && (
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCategory(null);
+                                                setSelectedPlaceId(null);
+                                                setSelectedPlaceIndex(null);
+                                                setSelectedPlaceConfirm(null);
+                                                setMissionUnlocked(false);
+                                                setInSelectedRange(false);
+                                                setFlowStep("category");
+                                            }}
+                                            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-white/85 hover:bg-white text-gray-900 border shadow mb-2"
+                                        >
+                                            ← 뒤로
+                                        </button>
+                                    )}
+                                    <div
+                                        className={`grid grid-cols-2 gap-3 ${
+                                            titlePopAnim ? "animate-[titlePop_400ms_ease-out]" : ""
+                                        } max-h-[56vh] overflow-auto pr-1`}
+                                    >
+                                        {(() => {
+                                            const label = (k: string) =>
+                                                ((
+                                                    {
+                                                        cafe: "☕ 카페",
+                                                        date: "🌳 산책",
+                                                        restaurant: "🍱 식사",
+                                                        dinner: "🍷 다이닝",
+                                                    } as Record<string, string>
+                                                )[k] || k);
+                                            // 카테고리 우선순위: 기본 정렬 후 조건에 따라 야경/다이닝을 마지막으로 배치
+                                            let base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
+                                            const hasNight = base.some((c) => c.key === "night");
+                                            // 야경이 있으면 야경을, 없으면 다이닝을 가장 마지막으로
+                                            base = base.sort((a, b) => {
+                                                const lastKey = hasNight ? "night" : "dinner";
+                                                if (a.key === lastKey && b.key !== lastKey) return 1;
+                                                if (b.key === lastKey && a.key !== lastKey) return -1;
+                                                return 0;
+                                            });
+                                            return base.map((cat) => {
+                                                const disabled = completedCategories.includes(cat.key);
+                                                return (
+                                                    <button
+                                                        key={cat.key}
+                                                        onClick={() => {
+                                                            if (disabled) return;
+                                                            setSelectedCategory(cat.key);
+                                                            try {
+                                                                const targetIdx = chapters.findIndex((ch: any) => {
+                                                                    const first = (ch?.placeOptions || [])[0];
+                                                                    const chCat = normalizeCategory(
+                                                                        first?.category || first?.type || ""
+                                                                    );
+                                                                    return chCat === cat.key;
+                                                                });
+                                                                if (targetIdx >= 0) setCurrentChapterIdx(targetIdx);
+                                                            } catch {}
+                                                            setSelectedPlaceId(null);
+                                                            setInSelectedRange(false);
+                                                            setMissionUnlocked(false);
+                                                            setFlowStep(inMission ? "mission" : "placeList");
+                                                        }}
+                                                        disabled={disabled}
+                                                        className={`px-4 py-3 rounded-xl text-gray-900 shadow ${
+                                                            disabled
+                                                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                                                : "bg-white/85 hover:bg-white"
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{cat.label}</span>
+                                                            {disabled && (
+                                                                <span className="ml-1 text-xs text-emerald-600">
+                                                                    완료됨
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            });
+                                        })()}
+                                    </div>
                                 </div>
                             )}
 
@@ -2941,11 +3261,15 @@ function EscapeIntroPageInner() {
                                                         key={m.id ?? mi}
                                                         onClick={() => {
                                                             // 미션마다 사진/답변 상태를 초기화하여 간섭 방지
-                                                            setPhotoFiles([]);
-                                                            setPhotoPreviewUrl(null);
-                                                            setPhotoPreviewUrls([]);
-                                                            setPhotoUploaded(false);
-                                                            setModalAnswer("");
+                                                            // 단, 이미 완료된 미션이면 상태 유지
+                                                            const isDone = done;
+                                                            if (!isDone) {
+                                                                setPhotoFiles([]);
+                                                                setPhotoPreviewUrl(null);
+                                                                setPhotoPreviewUrls([]);
+                                                                setPhotoUploaded(false);
+                                                                setModalAnswer("");
+                                                            }
                                                             setModalError(null);
                                                             setActiveMission(m);
                                                             setMissionModalOpen(true);
@@ -2970,19 +3294,44 @@ function EscapeIntroPageInner() {
                                     })()}
                                 </div>
                                 <div className="mt-4 flex justify-center">
-                                    <button
-                                        onClick={advanceToNextCategory}
-                                        className="px-4 py-2 rounded-lg bg-green-600 text-white disabled:opacity-50"
-                                        disabled={!canProceed || isSubmitting}
-                                    >
-                                        {isSubmitting
-                                            ? "처리 중..."
-                                            : solvedMissionIds.length >= 2
-                                            ? currentChapterIdx + 1 >= chapters.length
-                                                ? "엔딩 보기"
-                                                : "다음 카테고리로 →"
-                                            : `스토리 조각 ${Math.max(0, 2 - solvedMissionIds.length)}개 더 완료 필요`}
-                                    </button>
+                                    {(() => {
+                                        const placeList = (currentChapter as any)?.placeOptions || [];
+                                        const placeById = selectedPlaceId
+                                            ? placeList.find((p: any) => Number(p.id) === Number(selectedPlaceId))
+                                            : null;
+                                        const placeByIndex =
+                                            placeById ||
+                                            (selectedPlaceIndex != null
+                                                ? placeList[selectedPlaceIndex as number]
+                                                : null);
+                                        const placeMissions: any[] = Array.isArray((placeByIndex as any)?.missions)
+                                            ? (placeByIndex as any).missions
+                                            : [];
+                                        const placeMissionIds: number[] =
+                                            placeMissions.length > 0
+                                                ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
+                                                : [];
+                                        const placeClearedCount = placeMissionIds.filter((mid) => {
+                                            return clearedMissions[mid] || solvedMissionIds.includes(mid);
+                                        }).length;
+                                        const canProceedToNext = placeClearedCount >= 2;
+                                        
+                                        return (
+                                            <button
+                                                onClick={advanceToNextCategory}
+                                                className="px-4 py-2 rounded-lg bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                                                disabled={!canProceedToNext || isSubmitting}
+                                            >
+                                                {isSubmitting
+                                                    ? "처리 중..."
+                                                    : canProceedToNext
+                                                    ? currentChapterIdx + 1 >= chapters.length
+                                                        ? "엔딩 보기"
+                                                        : "다음 카테고리로 →"
+                                                    : `스토리 조각 ${Math.max(0, 2 - placeClearedCount)}개 더 완료 필요`}
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         ) : null}
@@ -3130,7 +3479,7 @@ function EscapeIntroPageInner() {
                                         if (/^hint[_-]?\d+$/i.test(k) && p[k]) hints.push(p[k]);
                                     });
                                 }
-                                // 통합 확인 핸들러: PHOTO는 업로드+저장, TEXT는 텍스트 저장 후 공통 후처리
+                                // 통합 확인 핸들러: PHOTO와 PUZZLE_ANSWER 처리
                                 const handleConfirm = async () => {
                                     try {
                                         if (t === "PHOTO") {
@@ -3192,7 +3541,6 @@ function EscapeIntroPageInner() {
                                         }
 
                                         // 공통 후처리
-                                        setMissionModalOpen(false);
                                         if (activeMission?.id != null) {
                                             setSolvedMissionIds((prev) =>
                                                 Array.from(new Set([...prev, Number(activeMission.id)]))
@@ -3202,7 +3550,68 @@ function EscapeIntroPageInner() {
                                                 [Number(activeMission.id)]: true,
                                             }));
                                         }
-                                        await proceedAfterMission();
+                                        
+                                        // ✅ 미션이 2개 완료되었는지 확인 (TEXT와 동일한 로직)
+                                        const place = (currentChapter?.placeOptions || []).find(
+                                            (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                        );
+                                        const placeMissions: any[] = Array.isArray((place as any)?.missions)
+                                            ? (place as any).missions
+                                            : [];
+                                        const placeMissionIds: number[] =
+                                            placeMissions.length > 0
+                                                ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
+                                                : [];
+                                        const placeClearedCount = placeMissionIds.filter((mid) => {
+                                            if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
+                                            return clearedMissions[mid] || solvedMissionIds.includes(mid);
+                                        }).length;
+                                        
+                                        // 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
+                                        if (placeClearedCount >= 2) {
+                                            // 카테고리 완료 처리
+                                            try {
+                                                const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
+                                                if (catKey) {
+                                                    setCompletedCategories((prev) => {
+                                                        const next = Array.from(new Set([...(prev || []), catKey]));
+                                                        try {
+                                                            const raw = localStorage.getItem(STORAGE_KEY);
+                                                            const obj = raw ? JSON.parse(raw) : {};
+                                                            obj.__completedCategories = next;
+                                                            localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                                        } catch {}
+                                                        return next;
+                                                    });
+                                                }
+                                            } catch {}
+                                            
+                                            // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
+                                            setMissionModalOpen(false);
+                                            setActiveMission(null);
+                                            if (t === "PHOTO") {
+                                                setPhotoFiles([]);
+                                                setPhotoPreviewUrl(null);
+                                                setPhotoPreviewUrls([]);
+                                                setPhotoUploaded(false);
+                                            } else {
+                                                setModalAnswer("");
+                                            }
+                                            setToast("미션 완료! 다음 카테고리로 버튼을 눌러주세요.");
+                                        } else {
+                                            // 미션이 2개 미완료인 경우: 모달만 닫고 미션 목록으로 돌아감
+                                            setMissionModalOpen(false);
+                                            setActiveMission(null);
+                                            if (t === "PHOTO") {
+                                                setPhotoFiles([]);
+                                                setPhotoPreviewUrl(null);
+                                                setPhotoPreviewUrls([]);
+                                                setPhotoUploaded(false);
+                                            } else {
+                                                setModalAnswer("");
+                                            }
+                                            setToast("미션 완료!");
+                                        }
                                     } catch (e: any) {
                                         setValidationError(e?.message || "오류가 발생했습니다.");
                                     } finally {
@@ -3268,133 +3677,74 @@ function EscapeIntroPageInner() {
                                                             }
                                                             try {
                                                                 // 서버 저장
-                                                                await fetch("/api/submit-mission", {
-                                                                    method: "POST",
-                                                                    headers: { "Content-Type": "application/json" },
-                                                                    credentials: "include",
-                                                                    body: JSON.stringify({
-                                                                        chapterId: Number(
-                                                                            selectedPlaceId ?? currentChapter?.id
-                                                                        ),
-                                                                        isCorrect: true,
-                                                                        textAnswer: text,
-                                                                    }),
+                                                                const r = await submitMission({
+                                                                    chapterId: Number(selectedPlaceId ?? currentChapter?.id),
+                                                                    missionType: t,
+                                                                    isCorrect: true,
+                                                                    textAnswer: text,
                                                                 });
+                                                                if (!r.success) throw new Error(r.error || "미션 저장 실패");
 
-                                                                setMissionModalOpen(false);
-                                                                // 완료 처리 공통 로직
-                                                                try {
-                                                                    const place = (
-                                                                        currentChapter?.placeOptions || []
-                                                                    ).find(
-                                                                        (p: any) =>
-                                                                            Number(p.id) === Number(selectedPlaceId)
+                                                                // 공통 후처리 (PHOTO/PUZZLE_ANSWER와 동일한 로직)
+                                                                if (activeMission?.id != null) {
+                                                                    setSolvedMissionIds((prev) =>
+                                                                        Array.from(new Set([...prev, Number(activeMission.id)]))
                                                                     );
-                                                                    const placeQueue: string[] = Array.isArray(
-                                                                        (place as any)?.stories
-                                                                    )
-                                                                        ? (place as any).stories
-                                                                              .map((s: any) =>
-                                                                                  String(
-                                                                                      s?.dialogue ||
-                                                                                          s?.narration ||
-                                                                                          s ||
-                                                                                          ""
-                                                                                  ).trim()
-                                                                              )
-                                                                              .filter(Boolean)
+                                                                    setClearedMissions((prev) => ({
+                                                                        ...prev,
+                                                                        [Number(activeMission.id)]: true,
+                                                                    }));
+                                                                }
+                                                                
+                                                                // ✅ 미션이 2개 완료되었는지 확인 (PHOTO/PUZZLE_ANSWER와 동일한 로직)
+                                                                const place = (currentChapter?.placeOptions || []).find(
+                                                                    (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                                                );
+                                                                const placeMissions: any[] = Array.isArray((place as any)?.missions)
+                                                                    ? (place as any).missions
+                                                                    : [];
+                                                                const placeMissionIds: number[] =
+                                                                    placeMissions.length > 0
+                                                                        ? placeMissions.map((m: any) => Number(m.id)).filter(Number.isFinite)
                                                                         : [];
-                                                                    const queue = placeQueue;
-                                                                    if (activeMission?.id != null) {
-                                                                        setSolvedMissionIds((prev) =>
-                                                                            Array.from(
-                                                                                new Set([
-                                                                                    ...prev,
-                                                                                    Number(activeMission.id),
-                                                                                ])
-                                                                            )
-                                                                        );
-                                                                        setClearedMissions((prev) => ({
-                                                                            ...prev,
-                                                                            [Number(activeMission.id)]: true,
-                                                                        }));
-                                                                    }
-                                                                    // ✅ 미션이 2개 완료되었을 때만 카테고리 완료 처리
-                                                                    // 현재 장소의 미션 완료 개수 확인
-                                                                    const placeMissions: any[] = Array.isArray(
-                                                                        (place as any)?.missions
-                                                                    )
-                                                                        ? (place as any).missions
-                                                                        : [];
-                                                                    const placeMissionIds: number[] =
-                                                                        placeMissions.length > 0
-                                                                            ? placeMissions
-                                                                                  .map((m: any) => Number(m.id))
-                                                                                  .filter(Number.isFinite)
-                                                                            : [];
-                                                                    const placeClearedCount = placeMissionIds.filter(
-                                                                        (mid) => {
-                                                                            if (mid === Number(activeMission?.id))
-                                                                                return true; // 방금 완료한 미션
-                                                                            return (
-                                                                                clearedMissions[mid] ||
-                                                                                solvedMissionIds.includes(mid)
-                                                                            );
-                                                                        }
-                                                                    ).length;
-
-                                                                    // 미션이 2개 완료되었을 때만 카테고리 완료 처리
-                                                                    if (placeClearedCount >= 2) {
-                                                                        try {
-                                                                            const catKey = normalizeCategory(
-                                                                                (place as any)?.category ||
-                                                                                    (place as any)?.type ||
-                                                                                    ""
-                                                                            );
-                                                                            if (catKey) {
-                                                                                setCompletedCategories((prev) => {
-                                                                                    const next = Array.from(
-                                                                                        new Set([
-                                                                                            ...(prev || []),
-                                                                                            catKey,
-                                                                                        ])
-                                                                                    );
-                                                                                    const raw =
-                                                                                        localStorage.getItem(
-                                                                                            STORAGE_KEY
-                                                                                        );
-                                                                                    const obj = raw
-                                                                                        ? JSON.parse(raw)
-                                                                                        : {};
-                                                                                    obj.__completedCategories = next;
-                                                                                    localStorage.setItem(
-                                                                                        STORAGE_KEY,
-                                                                                        JSON.stringify(obj)
-                                                                                    );
-                                                                                    return next;
-                                                                                });
-                                                                            }
-                                                                        } catch {}
-                                                                    }
-
-                                                                    // ✅ 편지 게이트가 다시 열리지 않도록 강제 고정
+                                                                const placeClearedCount = placeMissionIds.filter((mid) => {
+                                                                    if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
+                                                                    return clearedMissions[mid] || solvedMissionIds.includes(mid);
+                                                                }).length;
+                                                                
+                                                                // 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
+                                                                if (placeClearedCount >= 2) {
+                                                                    // 카테고리 완료 처리
                                                                     try {
-                                                                        localStorage.setItem(
-                                                                            `escape_letter_shown_${storyId}`,
-                                                                            "1"
-                                                                        );
-                                                                        setIsLetterOpened(true);
+                                                                        const catKey = normalizeCategory((place as any)?.category || (place as any)?.type || "");
+                                                                        if (catKey) {
+                                                                            setCompletedCategories((prev) => {
+                                                                                const next = Array.from(new Set([...(prev || []), catKey]));
+                                                                                try {
+                                                                                    const raw = localStorage.getItem(STORAGE_KEY);
+                                                                                    const obj = raw ? JSON.parse(raw) : {};
+                                                                                    obj.__completedCategories = next;
+                                                                                    localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                                                                } catch {}
+                                                                                return next;
+                                                                            });
+                                                                        }
                                                                     } catch {}
-                                                                    if (queue.length > 0) {
-                                                                        setPostStoryQueue(queue);
-                                                                        setPostStoryIdx(0);
-                                                                        setShowPostStory(true);
-                                                                        return;
-                                                                    }
-                                                                } catch {}
-                                                                goToNextChapter();
-                                                            } catch (err) {
-                                                                setModalError("저장 중 오류가 발생했어요.");
+                                                                    
+                                                                    // 모달 닫고 미션 목록으로 돌아감 (버튼 클릭으로 이동)
+                                                                    setMissionModalOpen(false);
+                                                                    setActiveMission(null);
+                                                                    setModalAnswer("");
+                                                                    setToast("미션 완료! 다음 카테고리로 버튼을 눌러주세요.");
+                                                                } else {
+                                                                    // 미션이 2개 미완료인 경우: 모달만 닫고 미션 목록으로 돌아감
+                                                                    setMissionModalOpen(false);
+                                                                    setActiveMission(null);
+                                                                    setModalAnswer("");
+                                                                    setToast("미션 완료!");
+                                                                }
+                                                            } catch (err: any) {
+                                                                setModalError(err?.message || "저장 중 오류가 발생했어요.");
                                                             }
                                                         }}
                                                         className="px-3 py-2 rounded text-sm text-white bg-blue-600 hover:bg-blue-700"
@@ -3407,49 +3757,57 @@ function EscapeIntroPageInner() {
                                         {modalError && <div className="text-sm text-red-600">{modalError}</div>}
                                         {t === "PHOTO" && (
                                             <div className="flex flex-col gap-2">
-                                                <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white cursor-pointer hover:bg-gray-50 w-fit">
-                                                    <input
-                                                        type="file"
-                                                        accept="image/*"
-                                                        multiple
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const files = Array.from(e.target.files || []);
-                                                            if (files.length > 0) {
-                                                                setPhotoFiles(files.slice(0, 5));
-                                                                try {
-                                                                    const urls = files
-                                                                        .slice(0, 5)
-                                                                        .map((f) => URL.createObjectURL(f));
-                                                                    setPhotoPreviewUrl(urls[0] || null);
-                                                                    setPhotoPreviewUrls(urls);
-                                                                } catch {}
-                                                                const enough = files.length >= 2;
-                                                                // 업로드 표시는 하지 않고, 확인 시 업로드하도록 변경
-                                                                setPhotoUploaded(false);
-                                                                setValidationError(
-                                                                    enough ? "" : "사진 2장을 업로드해 주세요."
-                                                                );
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span>사진 업로드 (2장)</span>
-                                                </label>
-                                                {photoPreviewUrls && photoPreviewUrls.length > 0 && (
-                                                    <div className="flex gap-1">
-                                                        {photoPreviewUrls.map((u, i) => (
-                                                            <div
-                                                                key={i}
-                                                                className="w-16 h-16 rounded-md overflow-hidden border"
-                                                            >
-                                                                <img
-                                                                    src={u}
-                                                                    alt={`미리보기-${i + 1}`}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                            </div>
-                                                        ))}
+                                                {photoUploaded ? (
+                                                    <div className="px-3 py-2 rounded-md border bg-green-50 text-green-700">
+                                                        ✅ 사진이 이미 업로드되었습니다.
                                                     </div>
+                                                ) : (
+                                                    <>
+                                                        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white cursor-pointer hover:bg-gray-50 w-fit">
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                multiple
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const files = Array.from(e.target.files || []);
+                                                                    if (files.length > 0) {
+                                                                        setPhotoFiles(files.slice(0, 5));
+                                                                        try {
+                                                                            const urls = files
+                                                                                .slice(0, 5)
+                                                                                .map((f) => URL.createObjectURL(f));
+                                                                            setPhotoPreviewUrl(urls[0] || null);
+                                                                            setPhotoPreviewUrls(urls);
+                                                                        } catch {}
+                                                                        const enough = files.length >= 2;
+                                                                        // 업로드 표시는 하지 않고, 확인 시 업로드하도록 변경
+                                                                        setPhotoUploaded(false);
+                                                                        setValidationError(
+                                                                            enough ? "" : "사진 2장을 업로드해 주세요."
+                                                                        );
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span>사진 업로드 (2장)</span>
+                                                        </label>
+                                                        {photoPreviewUrls && photoPreviewUrls.length > 0 && (
+                                                            <div className="flex gap-1">
+                                                                {photoPreviewUrls.map((u, i) => (
+                                                                    <div
+                                                                        key={i}
+                                                                        className="w-16 h-16 rounded-md overflow-hidden border"
+                                                                    >
+                                                                        <img
+                                                                            src={u}
+                                                                            alt={`미리보기-${i + 1}`}
+                                                                            className="w-full h-full object-cover"
+                                                                        />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
                                                 )}
                                                 {/* 하단 PHOTO 확인 버튼 제거: 공통 확인 버튼(handleConfirm)만 사용 */}
                                             </div>
@@ -3492,6 +3850,7 @@ function EscapeIntroPageInner() {
                         </div>
                     </div>
                 )}
+                
             </div>
         );
     }
