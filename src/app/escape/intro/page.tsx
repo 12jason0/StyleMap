@@ -2368,9 +2368,9 @@ function EscapeIntroPageInner() {
         const placeCat = normalizeCategory(place?.category || place?.type || "");
         if (!placeCat) return false; // 선택된 카테고리일 때는 비분류 항목 제외
         if (normalizedSel === placeCat) return true;
-        // 보조 매칭: restaurant ↔ dinner/dining
+        // 보조 매칭: lunch ↔ dinner/dining
         if (
-            (normalizedSel === "restaurant" && ["dinner", "dining", "레스토랑"].includes(placeCat)) ||
+            (normalizedSel === "lunch" && ["dinner", "dining", "레스토랑"].includes(placeCat)) ||
             (normalizedSel === "date" && ["walk"].includes(placeCat))
         )
             return true;
@@ -2516,7 +2516,7 @@ function EscapeIntroPageInner() {
                                                     {
                                                         cafe: "☕ 카페",
                                                         date: "🌳 산책",
-                                                        restaurant: "🍱 식사",
+                                                        lunch: "🍱 점심",
                                                         dinner: "🍷 다이닝",
                                                     } as Record<string, string>
                                                 )[k] || k);

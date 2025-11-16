@@ -32,11 +32,23 @@ export async function GET(request: NextRequest) {
             orderBy: { order: "asc" },
         });
 
-        // ✅ 카테고리별로 그룹화하여 각 카테고리를 하나의 챕터로 제공
+        // ✅ 카테고리 정규화 + 그룹화
+        const normalize = (v: unknown): string => {
+            const s = String(v || "")
+                .toLowerCase()
+                .replace(/\s+/g, "");
+            if (["cafe", "카페", "카페투어"].includes(s)) return "cafe";
+            if (["lunch", "점심", "restaurant", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s))
+                return "lunch";
+            if (["date", "walk", "산책", "데이트"].includes(s)) return "date";
+            if (["dinner", "다이닝"].includes(s)) return "dinner";
+            if (["night", "nightview", "야경"].includes(s)) return "night";
+            return s || "misc";
+        };
         const categoryOrder = ["lunch", "cafe", "date", "dinner"]; // 필요 시 확장
         const grouped = new Map<string, typeof placeOptions>();
         for (const p of placeOptions) {
-            const key = (p.category || "misc").toLowerCase();
+            const key = normalize((p as any).category);
             if (!grouped.has(key)) grouped.set(key, [] as any);
             (grouped.get(key) as any).push(p);
         }
