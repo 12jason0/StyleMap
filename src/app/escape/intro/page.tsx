@@ -552,6 +552,8 @@ function EscapeIntroPageInner() {
     const [selectedSolvedMissionId, setSelectedSolvedMissionId] = useState<number | null>(null);
     const [missionModalOpen, setMissionModalOpen] = useState<boolean>(false);
     const [activeMission, setActiveMission] = useState<any | null>(null);
+    // 2개 완료 시 진행 버튼을 누르면 뜨는 안내 모달 (4개 완료 시 쿠폰 안내)
+    const [showProceedModal, setShowProceedModal] = useState<boolean>(false);
     // Modal answer/check states
     const [modalAnswer, setModalAnswer] = useState<string>("");
     const [modalWrongOnce, setModalWrongOnce] = useState<boolean>(false);
@@ -1998,6 +2000,37 @@ function EscapeIntroPageInner() {
                     return clearedMissions[mid] || solvedMissionIds.includes(mid);
                 }).length;
 
+                // ✅ 장소 미션 4개 모두 완료 시 AI 쿠폰 1개 지급(서버 측 중복 방지 + 로컬 1회 플래그)
+                try {
+                    const total = placeMissionIds.length;
+                    if (total >= 4 && placeClearedCount >= total && Number(selectedPlaceId)) {
+                        let already = false;
+                        try {
+                            const raw = localStorage.getItem(STORAGE_KEY);
+                            const obj = raw ? JSON.parse(raw) : {};
+                            const awarded = Array.isArray(obj.__couponAwardedPlaces) ? obj.__couponAwardedPlaces : [];
+                            already = awarded.includes(Number(selectedPlaceId));
+                            if (!already) {
+                                const token = localStorage.getItem("authToken");
+                                if (token) {
+                                    await fetch("/api/escape/award-coupon", {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                            Authorization: `Bearer ${token}`,
+                                        },
+                                        body: JSON.stringify({ placeId: Number(selectedPlaceId) }),
+                                    }).catch(() => {});
+                                }
+                                const next = Array.from(new Set([...(awarded || []), Number(selectedPlaceId)]));
+                                obj.__couponAwardedPlaces = next;
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                setToast("AI 추천 쿠폰 1개가 지급되었습니다.");
+                            }
+                        } catch {}
+                    }
+                } catch {}
+
                 // ✅ 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
                 if (placeClearedCount >= 2) {
                     try {
@@ -2066,6 +2099,37 @@ function EscapeIntroPageInner() {
                     if (mid === Number(activeMission?.id)) return true; // 방금 완료한 미션
                     return clearedMissions[mid] || solvedMissionIds.includes(mid);
                 }).length;
+
+                // ✅ 장소 미션 4개 모두 완료 시 AI 쿠폰 1개 지급(서버 측 중복 방지 + 로컬 1회 플래그)
+                try {
+                    const total = placeMissionIds.length;
+                    if (total >= 4 && placeClearedCount >= total && Number(selectedPlaceId)) {
+                        let already = false;
+                        try {
+                            const raw = localStorage.getItem(STORAGE_KEY);
+                            const obj = raw ? JSON.parse(raw) : {};
+                            const awarded = Array.isArray(obj.__couponAwardedPlaces) ? obj.__couponAwardedPlaces : [];
+                            already = awarded.includes(Number(selectedPlaceId));
+                            if (!already) {
+                                const token = localStorage.getItem("authToken");
+                                if (token) {
+                                    await fetch("/api/escape/award-coupon", {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                            Authorization: `Bearer ${token}`,
+                                        },
+                                        body: JSON.stringify({ placeId: Number(selectedPlaceId) }),
+                                    }).catch(() => {});
+                                }
+                                const next = Array.from(new Set([...(awarded || []), Number(selectedPlaceId)]));
+                                obj.__couponAwardedPlaces = next;
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+                                setToast("AI 추천 쿠폰 1개가 지급되었습니다.");
+                            }
+                        } catch {}
+                    }
+                } catch {}
 
                 // ✅ 미션이 2개 완료되었을 때 카테고리 완료 처리 (자동 이동 제거)
                 if (placeClearedCount >= 2) {
@@ -2213,7 +2277,7 @@ function EscapeIntroPageInner() {
             .toLowerCase()
             .replace(/\s+/g, "");
         if (["cafe", "카페", "카페투어"].includes(s)) return "cafe";
-        if (["restaurant", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s)) return "restaurant";
+        if (["lunch", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s)) return "lunch";
         if (["date", "walk", "산책", "데이트"].includes(s)) return "date";
         if (["dinner", "다이닝"].includes(s)) return "dinner"; // dinner 별도 취급
         // 야경(나이트뷰) 카테고리 지원
@@ -2701,79 +2765,12 @@ function EscapeIntroPageInner() {
                             {flowStep === "pieceAward" && !endingFlowStarted && (
                                 <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 text-emerald-900 px-4 py-5 text-center animate-[pieceFloat_800ms_ease-out]">
                                     <div className="text-2xl mb-2">✉️ 편지 조각 {piecesCollected} 획득!</div>
-                                    <div className="text-sm mb-4">4개를 모으면 엔딩이 열립니다.</div>
+                                    <div className="text-sm mb-4">모든 카테고리를 완료하면 엔딩이 열립니다.</div>
                                     <button
                                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
                                         onClick={async () => {
                                             try {
-                                                // 1️⃣ 조각 4개 이상이면 엔딩 플로우 시작
-                                                if (piecesCollected >= 4) {
-                                                    if (endingStartedRef.current) return;
-                                                    endingStartedRef.current = true;
-                                                    // ✅ 화면 상태를 가장 먼저 엔딩으로 전환
-                                                    setEndingFlowStarted(true);
-                                                    setFlowStep("done");
-                                                    setEndingStep("epilogue");
-
-                                                    // 모달/오버레이 및 진행 상태 강제 정리 후 엔딩 유지
-                                                    try {
-                                                        setMissionModalOpen(false);
-                                                        setActiveMission(null);
-                                                    } catch {}
-                                                    try {
-                                                        setShowPostStory(false);
-                                                        setPostStoryQueue([]);
-                                                        setPostStoryIdx(0);
-                                                    } catch {}
-                                                    try {
-                                                        setIsDialogueActive(false);
-                                                        setEndingDialogueStep(0);
-                                                        setIsLetterOpened(true);
-                                                        setLetterEverShown(true);
-                                                    } catch {}
-                                                    // 미션 진행 강제 가드 해제 (inMission 효과 방지)
-                                                    try {
-                                                        setMissionUnlocked(false);
-                                                        setSelectedPlaceId(null);
-                                                        setSelectedPlaceIndex(null);
-                                                        setSelectedPlaceConfirm(null);
-                                                        setShowMapModal(false);
-                                                        setInSelectedRange(false);
-                                                    } catch {}
-                                                    // 2️⃣ 갤러리와 배지 데이터 미리 불러오기 (실패해도 진행)
-                                                    try {
-                                                        const [subResult, badgeResult] = await Promise.allSettled([
-                                                            fetch(`/api/escape/submissions?storyId=${storyId}`, {
-                                                                credentials: "include",
-                                                            }),
-                                                            fetch(`/api/escape/badge?storyId=${storyId}`),
-                                                        ]);
-
-                                                        if (
-                                                            subResult.status === "fulfilled" &&
-                                                            subResult.value &&
-                                                            subResult.value.ok
-                                                        ) {
-                                                            const data = await subResult.value.json();
-                                                            if (Array.isArray(data?.urls)) setGalleryUrls(data.urls);
-                                                        }
-
-                                                        if (
-                                                            badgeResult.status === "fulfilled" &&
-                                                            badgeResult.value &&
-                                                            badgeResult.value.ok
-                                                        ) {
-                                                            const bd = await badgeResult.value.json();
-                                                            if (bd?.badge) setBadge(bd.badge);
-                                                        }
-                                                    } catch {}
-                                                    // 엔딩 띄운 이후에는 한 번만 트리거되도록 플래그 해제 금지
-
-                                                    // 나머지는 DialogueFlow/onComplete 에서 수동 진행
-                                                    return;
-                                                }
-
-                                                // 2️⃣ 아직 조각이 4개 미만이면 기존 로직대로 다음 장소로 이동
+                                                // 조각 수와 무관하게 다음 단계로 진행 (마지막이면 엔딩으로 전환)
                                                 const nextIndex =
                                                     typeof pendingNextChapterIdx === "number"
                                                         ? pendingNextChapterIdx
@@ -2782,7 +2779,8 @@ function EscapeIntroPageInner() {
                                                         : null;
 
                                                 if (nextIndex === null) {
-                                                    setFlowStep("done");
+                                                    // 모든 카테고리를 완료한 경우: 엔딩 단계로 전환
+                                                    setFlowStep("done"); // endingStep은 useEffect에서 epilogue로 세팅됨
                                                     return;
                                                 }
 
@@ -2801,7 +2799,7 @@ function EscapeIntroPageInner() {
                                             }
                                         }}
                                     >
-                                        {piecesCollected >= 4 ? "엔딩 보기" : "다음 장소로 이동"}
+                                        계속
                                     </button>
                                 </div>
                             )}
@@ -3146,7 +3144,20 @@ function EscapeIntroPageInner() {
 
                                         return (
                                             <button
-                                                onClick={advanceToNextCategory}
+                                                onClick={() => {
+                                                    try {
+                                                        const total = placeMissionIds.length;
+                                                        const openConfirm =
+                                                            total >= 4 && canProceedToNext && placeClearedCount < 4;
+                                                        if (openConfirm) {
+                                                            setShowProceedModal(true);
+                                                        } else {
+                                                            advanceToNextCategory();
+                                                        }
+                                                    } catch {
+                                                        advanceToNextCategory();
+                                                    }
+                                                }}
                                                 className="px-4 py-2 rounded-lg bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                                                 disabled={!canProceedToNext || isSubmitting}
                                             >
@@ -3202,6 +3213,37 @@ function EscapeIntroPageInner() {
                                 : [];
                         })()}
                     />
+                )}
+
+                {/* 2개 완료 후 진행 버튼 클릭 시 안내 모달 */}
+                {showProceedModal && (
+                    <div className="fixed inset-0 z-[1500] bg-black/50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-md p-6 text-center">
+                            <div className="text-lg font-bold text-gray-900 mb-2">조금만 더!</div>
+                            <p className="text-gray-700 mb-5">
+                                이 장소의 미션을 4개 모두 완료하면 AI 추천 쿠폰을 드려요. 계속 하시겠어요?
+                            </p>
+                            <div className="flex items-center justify-center gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowProceedModal(false);
+                                        advanceToNextCategory();
+                                    }}
+                                    className="px-4 py-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900"
+                                >
+                                    그냥 넘어가기
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowProceedModal(false);
+                                    }}
+                                    className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                    계속 하기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
 
                 {/* 콜라주 미리보기 모달 */}

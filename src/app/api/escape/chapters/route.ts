@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         });
 
         // ✅ 카테고리별로 그룹화하여 각 카테고리를 하나의 챕터로 제공
-        const categoryOrder = ["restaurant", "cafe", "date", "dinner"]; // 필요 시 확장
+        const categoryOrder = ["lunch", "cafe", "date", "dinner"]; // 필요 시 확장
         const grouped = new Map<string, typeof placeOptions>();
         for (const p of placeOptions) {
             const key = (p.category || "misc").toLowerCase();

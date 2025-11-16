@@ -30,6 +30,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
             tags,
         } = body || {};
 
+        const coerceTags = (val: any) => {
+            if (val == null) return null;
+            if (typeof val === "string") {
+                try {
+                    const parsed = JSON.parse(val);
+                    return parsed;
+                } catch {
+                    if (val.includes(",")) {
+                        return val
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                    }
+                    return val; // JSON string 값으로 저장
+                }
+            }
+            if (typeof val === "object") return val;
+            return val;
+        };
+
         const updated = await (prisma as any).place.update({
             where: { id: placeId },
             data: {
@@ -46,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
                 ...(latitude !== undefined ? { latitude } : {}),
                 ...(longitude !== undefined ? { longitude } : {}),
                 ...(imageUrl !== undefined ? { imageUrl } : {}),
-                ...(tags !== undefined ? { tags } : {}),
+                ...(tags !== undefined ? { tags: coerceTags(tags) } : {}),
             },
             select: {
                 id: true,

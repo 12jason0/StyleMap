@@ -283,14 +283,31 @@ export default async function PlaceDetailPage({ params }: PageProps) {
                         <div className="bg-white rounded-2xl shadow-lg p-6">
                             <h2 className="text-2xl font-bold mb-4">태그</h2>
                             <div className="flex flex-wrap gap-2">
-                                {place.tags.split(",").map((tag, idx) => (
-                                    <span
-                                        key={idx}
-                                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
-                                    >
-                                        #{tag.trim()}
-                                    </span>
-                                ))}
+                                {(() => {
+                                    const raw = (place as any).tags;
+                                    let list: string[] = [];
+                                    if (Array.isArray(raw)) {
+                                        list = raw as string[];
+                                    } else if (typeof raw === "string") {
+                                        list = raw.split(",");
+                                    } else if (raw && typeof raw === "object") {
+                                        for (const key of Object.keys(raw)) {
+                                            const v = (raw as any)[key];
+                                            if (Array.isArray(v)) list.push(...v.map(String));
+                                            else if (typeof v === "string") list.push(v);
+                                        }
+                                    }
+                                    // 고유/정리
+                                    list = Array.from(new Set(list.map((t) => t.trim()).filter(Boolean)));
+                                    return list.map((tag, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                                        >
+                                            #{tag}
+                                        </span>
+                                    ));
+                                })()}
                             </div>
                         </div>
                     )}

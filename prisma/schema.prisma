@@ -63,7 +63,12 @@ model UserReward {
   type      RewardType
   unit      RewardUnit
   user      User       @relation(fields: [userId], references: [id])
+  // 장소 기반 보상(예: escape 장소 클리어 보상) 추적용
+  placeId   Int?
+  place     PlaceOption? @relation(fields: [placeId], references: [id])
 
+  // 같은 유형(type)의 장소(placeId) 보상은 사용자당 1회만 허용
+  @@unique([userId, placeId, type])
   @@map("user_rewards")
 }
 
@@ -164,7 +169,8 @@ model Place {
   imageUrl             String?          @db.VarChar(500)
   created_at           DateTime         @default(now())
   updated_at           DateTime         @updatedAt
-  tags                 String?
+  // 코스와 동일하게 JSON 형식으로 보관 (배열/객체 모두 허용)
+  tags                 Json?              // AI 추천용 태그: { concept, mood, target, time, budget(예산), theme }
   coursePlaces         CoursePlace[]
   closed_days          PlaceClosedDay[]
 
@@ -221,6 +227,8 @@ model PlaceOption {
   placeDialogues PlaceDialogue[]
   missions       PlaceMission[]
   stories        PlaceStory[]
+  // UserReward와의 역관계(장소 기반 보상 기록)
+  userRewards    UserReward[]
 }
 
 model PlaceDialogue {
@@ -581,6 +589,7 @@ enum RewardType {
   ad_watch
   purchase
   event
+  escape_place_clear
 }
 
 enum RewardUnit {

@@ -149,6 +149,26 @@ export async function POST(request: NextRequest) {
             tags,
         } = body || {};
 
+        const coerceTags = (val: any) => {
+            if (val == null) return null;
+            if (typeof val === "string") {
+                try {
+                    const parsed = JSON.parse(val);
+                    return parsed;
+                } catch {
+                    if (val.includes(",")) {
+                        return val
+                            .split(",")
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                    }
+                    return val; // store as JSON string value
+                }
+            }
+            if (typeof val === "object") return val;
+            return val;
+        };
+
         if (!name) {
             return NextResponse.json({ error: "장소 이름은 필수입니다." }, { status: 400 });
         }
@@ -168,7 +188,7 @@ export async function POST(request: NextRequest) {
                 latitude: latitude ?? null,
                 longitude: longitude ?? null,
                 imageUrl: imageUrl || null,
-                tags: tags || null,
+                tags: coerceTags(tags),
             },
             select: {
                 id: true,

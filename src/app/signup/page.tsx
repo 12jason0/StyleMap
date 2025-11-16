@@ -66,8 +66,8 @@ const Signup = () => {
 
             if (response.ok) {
                 try {
-                    localStorage.setItem("userCoupons", "10");
-                    localStorage.setItem("userCoins", "10");
+                    localStorage.setItem("userCoupons", "2");
+                    localStorage.setItem("userCoins", "2");
                 } catch {}
                 router.push("/login?message=회원가입이 완료되었습니다. 로그인해주세요.");
             } else {

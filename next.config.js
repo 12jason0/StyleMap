@@ -11,6 +11,8 @@ const nextConfig = {
                     { key: "X-Content-Type-Options", value: "nosniff" },
                     { key: "Referrer-Policy", value: "origin-when-cross-origin" },
                     { key: "X-XSS-Protection", value: "1; mode=block" },
+                    // Hide Vercel Toolbar on deployed site
+                    { key: "x-vercel-toolbar", value: "disabled" },
                     {
                         key: "Content-Security-Policy",
                         value: (() => {

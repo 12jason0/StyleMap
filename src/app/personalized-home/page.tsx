@@ -619,7 +619,7 @@ const AIRecommender = () => {
                         <User className="w-8 h-8 text-white" />
                     </div>
                     <h2 className="text-2xl font-bold mb-2 text-gray-600">로그인하고 AI 추천받기</h2>
-                    <p className="text-gray-600">로그인하면 무료 쿠폰 1개를 드려요! 🎁</p>
+                    <p className="text-gray-600">로그인하면 무료 쿠폰 2개를 드려요! 🎁</p>
                 </div>
 
                 <div className="space-y-4">
@@ -638,7 +638,7 @@ const AIRecommender = () => {
                     <ul className="text-sm text-purple-600 space-y-1">
                         <li className="flex items-center">
                             <CheckCircle className="w-4 h-4 mr-2 text-purple-500" />
-                            AI 추천 무료 쿠폰 1개
+                            AI 추천 무료 쿠폰 2개
                         </li>
                         <li className="flex items-center">
                             <CheckCircle className="w-4 h-4 mr-2 text-purple-500" />
@@ -966,7 +966,7 @@ const AIRecommender = () => {
                                         <div>
                                             <p className="text-base font-medium text-black">로그인이 필요해요</p>
                                             <p className="text-sm text-gray-500 mt-1">
-                                                로그인하면 무료 쿠폰 1개를 드려요! 🎁
+                                                로그인하면 무료 쿠폰 2개를 드려요! 🎁
                                             </p>
                                         </div>
                                     </div>
