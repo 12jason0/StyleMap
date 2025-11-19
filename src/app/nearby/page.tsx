@@ -200,7 +200,7 @@ export default function NearbyPage() {
                 if (searchInput.trim()) qs.set("q", searchInput.trim());
                 if (selectedRegions.length > 0) qs.set("region", selectedRegions[0]);
                 if (selectedTagIds.length > 0) qs.set("tagIds", selectedTagIds.join(","));
-                qs.set("limit", "200");
+                qs.set("limit", "80");
                 qs.set("nocache", "1");
                 // 이전 동작으로 복원: 완전 무필터일 때만 완화, 필터 존재 시 엄격 정책
                 const imagePolicy =

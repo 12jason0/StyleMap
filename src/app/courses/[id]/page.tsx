@@ -60,7 +60,7 @@ interface Course {
     concept: string;
     rating: number;
     isPopular: boolean;
-    recommendedTime: string;
+    recommended_start_time: string;
     season: string;
     courseType: string;
     transportation: string;
@@ -603,7 +603,7 @@ export default function CourseDetailPage() {
                                 </div>
                                 <span>📍 {courseData.coursePlaces?.length || 0}개 장소</span>
                                 <span>⏱ {courseData.duration}</span>
-                                <span className="hidden md:inline">🕒 {courseData.recommendedTime}</span>
+                                <span className="hidden md:inline">🕒 {courseData.recommended_start_time}</span>
                             </div>
                         </div>
                     </div>
@@ -934,9 +934,9 @@ export default function CourseDetailPage() {
                                             <div className="flex items-start gap-3">
                                                 <span className="text-orange-500 text-xl mt-1">🕒</span>
                                                 <div>
-                                                    <p className="font-medium text-gray-800">추천 시간</p>
+                                                    <p className="font-medium text-gray-800">추천 시간대</p>
                                                     <p className="text-sm text-gray-600">
-                                                        {courseData.recommendedTime}
+                                                        {courseData.recommended_start_time}
                                                     </p>
                                                 </div>
                                             </div>

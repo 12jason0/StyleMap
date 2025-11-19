@@ -56,7 +56,7 @@ interface Course {
     concept: string;
     rating: number;
     isPopular: boolean;
-    recommendedTime: string;
+    recommended_start_time: string;
     season: string;
     courseType: string;
     transportation: string;
@@ -748,7 +748,7 @@ function CourseDetailPage() {
                                 <span>📍 {courseData.coursePlaces?.length || 0}개 장소</span>
                                 <span>⏱ {courseData.duration}</span>
                                 {totalCost ? <span>💰 {totalCost}</span> : null}
-                                <span className="hidden md:inline">🕒 {courseData.recommendedTime}</span>
+                                <span className="hidden md:inline">🕒 {courseData.recommended_start_time}</span>
                             </div>
                         </div>
                     </div>

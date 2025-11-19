@@ -67,7 +67,7 @@ export async function GET(
             participants: course.current_participants || 0,
             maxParticipants: course.max_participants || 10,
             isPopular: (course.current_participants || 0) > 5,
-            recommendedTime: (course as any).courseDetail?.recommended_time || "오후 2시-6시",
+            recommended_start_time: (course as any).courseDetail?.recommended_start_time || "오후 2시-6시",
             season: (course as any).courseDetail?.season || "사계절",
             courseType: (course as any).courseDetail?.course_type || "데이트",
             transportation: (course as any).courseDetail?.transportation || "도보",

@@ -143,7 +143,8 @@ export default function Home() {
 
     const buildCourseListUrl = () => {
         const params = new URLSearchParams();
-        params.set("limit", "100");
+        // 초기 목록은 로딩 속도를 위해 30개만 로드
+        params.set("limit", "30");
         params.set("imagePolicy", "any");
         if (query.trim()) params.set("q", query.trim());
         if (selectedTagIds.length > 0) params.set("tagIds", selectedTagIds.join(","));
