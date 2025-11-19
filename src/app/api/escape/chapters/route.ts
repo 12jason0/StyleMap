@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
                 return "lunch";
             if (["date", "walk", "산책", "데이트"].includes(s)) return "date";
             if (["dinner", "다이닝"].includes(s)) return "dinner";
-            if (["night", "nightview", "야경"].includes(s)) return "night";
+            if (["night", "nightview", "야경"].includes(s)) return "nightview";
             return s || "misc";
         };
-        const categoryOrder = ["lunch", "cafe", "date", "dinner"]; // 필요 시 확장
+        const categoryOrder = ["lunch", "cafe", "date", "dinner", "nightview"]; // 필요 시 확장
         const grouped = new Map<string, typeof placeOptions>();
         for (const p of placeOptions) {
             const key = normalize((p as any).category);

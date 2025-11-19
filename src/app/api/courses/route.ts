@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url);
         const concept = searchParams.get("concept");
+        const q = (searchParams.get("q") || "").trim();
+        const tagIdsParam = (searchParams.get("tagIds") || "").trim(); // comma-separated ids
         const regionQuery = searchParams.get("region");
         const limitParam = searchParams.get("limit");
         const offsetParam = searchParams.get("offset");
@@ -41,11 +43,46 @@ export async function GET(request: NextRequest) {
         const prismaQuery: any = {
             where: {
                 ...(concept ? { concept } : {}),
+                ...(q
+                    ? {
+                          OR: [
+                              { title: { contains: q, mode: "insensitive" } },
+                              { description: { contains: q, mode: "insensitive" } },
+                              { concept: { contains: q, mode: "insensitive" } },
+                              { region: { contains: q, mode: "insensitive" } },
+                              // 포함된 장소 이름/주소까지 검색 범위 확장
+                              {
+                                  coursePlaces: {
+                                      some: {
+                                          place: {
+                                              OR: [
+                                                  { name: { contains: q, mode: "insensitive" } },
+                                                  { address: { contains: q, mode: "insensitive" } },
+                                              ],
+                                          },
+                                      },
+                                  },
+                              },
+                          ],
+                      }
+                    : {}),
                 ...(regionQuery
                     ? {
                           region: {
                               contains: regionQuery,
                               mode: "insensitive",
+                          },
+                      }
+                    : {}),
+                ...(tagIdsParam
+                    ? {
+                          // 코스가 선택된 태그 중 하나라도 매칭되면 포함
+                          CourseTagToCourses: {
+                              some: {
+                                  course_tags: {
+                                      id: { in: tagIdsParam.split(",").map((v) => Number(v)).filter((n) => Number.isFinite(n)) },
+                                  },
+                              },
                           },
                       }
                     : {}),
@@ -65,6 +102,11 @@ export async function GET(request: NextRequest) {
                 current_participants: true,
                 view_count: true,
                 createdAt: true,
+                CourseTagToCourses: {
+                    select: {
+                        course_tags: { select: { id: true, name: true } },
+                    },
+                },
                 coursePlaces: {
                     orderBy: { order_index: "asc" },
                     select: {
@@ -92,9 +134,9 @@ export async function GET(request: NextRequest) {
         };
 
         // --- 캐시 키 구성: 주요 파라미터와 이미지 정책/페이징 포함 ---
-        const cacheKey = `courses:${concept || "*"}:${
-            regionQuery || "*"
-        }:${imagePolicy}:${effectiveLimit}:${effectiveOffset}`;
+        const cacheKey = `courses:${concept || "*"}:${regionQuery || "*"}:${q || "*"}:${tagIdsParam || "*"}:${imagePolicy}:${
+            effectiveLimit
+        }:${effectiveOffset}`;
 
         let results: any[] | undefined = defaultCache.get<any[]>(cacheKey);
         if (!results) {
@@ -128,6 +170,9 @@ export async function GET(request: NextRequest) {
                 view_count: course.view_count || 0,
                 viewCount: course.view_count || 0,
                 createdAt: course.createdAt,
+                tags: Array.isArray(course?.CourseTagToCourses)
+                    ? course.CourseTagToCourses.map((ctc: any) => ctc.course_tags?.name).filter(Boolean)
+                    : [],
                 coursePlaces: Array.isArray(course.coursePlaces)
                     ? course.coursePlaces.map((cp: any) => ({
                           order_index: cp.order_index,

@@ -30,6 +30,11 @@ type Course = {
 
 export default function Home() {
     const [courses, setCourses] = useState<Course[]>([]);
+    const [allTags, setAllTags] = useState<Array<{ id: number; name: string }>>([]);
+    const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+    const [query, setQuery] = useState("");
+    const [showTags, setShowTags] = useState(false);
+    const [searchNonce, setSearchNonce] = useState(0);
     const [currentSlide] = useState(0);
     const [, setLoading] = useState(true);
     const [showWelcome, setShowWelcome] = useState(false);
@@ -125,10 +130,30 @@ export default function Home() {
         }
     };
 
+    // 태그 목록 불러오기
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/course-tags", { cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                if (data?.success && Array.isArray(data.tags)) setAllTags(data.tags);
+            } catch {}
+        })();
+    }, []);
+
+    const buildCourseListUrl = () => {
+        const params = new URLSearchParams();
+        params.set("limit", "100");
+        params.set("imagePolicy", "any");
+        if (query.trim()) params.set("q", query.trim());
+        if (selectedTagIds.length > 0) params.set("tagIds", selectedTagIds.join(","));
+        return `/api/courses?${params.toString()}`;
+    };
+
     useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await fetch(`/api/courses?limit=100&imagePolicy=any&lean=1` as any, {
+                const response = await fetch(buildCourseListUrl() as any, {
                     cache: "force-cache",
                     next: { revalidate: 300 },
                 });
@@ -137,7 +162,9 @@ export default function Home() {
                     return;
                 }
                 const data = await response.json().catch(() => null);
-                setCourses(Array.isArray(data) ? data : []);
+                setCourses(
+                    Array.isArray(data) ? data : Array.isArray((data as any)?.courses) ? (data as any).courses : []
+                );
             } catch {
                 setCourses([]);
             } finally {
@@ -145,7 +172,12 @@ export default function Home() {
             }
         };
         fetchCourses();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, selectedTagIds.join(","), searchNonce]);
+
+    const toggleTag = (id: number) => {
+        setSelectedTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    };
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -652,7 +684,35 @@ export default function Home() {
             )}
 
             <>
-                {/* 검색 바 제거 */}
+                {/* 검색/카테고리 섹션 (헤더와 분리) */}
+                <section className="py-6">
+                    <div className="max-w-7xl mx-auto px-4">
+                        <div className="space-y-2">
+                            <div className="flex gap-2">
+                                <input
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                    placeholder="코스 검색 (제목/설명/지역)"
+                                    className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
+                                    aria-label="코스 검색"
+                                />
+                                <button
+                                    onClick={() => {
+                                        const sp = new URLSearchParams();
+                                        if (query.trim()) sp.set("q", query.trim());
+                                        if (selectedTagIds.length > 0) sp.set("tagIds", selectedTagIds.join(","));
+                                        router.push(`/nearby?${sp.toString()}`);
+                                    }}
+                                    className="px-3 py-2 rounded-xl text-sm font-semibold border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                                    aria-label="검색 실행"
+                                >
+                                    검색
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {/* 메인 히어로 */}
                 <HeroSlider
                     items={topCourses.map((c) => ({
                         id: c.id,
@@ -662,6 +722,7 @@ export default function Home() {
                         tags: c.tags,
                     }))}
                 />
+
                 <TabbedConcepts courses={courses} hotCourses={hotCourses} newCourses={newCourses} />
                 {/* 당신을 위한 추천: 로그인 여부와 관계없이 항상 표시 */}
                 <section>

@@ -75,7 +75,10 @@ function computeEffectiveStreak(sortedDescCheckins: { date: Date; rewarded?: boo
 }
 
 // 보상일 기반 7칸 사이클 도장 배열 생성
-function buildCycleStamps(sortedDescCheckins: { date: Date; rewarded?: boolean }[], now: Date): { stamps: boolean[]; todayIndex: number | null } {
+function buildCycleStamps(
+    sortedDescCheckins: { date: Date; rewarded?: boolean }[],
+    now: Date
+): { stamps: boolean[]; todayIndex: number | null } {
     const todayStart = startOfDayKST(now);
     const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
 
@@ -143,10 +146,19 @@ export async function GET(request: NextRequest) {
 
         // 오늘 제외한 과거 출석만으로 유효 스트릭 계산
         const checkinsExcludingToday = checkins.filter((c: { date: Date }) => new Date(c.date) < todayStart);
-        const streak = computeEffectiveStreak(checkinsExcludingToday, now);
+        // "오늘 제외" 연속 스트릭은 기준 시점을 어제로 두어 계산
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const streak = computeEffectiveStreak(checkinsExcludingToday, yesterday);
 
         // 실제 출석 날짜를 기반으로 올바른 배열 생성
         const { stamps: weekStamps, todayIndex } = buildCycleStamps(checkins, now);
+        // 오늘 미체크 상태에서 "오늘 제외 연속 출석"이 존재하면 오늘 칸을 미리 표시(프리마킹)
+        if (!todayChecked && typeof todayIndex === "number" && todayIndex >= 0) {
+            if (streak > 0 && !weekStamps[todayIndex]) {
+                weekStamps[todayIndex] = true;
+            }
+        }
         const weekCount = Math.min(7, Math.max(0, streak));
 
         return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps, todayIndex });
@@ -179,7 +191,15 @@ export async function POST(request: NextRequest) {
             const streak = computeEffectiveStreak(recent, now);
             const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now);
             const weekCount = Math.min(7, Math.max(0, streak));
-            return NextResponse.json({ success: true, alreadyChecked: true, awarded: existing.rewarded, streak, weekStamps, weekCount, todayIndex });
+            return NextResponse.json({
+                success: true,
+                alreadyChecked: true,
+                awarded: existing.rewarded,
+                streak,
+                weekStamps,
+                weekCount,
+                todayIndex,
+            });
         }
 
         const created = await (prisma as any).userCheckin.create({ data: { userId, date: now, rewarded: false } });

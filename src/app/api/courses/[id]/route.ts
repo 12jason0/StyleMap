@@ -27,12 +27,13 @@ export async function GET(
             console.warn("View count increment failed for course", courseId, e);
         }
 
-        const course = await prisma.course.findUnique({
+        const course = await (prisma as any).course.findUnique({
             where: { id: courseId },
             include: {
                 highlights: true,
                 benefits: true,
                 courseNotices: true,
+                courseDetail: true,
                 coursePlaces: {
                     include: {
                         place: {
@@ -66,11 +67,10 @@ export async function GET(
             participants: course.current_participants || 0,
             maxParticipants: course.max_participants || 10,
             isPopular: (course.current_participants || 0) > 5,
-            recommendedTime: "오후 2시-6시",
-            season: "사계절",
-            courseType: "일반",
-            transportation: "대중교통",
-            parking: "주차 가능",
+            recommendedTime: (course as any).courseDetail?.recommended_time || "오후 2시-6시",
+            season: (course as any).courseDetail?.season || "사계절",
+            courseType: (course as any).courseDetail?.course_type || "데이트",
+            transportation: (course as any).courseDetail?.transportation || "도보",
             reservationRequired: false,
             placeCount: course._count?.coursePlaces ?? (course.coursePlaces?.length || 0),
             createdAt: course.createdAt,
@@ -78,7 +78,7 @@ export async function GET(
         };
 
         // 코스 장소 가공
-        const coursePlaces = course.coursePlaces.map((cp) => ({
+        const coursePlaces = (course.coursePlaces as any[]).map((cp: any) => ({
             id: cp.id,
             course_id: cp.course_id,
             place_id: cp.place_id,

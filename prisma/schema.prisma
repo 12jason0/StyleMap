@@ -138,6 +138,8 @@ model Course {
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   completedCourses     CompletedCourse[]
+  // 코스 상세(부가 정보) 1:1
+  courseDetail         CourseDetail?
   CourseTagToCourses   CourseTagToCourses[]
   benefits             Benefit[]
   bookings             Booking[]
@@ -150,6 +152,22 @@ model Course {
   interactions         UserInteraction[]
 
   @@map("courses")
+  @@index([concept])
+  @@index([region])
+  @@index([title])
+}
+
+// 코스 부가 정보(추천 시간/계절/유형/교통/주차 등)
+model CourseDetail {
+  id               Int      @id @default(autoincrement())
+  course_id        Int      @unique
+  recommended_time String?  @db.VarChar(100)
+  season           String?  @db.VarChar(50)
+  course_type      String?  @db.VarChar(50)
+  transportation   String?  @db.VarChar(50)
+  course           Course   @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@map("course_details")
 }
 
 model Place {
@@ -175,6 +193,8 @@ model Place {
   closed_days          PlaceClosedDay[]
 
   @@map("places")
+  @@index([name])
+  @@index([address])
 }
 
 model CourseTag {

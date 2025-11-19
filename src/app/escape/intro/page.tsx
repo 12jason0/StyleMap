@@ -2277,11 +2277,13 @@ function EscapeIntroPageInner() {
             .toLowerCase()
             .replace(/\s+/g, "");
         if (["cafe", "카페", "카페투어"].includes(s)) return "cafe";
-        if (["lunch", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s)) return "lunch";
+        // restaurant 계열 → lunch(점심)로 통일
+        if (["lunch", "점심", "restaurant", "food", "맛집", "음식점", "식사", "레스토랑"].includes(s)) return "lunch";
         if (["date", "walk", "산책", "데이트"].includes(s)) return "date";
-        if (["dinner", "다이닝"].includes(s)) return "dinner"; // dinner 별도 취급
-        // 야경(나이트뷰) 카테고리 지원
-        if (["night", "nightview", "야경"].includes(s)) return "night";
+        // 저녁은 dinner 로 고정
+        if (["dinner", "다이닝"].includes(s)) return "dinner";
+        // 야경은 nightview 로 고정
+        if (["night", "nightview", "야경"].includes(s)) return "nightview";
         if (s === "") return "misc";
         return s;
     };
@@ -2368,12 +2370,8 @@ function EscapeIntroPageInner() {
         const placeCat = normalizeCategory(place?.category || place?.type || "");
         if (!placeCat) return false; // 선택된 카테고리일 때는 비분류 항목 제외
         if (normalizedSel === placeCat) return true;
-        // 보조 매칭: lunch ↔ dinner/dining
-        if (
-            (normalizedSel === "lunch" && ["dinner", "dining", "레스토랑"].includes(placeCat)) ||
-            (normalizedSel === "date" && ["walk"].includes(placeCat))
-        )
-            return true;
+        // 보조 매칭: date ↔ walk
+        if (normalizedSel === "date" && ["walk"].includes(placeCat)) return true;
         return false;
     };
 
@@ -2517,15 +2515,14 @@ function EscapeIntroPageInner() {
                                                         cafe: "☕ 카페",
                                                         date: "🌳 산책",
                                                         lunch: "🍱 점심",
-                                                        dinner: "🍷 다이닝",
+                                                        dinner: "🌙 저녁",
+                                                        nightview: "🌃 야경",
                                                     } as Record<string, string>
                                                 )[k] || k);
-                                            // 카테고리 우선순위: 기본 정렬 후 조건에 따라 야경/다이닝을 마지막으로 배치
+                                            // 카테고리 우선순위: 야경(nightview)을 마지막으로 배치
                                             let base = availableCategoryKeys.map((k) => ({ key: k, label: label(k) }));
-                                            const hasNight = base.some((c) => c.key === "night");
-                                            // 야경이 있으면 야경을, 없으면 다이닝을 가장 마지막으로
                                             base = base.sort((a, b) => {
-                                                const lastKey = hasNight ? "night" : "dinner";
+                                                const lastKey = "nightview";
                                                 if (a.key === lastKey && b.key !== lastKey) return 1;
                                                 if (b.key === lastKey && a.key !== lastKey) return -1;
                                                 return 0;

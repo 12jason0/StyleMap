@@ -64,7 +64,6 @@ interface Course {
     season: string;
     courseType: string;
     transportation: string;
-    parking: string;
     reservationRequired: boolean;
     createdAt: string;
     updatedAt: string;
@@ -753,15 +752,19 @@ export default function CourseDetailPage() {
                                                                         <span className="text-sm text-gray-600">
                                                                             ⏱ {coursePlace.estimated_duration}분
                                                                         </span>
-                                                                        <span className="text-sm text-gray-600">
-                                                                            🕒 {coursePlace.recommended_time}
-                                                                        </span>
+                                                                        {coursePlace.place.opening_hours && (
+                                                                            <span className="text-xs text-gray-500">
+                                                                                🕘 {coursePlace.place.opening_hours}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     {/* 영업 상태 배지 */}
                                                                     <div className="mb-2">
                                                                         <PlaceStatusBadge
                                                                             place={coursePlace.place}
-                                                                            closedDays={coursePlace.place.closed_days || []}
+                                                                            closedDays={
+                                                                                coursePlace.place.closed_days || []
+                                                                            }
                                                                             size="sm"
                                                                             showHours={false}
                                                                         />
@@ -789,11 +792,6 @@ export default function CourseDetailPage() {
                                                                         >
                                                                             길찾기
                                                                         </button>
-                                                                        {coursePlace.place.opening_hours && (
-                                                                            <span className="text-xs text-gray-500">
-                                                                                🕘 {coursePlace.place.opening_hours}
-                                                                            </span>
-                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -986,9 +984,6 @@ export default function CourseDetailPage() {
                         </button>
                     </div>
                 </div>
-
-                {/* 모바일에서 하단 여백 추가 */}
-                <div className="lg:hidden h-20"></div>
             </div>
 
             {/* 공유 모달 */}

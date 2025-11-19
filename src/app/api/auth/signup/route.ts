@@ -51,14 +51,14 @@ export async function POST(request: NextRequest) {
             data: {
                 email,
                 password: hashedPassword,
-                nickname,
+                username: nickname,
                 provider: "local",
                 phone: trimmedPhone,
                 ageRange: trimmedAgeRange,
                 birthday: birthdayDate,
                 age: computedAge,
             },
-            select: { id: true, email: true, nickname: true },
+            select: { id: true, email: true, username: true },
         });
 
         const JWT_SECRET = getJwtSecret();

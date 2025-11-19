@@ -58,15 +58,7 @@ export async function GET(req: NextRequest) {
             console.warn("⚠️ 도보 거리가 너무 멀어 운전 모드로 변경:", distance.toFixed(0), "m");
             mode = "driving";
         }
-        // // ✅ 거리가 50m 이하면 API 호출 없이 바로 직선 반환
-        // if (distance < 50) {
-        //     console.warn("⚠️ 거리가 너무 가까움 (", distance.toFixed(0), "m) - 직선 경로 반환");
-        //     return NextResponse.json({
-        //         coordinates: createFallbackPath(),
-        //         fallback: true,
-        //         reason: "TOO_CLOSE",
-        //     });
-        // }
+        // ✅ 근거리(기본 500m 미만)도 API를 호출해 보행로/도로를 정확히 따르도록 변경
 
         // API 키가 없으면 직선 폴백 대신 경로 없음 반환 (건물 통과 방지)
         if (!clientId || !clientSecret) {
@@ -93,12 +85,12 @@ export async function GET(req: NextRequest) {
             let response = await doFetch(endpoint);
             let data = await response.json().catch(() => ({}));
 
-            // 운전 경로에서 권한 문제(403 / errorCode 230 등)면 도보로 한 번 더 시도
+            // 운전 경로에서 오류 발생 시(403/404/에러코드 230,300 등) 도보로 한 번 더 시도
             if (!response.ok && mode === "driving") {
                 const errCode = (data?.error?.errorCode || data?.errorCode) as string | undefined;
-                if (response.status === 403 || errCode === "230") {
+                if (response.status === 403 || response.status === 404 || errCode === "230" || errCode === "300") {
                     const walkingEp = `https://naveropenapi.apigw.ntruss.com/map-direction/v1/walking?start=${start}&goal=${goal}`;
-                    console.warn("🚶 Driving 권한 오류 → Walking으로 재시도");
+                    console.warn("🚶 Driving 오류 → Walking으로 재시도");
                     response = await doFetch(walkingEp);
                     data = await response.json().catch(() => ({}));
                     mode = "walking";
@@ -110,7 +102,18 @@ export async function GET(req: NextRequest) {
 
             // 🟢 에러(3xx/4xx/5xx) 시 직선 폴백 대신 경로 생략
             if (!response.ok) {
-                console.error("❌ Naver API 에러:", data);
+                const errCode = (data?.error?.errorCode || data?.errorCode) as string | undefined;
+                const errMsg = (data?.error?.message || data?.message) as string | undefined;
+                const errDetails = (data?.error?.details || data?.details) as string | undefined;
+                const isNotFoundUrl =
+                    errCode === "300" ||
+                    /not\s*found/i.test(String(errMsg || "")) ||
+                    /url\s*not\s*found/i.test(String(errDetails || ""));
+                if (isNotFoundUrl) {
+                    console.warn("⚠️ Naver API URL not found - 경로 생략:", { errCode, errMsg, errDetails });
+                } else {
+                    console.error("❌ Naver API 에러:", data);
+                }
                 return NextResponse.json({ coordinates: [], fallback: true, error: data?.message || response.status });
             }
 
