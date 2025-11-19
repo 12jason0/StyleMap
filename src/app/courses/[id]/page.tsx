@@ -575,12 +575,30 @@ export default function CourseDetailPage() {
                                         🔥 인기 코스
                                     </span>
                                 )}
-                                <span className="px-4 py-1.5 bg-emerald-600 text-white text-sm font-bold rounded-full">
-                                    {courseData.concept}
-                                </span>
-                                <span className="px-4 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-full">
-                                    {courseData.courseType}
-                                </span>
+                                {courseData.concept && (
+                                    <span className="px-4 py-1.5 bg-emerald-600 text-white text-sm font-bold rounded-full">
+                                        {courseData.concept}
+                                    </span>
+                                )}
+                                {Array.isArray(
+                                    (courseData.courseType || "")
+                                        .split(",")
+                                        .map((s) => s.trim())
+                                        .filter(Boolean)
+                                )
+                                    ? (courseData.courseType || "")
+                                          .split(",")
+                                          .map((s) => s.trim())
+                                          .filter(Boolean)
+                                          .map((t, idx) => (
+                                              <span
+                                                  key={`ctype-${idx}-${t}`}
+                                                  className="px-4 py-1.5 bg-emerald-700 text-white text-sm font-bold rounded-full"
+                                              >
+                                                  {t}
+                                              </span>
+                                          ))
+                                    : null}
                             </div>
 
                             <h1 className="text-2xl font-bold text-white mb-4">{courseData.title}</h1>

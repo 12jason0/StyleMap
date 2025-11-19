@@ -40,53 +40,88 @@ export async function GET(request: NextRequest) {
         const parsedOffset = Number(offsetParam ?? 0);
         const effectiveOffset = Math.max(Number.isFinite(parsedOffset) ? parsedOffset : 0, 0);
 
+        // AND로 결합할 동적 where 조건들
+        const andWhere: any[] = [];
+
+        // 텍스트 검색: 제목/설명/컨셉/지역 + 포함 장소 이름/주소
+        if (q) {
+            andWhere.push({
+                OR: [
+                    { title: { contains: q, mode: "insensitive" } },
+                    { description: { contains: q, mode: "insensitive" } },
+                    { concept: { contains: q, mode: "insensitive" } },
+                    { region: { contains: q, mode: "insensitive" } },
+                    {
+                        coursePlaces: {
+                            some: {
+                                place: {
+                                    OR: [
+                                        { name: { contains: q, mode: "insensitive" } },
+                                        { address: { contains: q, mode: "insensitive" } },
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                ],
+            });
+        }
+
+        // 활동 필터: courseDetail.course_type에 쉼표로 구분된 값 중 하나라도 포함 OR course.concept 부분일치
+        if (concept) {
+            const tokens = concept
+                .split(",")
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0);
+            if (tokens.length > 0) {
+                andWhere.push({
+                    OR: [
+                        { concept: { contains: concept, mode: "insensitive" } },
+                        {
+                            courseDetail: {
+                                is: {
+                                    OR: tokens.map((t) => ({
+                                        course_type: { contains: t, mode: "insensitive" },
+                                    })),
+                                },
+                            },
+                        },
+                    ],
+                });
+            }
+        }
+
+        // 지역 필터
+        if (regionQuery) {
+            andWhere.push({
+                region: {
+                    contains: regionQuery,
+                    mode: "insensitive",
+                },
+            });
+        }
+
+        // 태그 OR 매칭
+        if (tagIdsParam) {
+            const tagIdsArr = tagIdsParam
+                .split(",")
+                .map((v) => Number(v))
+                .filter((n) => Number.isFinite(n));
+            if (tagIdsArr.length > 0) {
+                andWhere.push({
+                    CourseTagToCourses: {
+                        some: {
+                            course_tags: {
+                                id: { in: tagIdsArr },
+                            },
+                        },
+                    },
+                });
+            }
+        }
+
         const prismaQuery: any = {
-            where: {
-                ...(concept ? { concept } : {}),
-                ...(q
-                    ? {
-                          OR: [
-                              { title: { contains: q, mode: "insensitive" } },
-                              { description: { contains: q, mode: "insensitive" } },
-                              { concept: { contains: q, mode: "insensitive" } },
-                              { region: { contains: q, mode: "insensitive" } },
-                              // 포함된 장소 이름/주소까지 검색 범위 확장
-                              {
-                                  coursePlaces: {
-                                      some: {
-                                          place: {
-                                              OR: [
-                                                  { name: { contains: q, mode: "insensitive" } },
-                                                  { address: { contains: q, mode: "insensitive" } },
-                                              ],
-                                          },
-                                      },
-                                  },
-                              },
-                          ],
-                      }
-                    : {}),
-                ...(regionQuery
-                    ? {
-                          region: {
-                              contains: regionQuery,
-                              mode: "insensitive",
-                          },
-                      }
-                    : {}),
-                ...(tagIdsParam
-                    ? {
-                          // 코스가 선택된 태그 중 하나라도 매칭되면 포함
-                          CourseTagToCourses: {
-                              some: {
-                                  course_tags: {
-                                      id: { in: tagIdsParam.split(",").map((v) => Number(v)).filter((n) => Number.isFinite(n)) },
-                                  },
-                              },
-                          },
-                      }
-                    : {}),
-            },
+            where: andWhere.length > 0 ? { AND: andWhere } : {},
             orderBy: [{ id: "desc" }],
             take: effectiveLimit,
             skip: effectiveOffset,
@@ -98,6 +133,7 @@ export async function GET(request: NextRequest) {
                 region: true,
                 imageUrl: true,
                 concept: true,
+                courseDetail: { select: { course_type: true } },
                 rating: true,
                 current_participants: true,
                 view_count: true,
