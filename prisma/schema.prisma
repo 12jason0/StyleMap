@@ -161,7 +161,7 @@ model Course {
 model CourseDetail {
   id               Int      @id @default(autoincrement())
   course_id        Int      @unique
-  recommended_time String?  @db.VarChar(100)
+  recommended_start_time String?  @db.VarChar(100)
   season           String?  @db.VarChar(50)
   course_type      String?  @db.VarChar(50)
   transportation   String?  @db.VarChar(50)
