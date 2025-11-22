@@ -1348,7 +1348,7 @@ function EscapeIntroPageInner() {
         const FRAME_OVERLAP = 6;
 
         // DB에서 템플릿 조회
-        let bgUrl = "/images/hongdaelatter_template.jpg";
+        let bgUrl = "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/hongdaeEscape_tamplete.png";
         let framesFromDB: Array<{ x: number; y: number; w: number; h: number }> | null = null;
         try {
             const res = await fetch("/api/collages/templates", { cache: "no-store" });
@@ -1584,7 +1584,7 @@ function EscapeIntroPageInner() {
 
     // 템플릿 배경 이미지 URL 해석 (DB 템플릿 우선, 없으면 기본값)
     const resolveTemplateBackgroundUrl = async (): Promise<string> => {
-        let bgUrl = "/images/hongdaelatter_template.jpg";
+        let bgUrl = "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/hongdaeEscape_tamplete.png";
         try {
             const res = await fetch("/api/collages/templates", { cache: "no-store" });
             const data = await res.json();
@@ -2950,7 +2950,7 @@ function EscapeIntroPageInner() {
                                                     onClick={async () => {
                                                         if (selectedGallery.length !== 4) return;
                                                         try {
-                                                            let bgUrl = "/images/hongdaelatter_template.jpg";
+                                                            let bgUrl = "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/hongdaeEscape_tamplete.png";
                                                             let frames: Array<{
                                                                 x: number;
                                                                 y: number;
