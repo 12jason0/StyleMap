@@ -10,6 +10,9 @@ type CompletionModalProps = {
 export default function CompletionModal({ isOpen, onClose }: CompletionModalProps) {
     const [animate, setAnimate] = useState(false);
     const [giftOpened, setGiftOpened] = useState(false);
+    const [particles, setParticles] = useState<
+        Array<{ id: number; left: number; delay: number; duration: number; size: number; type: "star" | "heart" }>
+    >([]);
 
     useEffect(() => {
         if (isOpen) {
@@ -46,6 +49,23 @@ export default function CompletionModal({ isOpen, onClose }: CompletionModalProp
                 aria-modal="true"
                 role="dialog"
             >
+                {giftOpened &&
+                    particles.map((p) => (
+                        <div
+                            key={p.id}
+                            style={{
+                                position: "fixed",
+                                left: `${p.left}%`,
+                                top: "-20px",
+                                fontSize: p.size,
+                                animation: `fallDown ${p.duration}s linear ${p.delay}s forwards`,
+                                pointerEvents: "none",
+                                zIndex: 1,
+                            }}
+                        >
+                            {p.type === "star" ? "✨" : "💚"}
+                        </div>
+                    ))}
                 <div
                     style={{
                         background: "white",
@@ -56,6 +76,7 @@ export default function CompletionModal({ isOpen, onClose }: CompletionModalProp
                         textAlign: "center",
                         boxShadow: "0 20px 60px rgba(0, 0, 0, 0.15)",
                         animation: animate ? "modalSlideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)" : "none",
+                        zIndex: 2,
                     }}
                 >
                     <div
@@ -120,7 +141,19 @@ export default function CompletionModal({ isOpen, onClose }: CompletionModalProp
 
                     {!giftOpened ? (
                         <div
-                            onClick={() => setGiftOpened(true)}
+                            onClick={() => {
+                                setGiftOpened(true);
+                                setParticles(
+                                    Array.from({ length: 100 }).map((_, i) => ({
+                                        id: i,
+                                        left: Math.random() * 100,
+                                        delay: Math.random() * 0.2,
+                                        duration: 2 + Math.random() * 0.8,
+                                        size: 10 + Math.random() * 4,
+                                        type: Math.random() > 0.5 ? "star" : "heart",
+                                    }))
+                                );
+                            }}
                             style={{
                                 background: "linear-gradient(135deg, #f0fdf4 0%, #f0fdf4 100%)",
                                 border: "2px solid #26a853",
@@ -184,14 +217,6 @@ export default function CompletionModal({ isOpen, onClose }: CompletionModalProp
                                 animation: "rewardReveal 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
                             }}
                         >
-                            <div
-                                style={{
-                                    fontSize: "24px",
-                                    animation: "rewardPop 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards",
-                                }}
-                            >
-                                🎉
-                            </div>
                             <div style={{ textAlign: "center" }}>
                                 <div style={{ fontSize: "10px", color: "#666", marginBottom: "6px" }}>보상 획득</div>
                                 <div style={{ fontSize: "14px", fontWeight: 700, color: "#26a853" }}>쿠폰 2개</div>
@@ -280,6 +305,10 @@ export default function CompletionModal({ isOpen, onClose }: CompletionModalProp
           0% { transform: scale(0) rotate(-30deg); opacity: 0; }
           50% { transform: scale(1.3) rotate(10deg); }
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes fallDown {
+          0% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(100vh) rotate(360deg); }
         }
       `}</style>
         </div>
