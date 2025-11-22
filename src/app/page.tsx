@@ -10,6 +10,7 @@ import Image from "@/components/ImageFallback";
 import SectionHeader from "@/components/SectionHeader";
 import HeroSlider from "@/components/HeroSlider";
 import OnboardingSection from "@/components/OnboardingSection";
+import CompletionModal from "@/components/CompletionModal";
 
 type Course = {
     id: string;
@@ -43,6 +44,7 @@ export default function Home() {
     const [isSignup, setIsSignup] = useState(false);
     const [showLoginRequiredModal, setShowLoginRequiredModal] = useState(false);
     const [showCheckinModal, setShowCheckinModal] = useState(false);
+    const [showRewardModal, setShowRewardModal] = useState(false);
     const [weekStamps, setWeekStamps] = useState<boolean[]>([false, false, false, false, false, false, false]);
     const [animStamps, setAnimStamps] = useState<boolean[] | null>(null);
     const [isStamping, setIsStamping] = useState(false);
@@ -130,15 +132,21 @@ export default function Home() {
         }
     };
 
-    // 태그 목록 불러오기
+    // 태그 목록 불러오기 (초기 페인트 후 유휴 시간에)
     useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/api/course-tags", { cache: "no-store" });
-                const data = await res.json().catch(() => ({}));
-                if (data?.success && Array.isArray(data.tags)) setAllTags(data.tags);
-            } catch {}
-        })();
+        const idle = (cb: () => void) =>
+            "requestIdleCallback" in window
+                ? (window as any).requestIdleCallback(cb, { timeout: 1200 })
+                : setTimeout(cb, 1);
+        idle(() => {
+            (async () => {
+                try {
+                    const res = await fetch("/api/course-tags", { cache: "no-store" });
+                    const data = await res.json().catch(() => ({}));
+                    if (data?.success && Array.isArray(data.tags)) setAllTags(data.tags);
+                } catch {}
+            })();
+        });
     }, []);
 
     const buildCourseListUrl = () => {
@@ -233,14 +241,18 @@ export default function Home() {
     const fetchAndSetWeekStamps = async (): Promise<{
         stamps: boolean[];
         todayChecked: boolean;
+        todayIndex?: number | null;
+        streak?: number;
+        weekCount?: number;
     } | null> => {
         const result = await fetchWeekStamps();
         if (!result) return null;
-        const { stamps, todayChecked } = result;
+        const { stamps, todayChecked } = result as any;
         setWeekStamps(stamps);
         setCycleProgress((stamps.filter(Boolean).length % 7) as number);
         setAlreadyToday(todayChecked);
-        return result;
+        if (typeof (result as any).streak === "number") setStreak(Number((result as any).streak));
+        return result as any;
     };
 
     const maybeOpenCheckinModal = async () => {
@@ -248,39 +260,56 @@ export default function Home() {
             const token = localStorage.getItem("authToken");
             if (!token) return;
 
-            const todayKey = getLocalTodayKey();
-            const shownDate = localStorage.getItem("checkinModalShownDate");
-            const checkinButtonPressed = localStorage.getItem(`checkinButtonPressed_${todayKey}`) === "true";
-
-            // 오늘 이미 출석체크 버튼을 눌렀거나, 오늘 이미 모달을 표시했으면 표시하지 않음 (하루에 한 번만)
-            if (checkinButtonPressed || (shownDate === todayKey && !showCheckinModal)) {
-                return;
-            }
-
             // 항상 최신 데이터를 가져옴
             const result = await fetchAndSetWeekStamps();
             if (!result) return;
 
             const already = Boolean(result.todayChecked);
-            const dismissedDate = localStorage.getItem("checkinModalDismissedDate");
 
             setAnimStamps(null);
 
-            // 오늘 출석했지만 출석체크 버튼을 안 눌렀으면 표시
-            if (already && !checkinButtonPressed) {
+            // 오늘 미출석이면 홈 진입 시마다 모달을 즉시 표시
+            if (!already) {
+                // 모달 노출 전에 최신 streak 정보를 동기화
+                try {
+                    const token2 = localStorage.getItem("authToken");
+                    const res = await fetch("/api/users/checkins", {
+                        headers: token2 ? { Authorization: `Bearer ${token2}` } : {},
+                        cache: "no-store",
+                    });
+                    if (res.ok) {
+                        const d = await res.json().catch(() => ({}));
+                        if (Number.isFinite(Number(d?.streak))) {
+                            setStreak(Number(d.streak));
+                        }
+                    }
+                } catch {}
+                // 서버 weekStamps가 불완전한 경우, streak와 todayIndex 기반으로 '어제까지' 도장을 채워 표시
+                try {
+                    const expected = Math.min(7, Number(result?.streak || 0));
+                    const tIdx = typeof result?.todayIndex === "number" ? (result?.todayIndex as number) : null;
+                    if (expected > 0 && tIdx !== null) {
+                        const currentTrue = (result?.stamps || []).filter(Boolean).length;
+                        if (currentTrue < expected) {
+                            // todayIndex가 0이면 서버 사이클이 '오늘부터' 시작하므로, 좌측부터 expected개를 채워 보정
+                            if (tIdx === 0) {
+                                const pre = new Array(7).fill(false);
+                                for (let i = 0; i < Math.min(7, expected); i++) pre[i] = true;
+                                setWeekStamps(pre);
+                            } else {
+                                const pre = (result?.stamps || new Array(7).fill(false)).slice(0, 7);
+                                // 어제까지 expected개: [tIdx - expected, tIdx - 1]
+                                const start = Math.max(0, tIdx - expected);
+                                const end = Math.max(-1, tIdx - 1);
+                                for (let i = start; i <= end; i++) pre[i] = true;
+                                setWeekStamps(pre);
+                            }
+                        }
+                    }
+                } catch {}
                 setStampCompleted(false);
                 setShowCheckinModal(true);
                 hasShownCheckinModalRef.current = true;
-                localStorage.setItem("checkinModalShownDate", todayKey);
-                return;
-            }
-
-            // 오늘 출석 안 했고, 오늘 닫지 않았을 때만 표시
-            if (!already && dismissedDate !== todayKey) {
-                setStampCompleted(false);
-                setShowCheckinModal(true);
-                hasShownCheckinModalRef.current = true;
-                localStorage.setItem("checkinModalShownDate", todayKey);
             }
         } catch (e) {
             console.error("출석체크 모달 오픈 실패:", e);
@@ -324,7 +353,16 @@ export default function Home() {
         };
     }, []);
 
+    // 홈 진입 시 즉시 출석 모달 확인 (로그인 상태)
+    useEffect(() => {
+        const token = localStorage.getItem("authToken");
+        if (token) {
+            maybeOpenCheckinModal();
+        }
+    }, []);
+
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const topCourses = courses.slice(0, 5);
     const hotCourses = courses
         .slice()
@@ -371,7 +409,13 @@ export default function Home() {
     };
 
     useEffect(() => {
-        fetchRecommendations();
+        const idle = (cb: () => void) =>
+            "requestIdleCallback" in window
+                ? (window as any).requestIdleCallback(cb, { timeout: 1200 })
+                : setTimeout(cb, 1);
+        idle(() => {
+            fetchRecommendations();
+        });
     }, []);
 
     // 로그인 상태 변경 시 추천 다시 가져오기
@@ -381,6 +425,33 @@ export default function Home() {
         };
         window.addEventListener("authTokenChange", handleAuthChange as EventListener);
         return () => window.removeEventListener("authTokenChange", handleAuthChange as EventListener);
+    }, []);
+
+    // 출석 업데이트를 전역 이벤트로 수신하여 위젯/모달 상태를 즉시 갱신
+    useEffect(() => {
+        const onCheckinUpdated = (e: Event) => {
+            const d = (e as CustomEvent).detail || {};
+            if (Array.isArray(d.weekStamps)) setWeekStamps(d.weekStamps as boolean[]);
+            if (typeof d.streak === "number") setStreak(Number(d.streak));
+            if (d.todayChecked) setAlreadyToday(true);
+        };
+        window.addEventListener("checkinUpdated", onCheckinUpdated as EventListener);
+        return () => window.removeEventListener("checkinUpdated", onCheckinUpdated as EventListener);
+    }, []);
+
+    // 미리보기: 토스트 테스트 (콘솔에서 window.previewCheckinToast() 호출 또는 ?toast=checkin7)
+    useEffect(() => {
+        try {
+            (window as any).previewCheckinToast = () => {
+                setShowRewardModal(true);
+            };
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("toast") === "checkin7") {
+                setShowRewardModal(true);
+                const clean = window.location.pathname;
+                window.history.replaceState({}, "", clean);
+            }
+        } catch {}
     }, []);
 
     const handleStartOnboarding = () => {
@@ -408,6 +479,24 @@ export default function Home() {
                     </div>
                 </div>
             )}
+            {successMessage && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+                        <div className="text-5xl mb-2">🎉</div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">축하합니다!</h3>
+                        <p className="text-gray-700 mb-4">{successMessage}</p>
+                        <div className="flex justify-center">
+                            <button
+                                onClick={() => setSuccessMessage(null)}
+                                className="hover:cursor-pointer px-6 py-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:from-green-600 hover:to-emerald-600"
+                            >
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <CompletionModal isOpen={showRewardModal} onClose={() => setShowRewardModal(false)} />
             {showWelcome && (
                 <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-lg shadow-lg animate-fade-in hover:cursor-pointer">
                     <div className="flex items-center space-x-2">
@@ -538,6 +627,9 @@ export default function Home() {
                     <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
                         <h3 className="text-lg font-bold text-gray-900 mb-2">출석 체크</h3>
                         <p className="text-gray-600 mb-1">이번 주 출석 현황</p>
+                        {streak > 0 && (
+                            <p className="text-sm text-emerald-700 mb-2 font-semibold">🔥 {streak}일 연속 출석 중</p>
+                        )}
                         {alreadyToday && <p className="text-sm text-green-600 mb-3">오늘 이미 출석했습니다</p>}
                         <div className="grid grid-cols-7 gap-2 mb-4">
                             {new Array(7).fill(0).map((_, i) => {
@@ -563,12 +655,6 @@ export default function Home() {
                                 <>
                                     <button
                                         onClick={() => {
-                                            // "나중에" 버튼: 오늘 출석했지만 버튼을 안 눌렀으면 dismissedDate 저장하지 않음
-                                            // (다시 메인으로 올 때 다시 표시되도록)
-                                            if (!alreadyToday) {
-                                                const todayKey = getLocalTodayKey();
-                                                localStorage.setItem("checkinModalDismissedDate", todayKey);
-                                            }
                                             setShowCheckinModal(false);
                                         }}
                                         className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
@@ -600,15 +686,23 @@ export default function Home() {
                                                     localStorage.setItem(`checkinButtonPressed_${todayKey}`, "true");
                                                     return;
                                                 }
-                                                // 서버에서 받은 weekStamps를 사용
-                                                if (Array.isArray(data.weekStamps)) {
-                                                    setWeekStamps(data.weekStamps as boolean[]);
-                                                }
+                                                // 서버에서 받은 weekCount/streak 등 보조정보는 즉시 반영
                                                 if (typeof data.weekCount === "number") {
                                                     setCycleProgress((data.weekCount % 7) as number);
                                                 }
                                                 if (typeof (data as any).streak === "number") {
                                                     setStreak((data as any).streak);
+                                                    try {
+                                                        window.dispatchEvent(
+                                                            new CustomEvent("checkinUpdated", {
+                                                                detail: {
+                                                                    streak: (data as any).streak,
+                                                                    weekStamps: data.weekStamps,
+                                                                    todayChecked: false,
+                                                                },
+                                                            })
+                                                        );
+                                                    } catch {}
                                                 }
 
                                                 // 애니메이션: 오늘 날짜에 해당하는 인덱스에만 도장 찍기
@@ -623,9 +717,35 @@ export default function Home() {
                                                     setIsStamping(false);
                                                     setStampCompleted(true);
                                                     const todayKey = getLocalTodayKey();
-                                                    localStorage.setItem("checkinModalDismissedDate", todayKey);
                                                     localStorage.setItem(`checkinButtonPressed_${todayKey}`, "true");
+                                                    try {
+                                                        window.dispatchEvent(
+                                                            new CustomEvent("checkinUpdated", {
+                                                                detail: {
+                                                                    streak: (data as any).streak,
+                                                                    weekStamps: data.weekStamps,
+                                                                    todayChecked: true,
+                                                                },
+                                                            })
+                                                        );
+                                                    } catch {}
+                                                    if (data.awarded) {
+                                                        setShowRewardModal(true);
+                                                    }
                                                     return;
+                                                }
+
+                                                // 기존(어제까지) 출석은 그대로 보이되, 오늘 건만 비워둔 상태로 먼저 렌더링
+                                                if (Array.isArray(data.weekStamps)) {
+                                                    const serverStamps = (data.weekStamps as boolean[]).slice(0, 7);
+                                                    if (targetIdx >= 0 && targetIdx < serverStamps.length) {
+                                                        const preStamps = serverStamps.slice();
+                                                        preStamps[targetIdx] = false; // 오늘 스탬프만 잠시 비움
+                                                        setWeekStamps(preStamps);
+                                                    } else {
+                                                        // 범위 밖이면 전체를 바로 반영
+                                                        setWeekStamps(serverStamps);
+                                                    }
                                                 }
 
                                                 setAnimStamps([false, false, false, false, false, false, false]);
@@ -643,13 +763,25 @@ export default function Home() {
                                                         setAnimStamps(null);
                                                         setIsStamping(false);
                                                         setStampCompleted(true);
-                                                        // 출석체크 버튼을 눌렀을 때만 dismissedDate 저장 및 버튼 눌림 표시
                                                         const todayKey = getLocalTodayKey();
-                                                        localStorage.setItem("checkinModalDismissedDate", todayKey);
                                                         localStorage.setItem(
                                                             `checkinButtonPressed_${todayKey}`,
                                                             "true"
                                                         );
+                                                        try {
+                                                            window.dispatchEvent(
+                                                                new CustomEvent("checkinUpdated", {
+                                                                    detail: {
+                                                                        streak: (data as any).streak,
+                                                                        weekStamps: data.weekStamps,
+                                                                        todayChecked: true,
+                                                                    },
+                                                                })
+                                                            );
+                                                        } catch {}
+                                                        if (data.awarded) {
+                                                            setShowRewardModal(true);
+                                                        }
                                                     }, 800);
                                                 }, 50);
                                             } catch {
@@ -668,8 +800,6 @@ export default function Home() {
                             ) : (
                                 <button
                                     onClick={() => {
-                                        const todayKey = getLocalTodayKey();
-                                        localStorage.setItem("checkinModalDismissedDate", todayKey);
                                         setShowCheckinModal(false);
                                         setAnimStamps(null);
                                         setStampCompleted(false);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import Header from "@/components/Header";
+import Link from "next/link";
 
 type Course = {
     id: string;
@@ -578,16 +579,16 @@ export default function AdminPage() {
                         </form>
                     </div>
                 ) : null}
-                <div className="text-center">
-                    <a href="/admin/notifications" className="text-blue-500">
-                        홍보 알람 보내기
-                    </a>
-                </div>
-                <div className="text-center">
-                    <a href="/admin/escape-stories" className="text-blue-500">
-                        escape 스토리 생성
-                    </a>
-                </div>
+				<div className="text-center">
+					<Link href="/admin/notifications" className="text-blue-500">
+						홍보 알람 보내기
+					</Link>
+				</div>
+				<div className="text-center">
+					<Link href="/admin/escape-stories" className="text-blue-500">
+						escape 스토리 생성
+					</Link>
+				</div>
 
                 {adminAuthed && (
                     <>

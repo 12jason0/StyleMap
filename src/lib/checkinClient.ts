@@ -5,6 +5,9 @@
 export type WeekStampsResult = {
     stamps: boolean[];
     todayChecked: boolean;
+    todayIndex?: number | null;
+    streak?: number;
+    weekCount?: number;
 };
 
 export async function fetchWeekStamps(): Promise<WeekStampsResult | null> {
@@ -24,7 +27,10 @@ export async function fetchWeekStamps(): Promise<WeekStampsResult | null> {
             ? (data.weekStamps as boolean[])
             : new Array(7).fill(false);
         const todayChecked = Boolean(data?.todayChecked);
-        return { stamps, todayChecked };
+        const todayIndex = typeof data?.todayIndex === "number" ? (data.todayIndex as number) : null;
+        const streak = Number.isFinite(Number(data?.streak)) ? Number(data?.streak) : undefined;
+        const weekCount = Number.isFinite(Number(data?.weekCount)) ? Number(data?.weekCount) : undefined;
+        return { stamps, todayChecked, todayIndex, streak, weekCount };
     } catch {
         return null;
     }

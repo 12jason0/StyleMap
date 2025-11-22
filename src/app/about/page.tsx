@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "@/components/ImageFallback";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface Course {
     id: string;
@@ -40,6 +42,7 @@ interface Review {
 }
 
 const AboutPage = () => {
+	const router = useRouter();
     const [courseCount, setCourseCount] = useState<number>(0);
     const [courses, setCourses] = useState<Course[]>([]);
     const [reviews, setReviews] = useState<Review[]>([]);
@@ -359,8 +362,8 @@ const AboutPage = () => {
                                         courses.map((course) => (
                                             <div key={course.id} className="w-full flex-shrink-0">
                                                 <div
-                                                    className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
-                                                    onClick={() => (window.location.href = `/courses/${course.id}`)}
+													className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+													onClick={() => router.push(`/courses/${course.id}`)}
                                                 >
                                                     <div className="h-40 relative">
                                                         <Image
@@ -576,18 +579,18 @@ const AboutPage = () => {
                             복잡한 계획 없이, 밀키트처럼 간편하게 완벽한 여행을 경험해보세요.
                         </p>
                         <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                            <a
-                                href="/personalized-home"
-                                className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-lg"
-                            >
-                                🎯 AI 추천 바로 가기
-                            </a>
-                            <a
-                                href="/map"
-                                className="bg-purple-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors text-lg"
-                            >
-                                🗺️ 지도에서 탐색하기
-                            </a>
+							<Link
+								href="/personalized-home"
+								className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors text-lg"
+							>
+								🎯 AI 추천 바로 가기
+							</Link>
+							<Link
+								href="/map"
+								className="bg-purple-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors text-lg"
+							>
+								🗺️ 지도에서 탐색하기
+							</Link>
                         </div>
                     </div>
                 </section>

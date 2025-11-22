@@ -144,21 +144,12 @@ export async function GET(request: NextRequest) {
             return d >= todayStart && d < todayEnd;
         });
 
-        // 오늘 제외한 과거 출석만으로 유효 스트릭 계산
-        const checkinsExcludingToday = checkins.filter((c: { date: Date }) => new Date(c.date) < todayStart);
-        // "오늘 제외" 연속 스트릭은 기준 시점을 어제로 두어 계산
-        const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const streak = computeEffectiveStreak(checkinsExcludingToday, yesterday);
+        // 유효 스트릭 계산 (오늘 포함하여 계산)
+        const streak = computeEffectiveStreak(checkins, now);
 
         // 실제 출석 날짜를 기반으로 올바른 배열 생성
         const { stamps: weekStamps, todayIndex } = buildCycleStamps(checkins, now);
-        // 오늘 미체크 상태에서 "오늘 제외 연속 출석"이 존재하면 오늘 칸을 미리 표시(프리마킹)
-        if (!todayChecked && typeof todayIndex === "number" && todayIndex >= 0) {
-            if (streak > 0 && !weekStamps[todayIndex]) {
-                weekStamps[todayIndex] = true;
-            }
-        }
+        // 프리마킹 제거: 오늘 미체크 상태에서는 오늘 칸을 채우지 않습니다.
         const weekCount = Math.min(7, Math.max(0, streak));
 
         return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps, todayIndex });
@@ -220,24 +211,18 @@ export async function POST(request: NextRequest) {
         );
 
         let awarded = false;
-        // 7개 달성 시 쿠폰 3개 + 물 주기 2개 지급 — 당일 중복 보상 방지
+        // 7개 달성 시 쿠폰 2개 지급 — 당일 중복 보상 방지
         if (effectiveStreak === 7 && !hasRewardedToday) {
             await (prisma as any).$transaction([
-                // 쿠폰 보상 기록
+                // 쿠폰 보상 기록 (2개)
                 (prisma as any).userReward.create({
-                    data: { userId, type: "checkin", amount: 3, unit: "coupon" as any },
+                    data: { userId, type: "checkin", amount: 2, unit: "coupon" as any },
                 }),
-                // 물 주기 보상 기록
-                (prisma as any).userReward.create({
-                    data: { userId, type: "checkin", amount: 2, unit: "water" as any },
-                }),
-                // 유저 데이터 업데이트 (쿠폰 3 + 물 2)
+                // 유저 데이터 업데이트 (쿠폰 2)
                 (prisma as any).user.update({
                     where: { id: userId },
                     data: {
-                        couponCount: { increment: 3 },
-                        waterStock: { increment: 2 },
-                        totalWaterGiven: { increment: 2 },
+                        couponCount: { increment: 2 },
                     },
                 }),
                 // 체크인 보상 완료 표시
@@ -254,7 +239,7 @@ export async function POST(request: NextRequest) {
             weekCount,
             weekStamps,
             todayIndex,
-            rewardAmount: awarded ? 3 : 0,
+            rewardAmount: awarded ? 2 : 0,
         });
     } catch (e) {
         return NextResponse.json({ success: false, error: "SERVER_ERROR" }, { status: 500 });

@@ -436,7 +436,7 @@ function CoursesPageInner() {
                                         () => {}
                                     );
                                 } catch {}
-                                window.location.href = `/courses/${course.id}`;
+								router.push(`/courses/${course.id}`);
                             }}
                         >
                             {/* 이미지 */}
