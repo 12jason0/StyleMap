@@ -1,5 +1,79 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { resolveUserId } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
+
+// GET /api/users/casefiles
+// Returns the current user's completed escape case files
+export async function GET(request: NextRequest) {
+	try {
+		const userIdStr = resolveUserId(request);
+		if (!userIdStr) return NextResponse.json({ items: [] }, { status: 200 });
+		const userId = Number(userIdStr);
+		if (!Number.isFinite(userId) || userId <= 0) return NextResponse.json({ items: [] }, { status: 200 });
+
+		// Completed escapes with story info
+		const completed = await prisma.completedEscape.findMany({
+			where: { userId },
+			orderBy: { completedAt: "desc" },
+			select: {
+				storyId: true,
+				completedAt: true,
+				story: {
+					select: {
+						id: true,
+						title: true,
+						synopsis: true,
+						region: true,
+						imageUrl: true,
+						reward_badge: { select: { id: true, name: true, image_url: true } },
+					},
+				},
+			},
+		});
+
+		if (completed.length === 0) {
+			return NextResponse.json({ items: [] }, { status: 200 });
+		}
+
+		// Optional: collage count per story for the user
+		const storyIds = Array.from(new Set(completed.map((c) => c.storyId))).filter((v) => Number.isFinite(v));
+		const collages = await prisma.userCollage.findMany({
+			where: { userId, storyId: { in: storyIds as number[] } },
+			select: { storyId: true, id: true },
+		});
+		const collageCountByStoryId = collages.reduce<Record<number, number>>((acc, row) => {
+			if (typeof row.storyId === "number") acc[row.storyId] = (acc[row.storyId] || 0) + 1;
+			return acc;
+		}, {});
+
+		const items = completed.map((c) => ({
+			story_id: c.storyId,
+			title: c.story?.title ?? "",
+			synopsis: c.story?.synopsis ?? "",
+			region: c.story?.region ?? null,
+			imageUrl: c.story?.imageUrl ?? null,
+			completedAt: c.completedAt?.toISOString?.() ?? null,
+			badge: c.story?.reward_badge
+				? {
+						id: c.story.reward_badge.id,
+						name: c.story.reward_badge.name,
+						image_url: c.story.reward_badge.image_url ?? null,
+				  }
+				: null,
+			photoCount: collageCountByStoryId[c.storyId] || 0,
+		}));
+
+		return NextResponse.json({ items });
+	} catch (e: any) {
+		console.error("[/api/users/casefiles] GET error:", e);
+		return NextResponse.json({ items: [] }, { status: 200 });
+	}
+}
+
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/db";
 import jwt from "jsonwebtoken";
 import { getJwtSecret, getUserIdFromRequest, resolveUserId as resolveUserIdFromAuth } from "@/lib/auth";
 
