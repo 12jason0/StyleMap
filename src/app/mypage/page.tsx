@@ -140,6 +140,7 @@ const MyPage = () => {
     const [selectedCaseStoryId, setSelectedCaseStoryId] = useState<number | null>(null);
     const [selectedCaseTitle, setSelectedCaseTitle] = useState("");
     const [casePhotoUrls, setCasePhotoUrls] = useState<string[]>([]);
+    const [fullImageUrl, setFullImageUrl] = useState<string | null>(null);
     const [casePhotoLoading, setCasePhotoLoading] = useState(false);
     const [rewards, setRewards] = useState<UserRewardRow[]>([]);
     const [checkins, setCheckins] = useState<UserCheckinRow[]>([]);
@@ -1304,7 +1305,9 @@ const MyPage = () => {
                                                         className="w-full h-full object-cover rounded cursor-zoom-in"
                                                     />
                                                 </div>
-                                                <div className="mt-2 text-xs text-gray-500">클릭하면 전체 화면으로 확대됩니다</div>
+                                                <div className="mt-2 text-xs text-gray-500">
+                                                    클릭하면 전체 화면으로 확대됩니다
+                                                </div>
                                             </button>
                                         ))}
                                     </div>

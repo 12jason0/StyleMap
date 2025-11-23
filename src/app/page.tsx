@@ -305,6 +305,16 @@ export default function Home() {
                                 setWeekStamps(pre);
                             }
                         }
+                    } else if (expected > 0) {
+                        // todayIndex를 전달받지 못한 경우: streak 기반으로 '어제까지' 미리 채워서 빈 화면 방지
+                        // 예: streak=6이면 [true,true,true,true,true,false,false] 형태로 표시
+                        const currentTrue = (result?.stamps || []).filter(Boolean).length;
+                        if (currentTrue < expected) {
+                            const fillCount = Math.max(0, Math.min(6, expected - 1)); // 오늘은 비워두기
+                            const pre = new Array(7).fill(false);
+                            for (let i = 0; i < fillCount; i++) pre[i] = true;
+                            setWeekStamps(pre);
+                        }
                     }
                 } catch {}
                 setStampCompleted(false);
