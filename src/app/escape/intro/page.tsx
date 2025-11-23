@@ -504,6 +504,15 @@ function EscapeIntroPageInner() {
     const [resumed, setResumed] = useState<boolean>(false);
     const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
     const [selectedGallery, setSelectedGallery] = useState<string[]>([]);
+    // 콜라주 1회 저장 제어를 위한 키/상태
+    const COLLAGE_URL_KEY = useMemo(() => `escape_collage_url_${storyId}`, [storyId]);
+    const [savedCollageUrl, setSavedCollageUrl] = useState<string | null>(null);
+    useEffect(() => {
+        try {
+            const u = localStorage.getItem(COLLAGE_URL_KEY);
+            if (u) setSavedCollageUrl(u);
+        } catch {}
+    }, [COLLAGE_URL_KEY]);
     // 사진 자리 교체를 위한 첫 번째 선택
     const [swapFrom, setSwapFrom] = useState<string | null>(null);
     const collageCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1616,6 +1625,18 @@ function EscapeIntroPageInner() {
     // 콜라주 자동 저장: 캔버스 → 업로드 → /api/collages 저장
     const autoSaveCollage = async (): Promise<string | null> => {
         try {
+            // 이미 저장된 URL이 있으면 그대로 재사용 (1회만 저장)
+            if (savedCollageUrl && typeof savedCollageUrl === "string") {
+                return savedCollageUrl;
+            }
+            try {
+                const fromStorage = typeof window !== "undefined" ? localStorage.getItem(COLLAGE_URL_KEY) : null;
+                if (fromStorage) {
+                    setSavedCollageUrl(fromStorage);
+                    return fromStorage;
+                }
+            } catch {}
+
             const blob = await getCollageBlob();
             if (!blob) return null;
             const form = new FormData();
@@ -1633,6 +1654,10 @@ function EscapeIntroPageInner() {
                     body: JSON.stringify({ storyId, collageUrl: url }),
                 });
             } catch {}
+            try {
+                localStorage.setItem(COLLAGE_URL_KEY, url);
+            } catch {}
+            setSavedCollageUrl(url);
             return url;
         } catch {
             return null;
@@ -1776,28 +1801,23 @@ function EscapeIntroPageInner() {
                 Kakao.init(jsKey);
             }
 
-            // 카카오톡 공유 실행 (JS SDK만 사용 - 무료 방식)
+            // 카카오톡 공유 실행 (이미지 단독 공유: 링크를 이미지 URL로 설정, 버튼 제거)
             setToast("카카오톡 공유 창을 여는 중...");
             Kakao.Share.sendDefault({
                 objectType: "feed",
                 content: {
-                    title: "DoNa Escape 콜라주",
-                    description: "나의 콜라주를 카카오톡으로 공유해요",
+                    // feed 템플릿은 title 필수 → 최소 텍스트로 설정
+                    title: "이미지 보기",
+                    // 설명은 생략하여 이미지 중심 카드로 표시
+                    description: "",
                     imageUrl: imageUrl,
+                    // 클릭 시 이미지 원본으로 열리도록 링크를 이미지로 지정
                     link: {
-                        mobileWebUrl: landingUrl,
-                        webUrl: landingUrl,
+                        mobileWebUrl: imageUrl,
+                        webUrl: imageUrl,
                     },
                 },
-                buttons: [
-                    {
-                        title: "열어보기",
-                        link: {
-                            mobileWebUrl: landingUrl,
-                            webUrl: landingUrl,
-                        },
-                    },
-                ],
+                // 버튼 없이 이미지 링크만 제공
             });
 
             setToast("카카오톡 공유 창이 열렸어요!");

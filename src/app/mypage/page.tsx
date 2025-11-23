@@ -1245,6 +1245,28 @@ const MyPage = () => {
                 )}
                 {activeTab === "rewards" && renderRewardsTab()}
                 {activeTab === "checkins" && renderCheckinsTab()}
+                {/* 전체 화면 이미지 뷰어 */}
+                {fullImageUrl && (
+                    <div
+                        className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4"
+                        role="dialog"
+                        aria-modal="true"
+                        onClick={() => setFullImageUrl(null)}
+                    >
+                        <button
+                            onClick={() => setFullImageUrl(null)}
+                            className="absolute top-4 right-4 px-3 py-1.5 rounded-lg bg-white/90 text-gray-900 hover:bg-white shadow"
+                        >
+                            닫기
+                        </button>
+                        <img
+                            src={fullImageUrl}
+                            alt="full"
+                            className="max-h-[90vh] max-w-[96vw] object-contain rounded"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                )}
                 {selectedCaseStoryId !== null && (
                     <div
                         className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
@@ -1268,17 +1290,22 @@ const MyPage = () => {
                                 {casePhotoLoading ? (
                                     <div className="py-16 text-center text-gray-600">불러오는 중...</div>
                                 ) : casePhotoUrls.length > 0 ? (
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                                        {casePhotoUrls.map((u, i) => (
-                                            <div key={i} className="bg-[#a5743a] rounded-xl p-2 shadow-inner">
+                                    <div className="grid grid-cols-1 gap-3 md:gap-4">
+                                        {casePhotoUrls.slice(0, 1).map((u, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => setFullImageUrl(u)}
+                                                className="bg-[#a5743a] rounded-xl p-2 shadow-inner text-left"
+                                            >
                                                 <div className="bg-[#f8f5ef] rounded-lg p-2 border-2 border-[#704a23]">
                                                     <img
                                                         src={u}
                                                         alt={`upload-${i}`}
-                                                        className="w-full h-full object-cover rounded"
+                                                        className="w-full h-full object-cover rounded cursor-zoom-in"
                                                     />
                                                 </div>
-                                            </div>
+                                                <div className="mt-2 text-xs text-gray-500">클릭하면 전체 화면으로 확대됩니다</div>
+                                            </button>
                                         ))}
                                     </div>
                                 ) : (
