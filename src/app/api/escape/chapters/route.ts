@@ -5,6 +5,11 @@ import prisma from "@/lib/db";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+// 텍스트 내 리터럴 "\n"을 실제 줄바꿈으로 변환 (한 줄 띄기 = 두 번 줄바꿈)
+const normalizeText = (v: unknown): string => {
+    return String(v ?? "").replace(/\\n/g, "\n\n");
+};
+
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -85,7 +90,7 @@ export async function GET(request: NextRequest) {
 
             const storyText = (representative.stories || [])
                 .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-                .map((s: any) => s.dialogue || s.narration || "")
+                .map((s: any) => normalizeText(s.dialogue || s.narration || ""))
                 .filter(Boolean)
                 .join("\n\n");
 
@@ -93,7 +98,11 @@ export async function GET(request: NextRequest) {
             const introDialogues = ((representative as any).placeDialogues || [])
                 .filter((d: any) => String(d?.type || "").toLowerCase() === "intro")
                 .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-                .map((d: any) => ({ speaker: d.speaker || "", role: d.role || "", text: d.message || "" }))
+                .map((d: any) => ({
+                    speaker: d.speaker || "",
+                    role: d.role || "",
+                    text: normalizeText(d.message || ""),
+                }))
                 .filter((d: any) => d.text);
 
             const base = {
@@ -142,8 +151,8 @@ export async function GET(request: NextRequest) {
                                       id: s.id,
                                       order: s.order,
                                       speaker: s.speaker,
-                                      dialogue: s.dialogue,
-                                      narration: s.narration,
+                                      dialogue: normalizeText(s.dialogue),
+                                      narration: normalizeText(s.narration),
                                   }))
                             : [],
                         // ✅ 모든 미션 배열 제공
@@ -180,7 +189,11 @@ export async function GET(request: NextRequest) {
             // 스토리 레벨 인트로(1챕터에만 적용) 우선, 없으면 장소 인트로, 그래도 없으면 PlaceStory 결합 텍스트
             const storyIntroMessages = (storyIntro || [])
                 .filter((d: any) => !d.placeId && String(d?.type || "").toLowerCase() === "intro")
-                .map((d: any) => ({ speaker: d.speaker || "", role: d.role || "", text: d.message || "" }))
+                .map((d: any) => ({
+                    speaker: d.speaker || "",
+                    role: d.role || "",
+                    text: normalizeText(d.message || ""),
+                }))
                 .filter((d: any) => d.text);
 
             const story_text =

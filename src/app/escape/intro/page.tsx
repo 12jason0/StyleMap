@@ -504,6 +504,28 @@ function EscapeIntroPageInner() {
     const [resumed, setResumed] = useState<boolean>(false);
     const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
     const [selectedGallery, setSelectedGallery] = useState<string[]>([]);
+    // 템플릿 프레임 수에 맞춰 선택 수를 제한
+    const [requiredPhotoCount, setRequiredPhotoCount] = useState<number>(4);
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/collages/templates", { cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                const list = Array.isArray(data?.templates) ? data.templates : [];
+                const t =
+                    list.find(
+                        (it: any) =>
+                            String(it?.name || "")
+                                .toLowerCase()
+                                .includes("hongdae") || String(it?.imageUrl || "").includes("hongdaelatter_template")
+                    ) || list[0];
+                const raw = (t?.framesJson ?? t?.frames_json) as any;
+                const frames = Array.isArray(raw) ? raw : [];
+                const cnt = Number.isFinite(frames.length) && frames.length > 0 ? frames.length : 4;
+                setRequiredPhotoCount(cnt);
+            } catch {}
+        })();
+    }, [storyId]);
     // 콜라주 1회 저장 제어를 위한 키/상태
     const COLLAGE_URL_KEY = useMemo(() => `escape_collage_url_${storyId}`, [storyId]);
     const [savedCollageUrl, setSavedCollageUrl] = useState<string | null>(null);
@@ -741,7 +763,7 @@ function EscapeIntroPageInner() {
         const BASE_H = baseH || 1920;
         const raw = (framePreviewTemplate as any)?.framesJson || (framePreviewTemplate as any)?.frames_json || [];
         const frames = Array.isArray(raw) ? raw : [];
-        const urls = selectedGallery.slice(0, 4);
+        const urls = selectedGallery.slice(0, requiredPhotoCount);
         const sx = iw / BASE_W;
         const sy = ih / BASE_H;
         return frames.slice(0, urls.length).map((f: any, i: number) => {
@@ -1332,18 +1354,18 @@ function EscapeIntroPageInner() {
             setSwapFrom(null);
             return;
         }
-        if (selectedGallery.length >= 4) return; // 최대 4장 제한 유지
+        if (selectedGallery.length >= requiredPhotoCount) return; // 최대 프레임 수 제한
         setSelectedGallery((prev) => [...prev, url]);
     };
 
     const renderCollage = async () => {
         const urls = (
             Array.isArray(selectedGallery) && selectedGallery.length > 0 ? selectedGallery : galleryUrls || []
-        ).slice(0, 4);
+        ).slice(0, requiredPhotoCount);
 
-        if (urls.length !== 4) {
-            console.warn("템플릿 합성에는 정확히 4장의 사진이 필요합니다");
-            setToast("4장의 사진을 선택해주세요");
+        if (urls.length !== requiredPhotoCount) {
+            console.warn("템플릿 합성에 필요한 사진 수가 부족합니다");
+            setToast(`사진 ${requiredPhotoCount}장을 선택해주세요`);
             return;
         }
 
@@ -1714,8 +1736,8 @@ function EscapeIntroPageInner() {
             setIsSharing(true);
 
             // 선택된 이미지 확인
-            if (selectedGallery.length !== 4) {
-                setToast("사진 4장을 선택해주세요");
+            if (selectedGallery.length !== requiredPhotoCount) {
+                setToast(`사진 ${requiredPhotoCount}장을 선택해주세요`);
                 setIsSharing(false);
                 return;
             }
@@ -2898,7 +2920,7 @@ function EscapeIntroPageInner() {
                             <div className="fixed inset-0 z-[2000] bg-black/40 flex items-end md:items-center justify-center p-2">
                                 <div className="w-[92vw] max-w-[520px] sm:max-w-[640px] max-h-[76vh] md:max-h-[86vh] rounded-2xl bg-white/85 backdrop-blur p-3 border shadow overflow-hidden flex flex-col">
                                     <h3 className="text-lg font-bold text-gray-800 mb-3">
-                                        엔딩 갤러리 (최대 4장 선택)
+                                        엔딩 갤러리 (최대 {requiredPhotoCount}장 선택)
                                     </h3>
                                     <div className="flex-1 overflow-auto pr-1 min-h-0">
                                         {galleryUrls.length === 0 ? (
@@ -2920,9 +2942,10 @@ function EscapeIntroPageInner() {
                                                                 alt="photo"
                                                                 className="w-full h-[78px] sm:h-24 object-cover"
                                                             />
-                                                            {swapFrom === url && selectedGallery.length === 4 && (
-                                                                <span className="absolute inset-0 bg-amber-500/20" />
-                                                            )}
+                                                            {swapFrom === url &&
+                                                                selectedGallery.length === requiredPhotoCount && (
+                                                                    <span className="absolute inset-0 bg-amber-500/20" />
+                                                                )}
                                                             {sel && (
                                                                 <span className="absolute top-1 right-1 text-xs bg-amber-600 text-white px-1 rounded">
                                                                     선택됨
@@ -2960,7 +2983,7 @@ function EscapeIntroPageInner() {
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={handleDownloadCollage}
-                                                    disabled={selectedGallery.length !== 4}
+                                                    disabled={selectedGallery.length !== requiredPhotoCount}
                                                     className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md"
                                                     style={{ backgroundColor: "#99c08e" }}
                                                 >
@@ -2968,9 +2991,10 @@ function EscapeIntroPageInner() {
                                                 </button>
                                                 <button
                                                     onClick={async () => {
-                                                        if (selectedGallery.length !== 4) return;
+                                                        if (selectedGallery.length !== requiredPhotoCount) return;
                                                         try {
-                                                            let bgUrl = "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/hongdaeEscape_tamplete.png";
+                                                            let bgUrl =
+                                                                "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/hongdaeEscape_tamplete.png";
                                                             let frames: Array<{
                                                                 x: number;
                                                                 y: number;
@@ -3018,7 +3042,7 @@ function EscapeIntroPageInner() {
                                                             setShowCollagePreview(true);
                                                         } catch {}
                                                     }}
-                                                    disabled={selectedGallery.length !== 4}
+                                                    disabled={selectedGallery.length !== requiredPhotoCount}
                                                     className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md"
                                                     style={{ backgroundColor: "#7da871" }}
                                                 >
@@ -3026,7 +3050,9 @@ function EscapeIntroPageInner() {
                                                 </button>
                                                 <button
                                                     onClick={handleShareToKakao}
-                                                    disabled={selectedGallery.length !== 4 || isSharing}
+                                                    disabled={
+                                                        selectedGallery.length !== requiredPhotoCount || isSharing
+                                                    }
                                                     className="px-4 py-2 rounded-lg text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-md bg-gradient-to-r from-green-500 to-green-600"
                                                 >
                                                     {isSharing ? "공유 준비 중..." : "카카오톡으로 공유"}
