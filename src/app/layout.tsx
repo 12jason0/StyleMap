@@ -74,7 +74,7 @@ export const metadata: Metadata = {
         icon: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",
         apple: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",
         shortcut: "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/logo/donalogo_512.png",
-    },
+    },  
 };
 
 function BodyLayout({ children }: { children: React.ReactNode }) {

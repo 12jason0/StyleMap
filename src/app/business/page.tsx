@@ -21,7 +21,7 @@ export default function BusinessPage() {
 
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 mb-2">사업자등록번호</h3>
-                                    <p className="text-gray-700">준비 중 (베타 서비스)</p>
+                                    <p className="text-gray-700">166-10-03081</p>
                                 </div>
 
                                 <div>
@@ -136,8 +136,8 @@ export default function BusinessPage() {
                                 배포를 금지합니다.
                             </p>
                             <p className="mb-2">
-                                <strong>면책조항:</strong> DoNa는 베타 서비스 운영 중으로, 서비스 이용으로 인한
-                                직간접적 손해에 대해 제한적 책임을 집니다.
+                                <strong>면책조항:</strong> DoNa는 베타 서비스 운영 중으로, 서비스 이용으로 인한 직간접적
+                                손해에 대해 제한적 책임을 집니다.
                             </p>
                             <p>
                                 <strong>분쟁해결:</strong> 서비스 이용 관련 분쟁 발생 시 서비스 운영자 소재지 관할

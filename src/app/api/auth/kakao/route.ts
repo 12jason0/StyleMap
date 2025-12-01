@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
         if (existing) {
             user = existing;
         } else {
-            // 새로운 유저 생성 + 코인 10개 지급
+            // 새로운 유저 생성 + 쿠폰 2개 지급
             user = await (prisma as any).user.create({
                 data: {
                     email,
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
                     profileImageUrl,
                     provider: "kakao",
                     createdAt: new Date(),
-                    couponCount: 10,
+                    couponCount: 2,
                 },
                 select: { id: true, email: true, username: true, couponCount: true },
             });
@@ -154,14 +154,14 @@ export async function POST(request: NextRequest) {
                 data: {
                     userId: user.id,
                     type: "signup",
-                    amount: 10,
+                    amount: 2,
                     unit: "coupon",
                 },
             });
 
-            message = "카카오 회원가입이 완료되었습니다. 쿠폰 10개가 지급되었습니다.";
+            message = "카카오 회원가입이 완료되었습니다. 쿠폰 2개가 지급되었습니다.";
             isNewUser = true;
-            couponsAwarded = 10;
+            couponsAwarded = 2;
         }
 
         // ✅ 토큰에 username 반영

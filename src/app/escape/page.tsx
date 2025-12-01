@@ -200,114 +200,127 @@ function useEscapeGame() {
 }
 
 // --- UI: StoryCard ---
-const StoryCard = ({ story, badge, progress, onStart, onResume, onDetails, isFirst }: any) => {
-    const imageSrc = story.imageUrl || badge?.image_url || "";
-    const isCompleted = progress?.status === "completed";
-    const isInProgress = progress?.status === "in_progress";
-    const isPopular = /종로|익선동|1919|Jongro|Jongno/i.test(`${story.title} ${story.region || ""}`);
+const StoryCard = React.memo(
+    ({ story, badge, progress, onStart, onResume, onDetails, isFirst }: any) => {
+        const imageSrc = story.imageUrl || badge?.image_url || "";
+        const isCompleted = progress?.status === "completed";
+        const isInProgress = progress?.status === "in_progress";
+        const isPopular = /종로|익선동|1919|Jongro|Jongno/i.test(`${story.title} ${story.region || ""}`);
 
-    const getDifficultyStars = (level?: number | string) => {
-        let lv = 0;
-        if (level !== undefined && level !== null) {
-            const parsed = parseInt(
-                String(level).replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0)),
-                10
-            );
-            if (!isNaN(parsed) && parsed > 0) lv = Math.min(5, parsed);
-        }
-        return Array.from({ length: 5 }).map((_, i) => (
-            <svg
-                key={i}
-                className={`w-4 h-4 ${i < lv ? "text-yellow-400" : "text-gray-300"}`}
-                viewBox="0 0 20 20"
-                fill="currentColor"
+        const getDifficultyStars = (level?: number | string) => {
+            let lv = 0;
+            if (level !== undefined && level !== null) {
+                const parsed = parseInt(
+                    String(level).replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0)),
+                    10
+                );
+                if (!isNaN(parsed) && parsed > 0) lv = Math.min(5, parsed);
+            }
+            return Array.from({ length: 5 }).map((_, i) => (
+                <svg
+                    key={i}
+                    className={`w-4 h-4 ${i < lv ? "text-yellow-400" : "text-gray-300"}`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.802 2.035a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.802-2.035a1 1 0 00-1.175 0l-2.802 2.035c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81H7.03a1 1 0 00.95-.69l1.07-3.292z" />
+                </svg>
+            ));
+        };
+
+        return (
+            <div
+                className="group flex flex-col gap-4 border rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white"
+                onClick={() => onDetails(story.id)}
             >
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.802 2.035a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.802-2.035a1 1 0 00-1.175 0l-2.802 2.035c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81H7.03a1 1 0 00.95-.69l1.07-3.292z" />
-            </svg>
-        ));
-    };
-
-    return (
-        <div
-            className="group flex flex-col gap-4 border rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-white"
-            onClick={() => onDetails(story.id)}
-        >
-            <div className="relative h-40 rounded-2xl overflow-hidden">
-                {isPopular && (
-                    <div className="absolute top-2 left-2 z-10">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold bg-amber-500 text-white shadow">
-                            <span>🔥</span> 인기
-                        </span>
-                    </div>
-                )}
-                <Image
-                    src={imageSrc || ""}
-                    alt={story.title}
-                    fill
-                    priority={isFirst}
-                    sizes="100vw"
-                    className="object-cover"
-                />
-            </div>
-            <div className="pt-1 pr-4 pb-4 pl-4">
-                <div className="mb-2 flex items-center justify-between">
-                    <div>
-                        {story.region && (
-                            <span className="inline-block bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-medium">
-                                #{story.region}
+                <div className="relative h-40 rounded-2xl overflow-hidden">
+                    {isPopular && (
+                        <div className="absolute top-2 left-2 z-10">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold bg-amber-500 text-white shadow">
+                                <span>🔥</span> 인기
                             </span>
+                        </div>
+                    )}
+                    <Image
+                        src={imageSrc || ""}
+                        alt={story.title}
+                        fill
+                        priority={isFirst}
+                        sizes="100vw"
+                        className="object-cover"
+                    />
+                </div>
+                <div className="pt-1 pr-4 pb-4 pl-4">
+                    <div className="mb-2 flex items-center justify-between">
+                        <div>
+                            {story.region && (
+                                <span className="inline-block bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-medium">
+                                    #{story.region}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1" title={`난이도 ${story.level || 0}/5`}>
+                            {getDifficultyStars(story.level)}
+                        </div>
+                    </div>
+                    <div className="mb-2">
+                        <h3 className="text-xl font-bold text-gray-900">{story.title}</h3>
+                    </div>
+                    <p className="text-gray-600 mb-4 line-clamp-2">{story.synopsis}</p>
+                    {badge && (
+                        <div className="text-xs text-amber-700 mb-4 bg-amber-50 px-2 py-1 rounded-md inline-block">
+                            🏅 보상 배지: {badge.name}
+                        </div>
+                    )}
+                    <div className="flex items-center justify-end gap-3">
+                        {isCompleted ? (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDetails(story.id);
+                                }}
+                                className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            >
+                                완료 (상세)
+                            </button>
+                        ) : isInProgress ? (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onResume(story.id);
+                                }}
+                                className="px-4 py-2 rounded-full text-sm font-semibold btn-primary"
+                            >
+                                이어하기
+                            </button>
+                        ) : (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onStart(story.id);
+                                }}
+                                className="px-4 py-2 rounded-full text-sm font-semibold btn-primary"
+                            >
+                                시작하기
+                            </button>
                         )}
                     </div>
-                    <div className="flex items-center gap-1" title={`난이도 ${story.level || 0}/5`}>
-                        {getDifficultyStars(story.level)}
-                    </div>
-                </div>
-                <div className="mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{story.title}</h3>
-                </div>
-                <p className="text-gray-600 mb-4 line-clamp-2">{story.synopsis}</p>
-                {badge && (
-                    <div className="text-xs text-amber-700 mb-4 bg-amber-50 px-2 py-1 rounded-md inline-block">
-                        🏅 보상 배지: {badge.name}
-                    </div>
-                )}
-                <div className="flex items-center justify-end gap-3">
-                    {isCompleted ? (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDetails(story.id);
-                            }}
-                            className="px-4 py-2 rounded-full text-sm font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300"
-                        >
-                            완료 (상세)
-                        </button>
-                    ) : isInProgress ? (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onResume(story.id);
-                            }}
-                            className="px-4 py-2 rounded-full text-sm font-semibold btn-primary"
-                        >
-                            이어하기
-                        </button>
-                    ) : (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onStart(story.id);
-                            }}
-                            className="px-4 py-2 rounded-full text-sm font-semibold btn-primary"
-                        >
-                            시작하기
-                        </button>
-                    )}
                 </div>
             </div>
-        </div>
-    );
-};
+        );
+    },
+    (prev: any, next: any) => {
+        return (
+            prev.story?.id === next.story?.id &&
+            prev.story?.title === next.story?.title &&
+            prev.story?.imageUrl === next.story?.imageUrl &&
+            prev.progress?.status === next.progress?.status &&
+            prev.progress?.current_chapter === next.progress?.current_chapter &&
+            prev.badge?.id === next.badge?.id &&
+            prev.isFirst === next.isFirst
+        );
+    }
+);
 
 // --- DetailsModal: 화면 정중앙 팝업 스타일 ---
 const DetailsModal = ({ story, chapters, isOpen, onClose, onStart }: any) => {
@@ -320,24 +333,18 @@ const DetailsModal = ({ story, chapters, isOpen, onClose, onStart }: any) => {
         }
 
         return chapters.map((c: any) => {
-            // 1. 데이터 추출
+            // 1) 장소/테마 데이터
             const place = c.placeOptions?.[0];
-            const themeRaw = (place?.theme || "").trim();
-            const catRaw = (place?.category || "").trim();
-            const themeKey = themeRaw.toLowerCase();
-            const catKey = catRaw.toLowerCase();
+            const rawKey = (place?.theme || place?.category || place?.type || "").trim().toLowerCase();
 
-            // 2. 제목 표시 로직 (테마 우선 -> 없으면 시그니처)
-            let mainDisplay = c.title;
-            if (themeKey && CATEGORY_MAP[themeKey]) {
-                mainDisplay = CATEGORY_MAP[themeKey];
-            } else if (themeRaw) {
-                // 매핑 키가 없어도 값이 있으면 그대로 사용
-                mainDisplay = themeRaw;
-            }
+            // 2) 표시용 텍스트 (한글 매핑 우선)
+            const mapped = rawKey ? CATEGORY_MAP[rawKey] || place?.theme || place?.category || place?.type || "" : "";
 
-            // 3. 뱃지 표시 로직 (카테고리)
-            const badgeLabel = catKey ? CATEGORY_MAP[catKey] || catRaw : null;
+            // 3) 메인 텍스트: theme(또는 fallback) 있으면 사용, 없으면 챕터 제목
+            const mainDisplay = mapped || c.title;
+
+            // 4) 오른쪽 뱃지: theme/카테고리/타입에서 파생된 동일 텍스트
+            const badgeLabel = mapped || null;
 
             return (
                 <li
@@ -421,6 +428,13 @@ export default function EscapePage() {
         useEscapeGame();
     const [activeModalStoryId, setActiveModalStoryId] = useState<number | null>(null);
 
+    // 배지 맵 캐시(O(1) 조회)
+    const badgeById = React.useMemo(() => {
+        const m = new Map<number, any>();
+        for (const b of badges) m.set(b.id, b);
+        return m;
+    }, [badges]);
+
     const handleOpenDetails = (storyId: number) => {
         fetchChaptersForStory(storyId);
         setActiveModalStoryId(storyId);
@@ -461,7 +475,7 @@ export default function EscapePage() {
                               <StoryCard
                                   key={story.id}
                                   story={story}
-                                  badge={badges.find((b) => b.id === story.reward_badge_id)}
+                                  badge={badgeById.get((story.reward_badge_id as number) || -1)}
                                   progress={progressMap[String(story.id)]}
                                   onStart={handleStartStory}
                                   onResume={handleResumeStory}

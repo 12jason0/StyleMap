@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
         const stories = await prisma.story.findMany({
             where: { is_active: true },
-            orderBy: [{ id: "asc" }],
+            orderBy: [{ created_at: "desc" }, { id: "desc" }],
             include: {
                 reward_badge: true,
             },

@@ -183,16 +183,36 @@ export default function PrivacyPolicyPage() {
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제5조 개인정보의 제3자 제공</h2>
                         <p className="text-gray-700 mb-6">
-                            DoNa는 정보주체의 개인정보를 제1조(개인정보의 처리목적)에서 명시한 범위 내에서만
-                            처리하며, 정보주체의 동의, 법률의 특별한 규정 등 개인정보보호법 제17조에 해당하는 경우에만
-                            개인정보를 제3자에게 제공합니다. 현재 서비스는 법률에 따른 의무 이행 외에 개인정보를
-                            제3자에게 제공하고 있지 않습니다.
+                            DoNa는 정보주체의 개인정보를 제1조(개인정보의 처리목적)에서 명시한 범위 내에서만 처리하며,
+                            정보주체의 동의, 법률의 특별한 규정 등 개인정보보호법 제17조에 해당하는 경우에만 개인정보를
+                            제3자에게 제공합니다. 현재 서비스는 법률에 따른 의무 이행 외에 개인정보를 제3자에게 제공하고
+                            있지 않습니다.
                         </p>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제6조 개인정보처리 위탁</h2>
-                        <p className="text-gray-700 mb-4">
-                            DoNa는 현재 개인정보 처리업무를 위탁하고 있지 않습니다.
+                        <p className="text-gray-700 mb-2">
+                            DoNa는 서비스 제공의 효율성을 위해 아래와 같이 일부 업무를 외부 전문업체에 위탁합니다.
+                            위탁계약 체결 시 개인정보보호 관련 법령을 준수하고 수탁자에 대한 관리·감독을 실시합니다.
                         </p>
+                        <ul className="list-disc pl-6 mb-6 text-gray-700 space-y-2">
+                            <li>
+                                <strong>Amazon Web Services, Inc. (AWS)</strong> — 클라우드 인프라 운영 및 이미지
+                                저장(S3) / 보관 위치: 서울 리전(ap-northeast-2) / 보유·이용기간: 목적 달성 또는 계약
+                                종료 시까지
+                            </li>
+                            <li>
+                                <strong>토스페이먼츠 주식회사</strong> — 결제 처리 및 정산(유료 결제 도입 시) /
+                                보유·이용기간: 전자상거래법 등 관계법령에서 정한 기간
+                            </li>
+                            <li>
+                                <strong>카카오</strong> — 소셜 로그인(OAuth) 인증 / 항목: 식별자, 프로필(닉네임/이미지)
+                                등 동의 범위 내 / 보유·이용기간: 연동 해제 또는 회원 탈퇴 시까지
+                            </li>
+                            <li>
+                                <strong>Google LLC (Google Analytics)</strong> — 서비스 이용 행태 분석 / 항목: 쿠키,
+                                방문·클릭 이력 등 개인을 식별할 수 없는 형태 / 보유·이용기간: 최대 26개월
+                            </li>
+                        </ul>
 
                         {/* 이하 내용은 기존과 동일하므로 생략합니다. 가독성을 위해 기존 코드를 그대로 붙여넣으시면 됩니다. */}
                         {/* ... 제7조부터 부칙까지 ... */}
@@ -201,8 +221,7 @@ export default function PrivacyPolicyPage() {
                             제7조 정보주체의 권리·의무 및 행사방법
                         </h2>
                         <p className="text-gray-700 mb-4">
-                            정보주체는 DoNa에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수
-                            있습니다.
+                            정보주체는 DoNa에 대해 언제든지 다음 각 호의 개인정보 보호 관련 권리를 행사할 수 있습니다.
                         </p>
                         <ul className="list-disc pl-6 mb-4 text-gray-700">
                             <li>개인정보 열람 요구</li>
@@ -220,13 +239,23 @@ export default function PrivacyPolicyPage() {
                             DoNa는 개인정보 보유기간의 경과, 처리목적 달성 등 개인정보가 불필요하게 되었을 때에는
                             지체없이 해당 개인정보를 파기합니다.
                         </p>
+                        <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                            제8-1조 장기 미이용자(휴면계정) 관리
+                        </h2>
+                        <ul className="list-disc pl-6 mb-6 text-gray-700 space-y-2">
+                            <li>
+                                연속 1년 이상 로그인 이력이 없는 계정은 휴면계정으로 전환하여 별도로 분리·보관합니다.
+                            </li>
+                            <li>휴면 전환 30일 전에 이메일 등으로 사전 안내하며, 로그인 시 휴면 상태는 해제됩니다.</li>
+                            <li>분리·보관된 정보는 관계법령 보관기간 경과 후 지체없이 파기합니다.</li>
+                        </ul>
 
                         <h2 id="security" className="text-2xl font-bold text-gray-900 mt-8 mb-4 scroll-mt-24">
                             제9조 개인정보의 안전성 확보조치
                         </h2>
                         <p className="text-gray-700 mb-4">
-                            DoNa는 개인정보보호법 제29조에 따라 다음과 같이 안전성 확보에 필요한 기술적/관리적 및
-                            물리적 조치를 하고 있습니다.
+                            DoNa는 개인정보보호법 제29조에 따라 다음과 같이 안전성 확보에 필요한 기술적/관리적 및 물리적
+                            조치를 하고 있습니다.
                         </p>
                         <ul className="list-disc pl-6 mb-6 text-gray-700">
                             <li>개인정보 취급 직원의 최소화 및 교육</li>
@@ -235,6 +264,15 @@ export default function PrivacyPolicyPage() {
                             <li>개인정보의 암호화</li>
                             <li>해킹 등에 대비한 기술적 대책</li>
                         </ul>
+                        <h2 id="location" className="text-2xl font-bold text-gray-900 mt-8 mb-4">
+                            제9-1조 위치정보 처리에 관한 사항
+                        </h2>
+                        <p className="text-gray-700 mb-4">
+                            DoNa는 지도 보기 및 근처 추천 기능 제공을 위해 단말기의 위치정보(위도·경도 등)를 이용할 수
+                            있습니다. 위치정보는 서비스 제공을 위한 최소 범위에서만 이용되며, 브라우저/OS 권한 설정을
+                            통해 수집·이용 동의를 언제든지 철회할 수 있습니다. 동의 철회 시 위치 기반 기능의 일부가
+                            제한될 수 있습니다.
+                        </p>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제10조 개인정보 보호책임자</h2>
                         <div className="bg-gray-50 p-6 rounded-lg mb-6">
@@ -257,7 +295,7 @@ export default function PrivacyPolicyPage() {
                         </div>
 
                         <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4">제11조 개인정보 처리방침 변경</h2>
-                        <p className="text-gray-700 mb-2">이 개인정보처리방침은 2025년 9월 12일부터 적용됩니다.</p>
+                        <p className="text-gray-700 mb-2">이 개인정보처리방침은 2026년 1월 1일부터 적용됩니다.</p>
                     </div>
                 </div>
             </main>
