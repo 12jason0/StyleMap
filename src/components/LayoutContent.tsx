@@ -146,13 +146,6 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
                     </div>
                 </div>
             </div>
-            {/* 광고 심사용 고정 하단 사업자 정보 노출 (디자인 최소 침해, 클릭 방해 방지) */}
-            <div className="fixed inset-x-0 bottom-0 z-[9999] pointer-events-none">
-                <div className="mx-auto max-w-[500px] bg-black/70 text-white text-[10px] text-center py-2 leading-tight">
-                    <p className="m-0">상호: DoNa | 대표: 오승용 | 사업자등록번호: 166-10-03081</p>
-                    <p className="m-0">소재지: 온라인 서비스 | 연락처: 12jason@naver.com</p>
-                </div>
-            </div>
         </div>
     );
 }

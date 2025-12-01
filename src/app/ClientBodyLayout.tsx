@@ -7,6 +7,10 @@ import LayoutContent from "@/components/LayoutContent";
 export default function ClientBodyLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const isGarden = pathname?.startsWith("/garden");
+
+    // 2. [추가] 메인 페이지인지 확인 (여기가 바로 포스터 페이지입니다)
+    const isLanding = pathname === "/";
+
     React.useEffect(() => {
         // Next.js Dev Tools 배지/버튼 강제 제거 (개발용)
         const removeDevBadge = () => {
@@ -18,7 +22,7 @@ export default function ClientBodyLayout({ children }: { children: React.ReactNo
                 "#nextjs-devtools-container",
                 '[aria-label="Open Next.js Dev Tools"]',
                 '[aria-haspopup="menu"][aria-controls*="nextjs"]',
-                'nextjs-devtools',
+                "nextjs-devtools",
             ];
             const removeFrom = (root: Document | ShadowRoot | HTMLElement) => {
                 selectors.forEach((sel) => {
@@ -56,5 +60,5 @@ export default function ClientBodyLayout({ children }: { children: React.ReactNo
             window.clearInterval(interval);
         };
     }, []);
-    return isGarden ? <>{children}</> : <LayoutContent>{children}</LayoutContent>;
+    return isGarden || isLanding ? <>{children}</> : <LayoutContent>{children}</LayoutContent>;
 }
