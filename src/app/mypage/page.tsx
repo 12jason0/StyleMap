@@ -221,6 +221,15 @@ const MyPage = () => {
         }
     };
 
+    // 출석 업데이트 전역 이벤트 수신 → 즉시 갱신
+    useEffect(() => {
+        const onCheckinUpdated = () => {
+            fetchCheckins();
+        };
+        window.addEventListener("checkinUpdated", onCheckinUpdated as EventListener);
+        return () => window.removeEventListener("checkinUpdated", onCheckinUpdated as EventListener);
+    }, []);
+
     const fetchBadges = async () => {
         try {
             const token = localStorage.getItem("authToken");
@@ -442,7 +451,11 @@ const MyPage = () => {
         try {
             const token = localStorage.getItem("authToken");
             if (!token) return;
-            const res = await fetch("/api/users/checkins", { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch("/api/users/checkins", {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+                credentials: "include",
+            });
             const data = await res.json();
             if (res.ok && data?.success) setCheckins(data.checkins || []);
         } catch {}
@@ -550,8 +563,17 @@ const MyPage = () => {
                 <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">프로필 정보</h3>
                 {userInfo ? (
                     <div className="flex items-center space-x-4 md:space-x-6">
-                        <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xl md:text-2xl font-bold">{userInfo.name[0]}</span>
+                        <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden bg-gray-100">
+                            <Image
+                                src={
+                                    userInfo.profileImage ||
+                                    "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/profileLogo.png"
+                                }
+                                alt={userInfo.name || "프로필"}
+                                fill
+                                className="object-cover"
+                                priority={false}
+                            />
                         </div>
                         <div className="flex-1">
                             <h4 className="text-lg md:text-xl font-bold text-gray-900 mb-1 md:mb-2">{userInfo.name}</h4>
@@ -935,15 +957,43 @@ const MyPage = () => {
                             {rewards.map((r) => (
                                 <div key={r.id} className="py-3 flex items-center justify-between">
                                     <div className="text-gray-800">
-                                        <div className="font-semibold">{r.type}</div>
+                                        <div className="font-semibold">
+                                            {(() => {
+                                                // 보상 유형 한글 라벨 매핑
+                                                const type = String(r.type || "").toLowerCase();
+                                                if (type === "checkin") return "7일 연속 출석 완료";
+                                                if (type === "escape_place_clear") return "미션 장소 클리어 보상";
+                                                if (type === "signup") return "회원가입 보상";
+                                                if (type === "ad_watch") return "광고 시청 보상";
+                                                if (type === "purchase") return "구매 보상";
+                                                if (type === "event") return "이벤트 보상";
+                                                return r.type;
+                                            })()}
+                                        </div>
                                         <div className="text-xs text-gray-500">
                                             {new Date(r.createdAt).toLocaleString()}
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <div className="font-bold">
-                                            +{r.amount} {r.unit}
-                                        </div>
+                                        {(() => {
+                                            const unit = String(r.unit || "").toLowerCase();
+                                            const unitKo =
+                                                unit === "coupon"
+                                                    ? "쿠폰"
+                                                    : unit === "coin"
+                                                    ? "코인"
+                                                    : unit === "water"
+                                                    ? "물"
+                                                    : r.unit;
+                                            return (
+                                                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-sm md:text-base border border-emerald-200">
+                                                    <span className="leading-none">+{r.amount}</span>
+                                                    <span className="leading-none">
+                                                        {unit === "coupon" ? "coupon" : unitKo}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             ))}

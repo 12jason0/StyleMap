@@ -6,6 +6,7 @@ import FrameRenderer from "@/components/FrameRenderer";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamicImport from "next/dynamic";
 import imageCompression from "browser-image-compression";
+import JongroMapFinalExact from "@/components/JongroMapFinalExact";
 function EpilogueFromDB({
     storyId,
     step,
@@ -27,11 +28,15 @@ function EpilogueFromDB({
                 const data = await res.json();
                 if (!alive) return;
                 const arr = Array.isArray(data?.messages)
-                    ? (data.messages as any[]).map((m) => ({
-                          speaker: String(m?.speaker || ""),
-                          role: String(m?.role || ""),
-                          text: String(m?.text || ""),
-                      }))
+                    ? (data.messages as any[]).map((m) => {
+                          const raw = String(m?.text || "");
+                          const normalized = raw.replace(/\\n/g, "\n"); // '\n' 리터럴을 실제 줄바꿈으로
+                          return {
+                              speaker: String(m?.speaker || ""),
+                              role: String(m?.role || ""),
+                              text: normalized,
+                          };
+                      })
                     : [];
                 if (arr.length > 0) {
                     setDialogues(arr as any);
@@ -62,6 +67,445 @@ function EpilogueFromDB({
             letterMode
         />
     );
+}
+
+// --- 간단한 Webtoon 인트로 렌더러(1차 연결용) ---
+function WebtoonIntro({ tokens, flow, onComplete }: { tokens?: any; flow?: any; onComplete: () => void }) {
+    const scenes = Array.isArray(flow?.scenes) ? flow.scenes : [];
+    const shouldSkip = !scenes || scenes.length === 0;
+    React.useEffect(() => {
+        if (!shouldSkip) return;
+        const timer = setTimeout(() => onComplete(), 100);
+        return () => clearTimeout(timer);
+    }, [shouldSkip, onComplete]);
+    if (shouldSkip) {
+        return null;
+    }
+    return (
+        <div className="fixed inset-0 z-[1400] bg-black/60 flex items-start justify-center p-4 animate-fade-in overflow-y-auto">
+            <div className="w-full max-w-3xl bg-white/95 rounded-2xl shadow-lg border overflow-hidden">
+                <div className="p-4 md:p-6 space-y-4">
+                    {scenes.map((scene: any, si: number) => {
+                        const panels = Array.isArray(scene?.panels) ? scene.panels : [];
+                        return (
+                            <div key={si} className="space-y-3">
+                                {panels.map((p: any, pi: number) => {
+                                    const bgImg = p?.bg?.image as string | undefined;
+                                    const narration = Array.isArray(p?.balloons)
+                                        ? p.balloons
+                                              .filter((b: any) => b?.type === "narration")
+                                              .map((b: any) => String(b?.text || ""))
+                                              .join("\n")
+                                        : undefined;
+                                    const speech = Array.isArray(p?.balloons)
+                                        ? p.balloons
+                                              .filter((b: any) => b?.type === "speech")
+                                              .map((b: any) => String(b?.text || ""))
+                                              .join("\n")
+                                        : undefined;
+                                    return (
+                                        <div
+                                            key={pi}
+                                            className="relative rounded-xl overflow-hidden border bg-gray-50"
+                                            style={{ minHeight: 180 }}
+                                        >
+                                            {bgImg ? (
+                                                <img
+                                                    src={bgImg}
+                                                    alt=""
+                                                    className="absolute inset-0 w-full h-full object-cover"
+                                                />
+                                            ) : null}
+                                            <div className="absolute inset-0 bg-black/20" />
+                                            <div className="relative p-4 space-y-2">
+                                                {narration ? (
+                                                    <div className="inline-block bg-white/85 rounded-xl px-3 py-2 text-gray-900 shadow">
+                                                        {narration}
+                                                    </div>
+                                                ) : null}
+                                                {speech ? (
+                                                    <div className="inline-block bg-blue-100 rounded-2xl px-3 py-2 text-[#0F2B46] shadow">
+                                                        {speech}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
+                    <div className="text-right">
+                        <button
+                            onClick={onComplete}
+                            className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow"
+                        >
+                            계속
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- 웹툰 스크롤 → 맵 UI 렌더러 ---
+function WebtoonScrollToMap({
+    tokens,
+    flow,
+    onComplete,
+    backgroundImage,
+}: {
+    tokens?: any;
+    flow?: any;
+    onComplete: () => void;
+    backgroundImage?: string | null;
+}) {
+    type ChatMsg = { type: "npc" | "me" | "system"; text: string };
+    const [messages, setMessages] = React.useState<ChatMsg[]>([]);
+    const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+    const [selectedPlace, setSelectedPlace] = React.useState<any | null>(null);
+    const [showMap, setShowMap] = React.useState<boolean>(false);
+    const mapTriggerRef = React.useRef<HTMLDivElement | null>(null);
+    const bgUrl = backgroundImage ? String(backgroundImage) : "";
+
+    const introIds: number[] = React.useMemo(() => {
+        const idsFromFlow =
+            (Array.isArray(flow?.intro) && Array.isArray(flow.intro[0]?.ids) && flow.intro[0].ids) ||
+            (Array.isArray(flow?.ids) && flow.ids) ||
+            [];
+        return (idsFromFlow as any[]).map((v) => Number(v)).filter((n) => Number.isFinite(n));
+    }, [flow]);
+
+    // scenes → 메시지 폴백 생성기
+    const fallbackMessagesFromScenes: ChatMsg[] = React.useMemo(() => {
+        const scenes = Array.isArray(flow?.scenes) ? flow.scenes : [];
+        if (!scenes.length) return [];
+        const first = scenes[0];
+        const panels = Array.isArray(first?.panels) ? first.panels : [];
+        const msgs: ChatMsg[] = [];
+        for (const panel of panels) {
+            const balloons = Array.isArray(panel?.balloons) ? panel.balloons : [];
+            for (const b of balloons) {
+                const rawType = String(b?.type || "").toLowerCase();
+                const text = String(b?.text || "")
+                    .replace(/\\n/g, "\n")
+                    .trim();
+                if (!text) continue;
+                let type: ChatMsg["type"] = "npc";
+                if (rawType === "system") type = "system";
+                else if (rawType === "speech") type = "me";
+                else type = "npc"; // narration 등은 npc 버블로
+                msgs.push({ type, text });
+            }
+        }
+        return msgs;
+    }, [flow]);
+
+    React.useEffect(() => {
+        // ids가 있으면 우선 API에서 로드, 없으면 scenes 폴백 사용
+        if (!introIds.length) {
+            setMessages(fallbackMessagesFromScenes);
+            return;
+        }
+        (async () => {
+            try {
+                const res = await fetch(`/api/escape/messages?ids=${introIds.join(",")}`, { cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                const list = Array.isArray(data?.messages) ? data.messages : [];
+                // placeId가 있는 메시지는 placeStory → 인트로에서 제외
+                const onlyIntro = list.filter(
+                    (m: any) => !m?.placeId && String(m?.type || "").toLowerCase() !== "place"
+                );
+                let mapped: ChatMsg[] = onlyIntro.map((m: any) => {
+                    const raw = String(m?.text ?? "");
+                    const normalized = raw.replace(/\\n/g, "\n");
+                    const role = String(m?.role ?? "").toLowerCase();
+                    const type: "npc" | "me" | "system" =
+                        role === "system" ? "system" : role === "user" || role === "me" ? "me" : "npc";
+                    return { type, text: normalized };
+                });
+                if (mapped.length === 0 && fallbackMessagesFromScenes.length > 0) {
+                    mapped = fallbackMessagesFromScenes;
+                }
+                setMessages(mapped);
+            } catch {
+                setMessages(fallbackMessagesFromScenes);
+            }
+        })();
+    }, [introIds, fallbackMessagesFromScenes]);
+
+    React.useEffect(() => {
+        const obs = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) setShowMap(true);
+            },
+            { threshold: 0.1 }
+        );
+        const el = mapTriggerRef.current;
+        if (el) obs.observe(el);
+        return () => {
+            if (el) obs.unobserve(el);
+        };
+    }, []);
+
+    const categories: any[] = React.useMemo(() => {
+        if (Array.isArray(flow?.places)) return flow.places;
+        if (Array.isArray(flow?.categories)) return flow.categories;
+        return [];
+    }, [flow]);
+
+    const title = String(tokens?.title || flow?.title || "");
+    const subtitle = String(tokens?.subtitle || flow?.subtitle || "");
+
+    const nl2br = (text: string) =>
+        text.split("\n").map((line, i) => (
+            <span key={i}>
+                {line}
+                <br />
+            </span>
+        ));
+
+    const selectedCategoryData = React.useMemo(
+        () => categories.find((c: any) => String(c?.id) === String(selectedCategory)),
+        [categories, selectedCategory]
+    );
+
+    return (
+        <div className="fixed inset-0 z-[1400]">
+            {bgUrl ? (
+                <>
+                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }} />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/20" />
+                </>
+            ) : (
+                <div className="absolute inset-0 bg-black/60" />
+            )}
+            <div className="absolute inset-0 flex items-end justify-center p-4 pb-[12vh] animate-fade-in overflow-y-auto">
+                <div className="w-full max-w-lg rounded-2xl overflow-hidden">
+                    <div className="bg-white/95 rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto space-y-4">
+                        <header className="text-center mb-6 pt-4 pb-3 border-b border-[#c8aa64]">
+                            {title ? (
+                                <h1 className="font-serif text-2xl text-[#c8aa64] tracking-wide font-bold">{title}</h1>
+                            ) : null}
+                            {subtitle ? <h2 className="font-serif text-sm text-[#8b8070] mt-2">{subtitle}</h2> : null}
+                        </header>
+                        <div className="space-y-4">
+                            {messages.map((msg, index) => {
+                                const isTriggerMessage = index === messages.length - 5;
+                                return (
+                                    <div key={index}>
+                                        {isTriggerMessage ? (
+                                            <div ref={mapTriggerRef} className="h-px invisible" />
+                                        ) : null}
+                                        <div
+                                            className={
+                                                msg.type === "system"
+                                                    ? "flex justify-center my-6"
+                                                    : msg.type === "me"
+                                                    ? "flex justify-end pr-2"
+                                                    : "flex justify-start pl-2"
+                                            }
+                                        >
+                                            {msg.type === "system" ? (
+                                                <div className="w-[90%] bg-[rgba(200,170,100,0.08)] border-2 border-[#c8aa64] p-4 text-center outline-[3px] outline-double outline-[rgba(200,170,100,0.3)] outline-offset-[-8px]">
+                                                    <div className="font-serif text-[#c8aa64] font-bold whitespace-pre-wrap">
+                                                        {nl2br(msg.text)}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    className={
+                                                        msg.type === "me"
+                                                            ? "max-w-[80%] px-4 py-3 rounded-xl bg-[#3a3530] text-[#d4a574] italic border border-[#5a5450] shadow"
+                                                            : "max-w-[80%] px-4 py-3 rounded-xl bg-[#f5e6d3] text-[#3a3530] border border-[#d4a574] shadow"
+                                                    }
+                                                >
+                                                    <div className="leading-7 text-[0.95rem]">{nl2br(msg.text)}</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="h-10" />
+                    </div>
+
+                    <div className="bg-white/95 rounded-b-2xl p-4 text-right border-t">
+                        <button
+                            onClick={onComplete}
+                            className="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow font-medium"
+                        >
+                            계속
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* 맵 섹션 (오버레이) */}
+            <div className="absolute inset-0" style={{ display: showMap && categories.length > 0 ? "block" : "none" }}>
+                <div className="absolute inset-0 max-w-[500px] mx-auto">
+                    {selectedCategory || selectedPlace ? (
+                        <button
+                            className="absolute top-8 left-8 z-50 bg-[rgba(200,170,100,0.2)] border-2 border-[#c8aa64] text-[#c8aa64] px-4 py-2 rounded"
+                            onClick={() => {
+                                setSelectedCategory(null);
+                                setSelectedPlace(null);
+                            }}
+                        >
+                            ← 뒤로
+                        </button>
+                    ) : null}
+
+                    {/* 배경 이미지 */}
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            backgroundImage:
+                                "url('https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/escape/joro/jongroMap.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                        }}
+                    />
+
+                    {/* 마커 */}
+                    {!selectedCategory && (
+                        <div className="absolute inset-0 z-10">
+                            {categories.map((category: any) => (
+                                <button
+                                    key={String(category?.id)}
+                                    className="absolute -translate-x-1/2 -translate-y-full"
+                                    style={{
+                                        top: category?.position?.top || "50%",
+                                        left: category?.position?.left || "50%",
+                                    }}
+                                    onClick={() => setSelectedCategory(String(category?.id))}
+                                    title={String(category?.label || category?.name || "")}
+                                >
+                                    <div className="w-10 h-12 rounded-[60%_60%_70%_70%] bg-gradient-to-br from-red-500 via-orange-500 to-red-500 shadow-[0_0_25px_rgba(255,68,68,0.85),0_0_50px_rgba(255,68,68,0.4),inset_-8px_-8px_15px_rgba(0,0,0,0.4),inset_8px_2px_15px_rgba(255,255,200,0.35)]" />
+                                    <div className="mt-1 text-xs font-bold text-[#c8aa64] bg-black/60 px-2 py-0.5 rounded border border-[rgba(200,170,100,0.3)]">
+                                        {String(category?.label || category?.name || "")}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* 카테고리 팝업 */}
+                    {selectedCategory && !selectedPlace && (
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[360px] bg-gradient-to-br from-[#3a3530] to-[#4a4440] border-4 border-[#c8aa64] rounded-xl z-50 shadow-2xl overflow-hidden">
+                            <button
+                                className="absolute right-3 top-3 w-7 h-7 rounded-full bg-black/30 border border-[#c8aa64] text-[#c8aa64]"
+                                onClick={() => setSelectedCategory(null)}
+                            >
+                                ✕
+                            </button>
+                            <div className="p-6 relative">
+                                <div className="absolute inset-0 m-4 border-2 border-[#c8aa64] rounded pointer-events-none opacity-50" />
+                                <h2 className="text-center text-xl font-serif text-[#c8aa64] font-bold">
+                                    {String(selectedCategoryData?.name || "")}{" "}
+                                    {String(selectedCategoryData?.icon || "")}
+                                </h2>
+                                <p className="text-center text-sm text-[#c8aa64] mt-2">
+                                    {String(selectedCategoryData?.label || "")}
+                                </p>
+                                <p className="text-center text-sm text-[#8b8070] mt-2">
+                                    {String(selectedCategoryData?.description || "")}
+                                </p>
+                                <button className="mt-3 w-full bg-gradient-to-r from-[#d4af37] to-[#daa520] text-[#2a2620] py-3 rounded font-serif font-bold">
+                                    이곳으로 가기
+                                </button>
+                                <div className="grid grid-cols-2 gap-2 mt-3">
+                                    {(selectedCategoryData?.places || []).map((place: any, idx: number) => (
+                                        <button
+                                            key={idx}
+                                            className="py-2 bg-[rgba(200,170,100,0.08)] border border-[#5a5450] rounded text-[#c8aa64]"
+                                            onClick={() => setSelectedPlace(place)}
+                                        >
+                                            <span className="text-base text-[#ff6b35] font-bold mr-2">{idx + 1}</span>
+                                            <span className="text-xs text-[#8b8070]">{String(place?.name || "")}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 장소 상세 */}
+                    {selectedPlace && (
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[88%] max-w-[330px] bg-gradient-to-br from-[#3a3530] to-[#4a4440] border-4 border-[#c8aa64] rounded-xl z-50 shadow-2xl overflow-hidden">
+                            <button
+                                className="px-6 py-4 text-[#c8aa64] font-serif"
+                                onClick={() => setSelectedPlace(null)}
+                            >
+                                ← 돌아가기
+                            </button>
+                            <div className="p-6">
+                                <h3 className="text-center text-xl font-serif text-[#c8aa64] font-bold">
+                                    {String(selectedPlace?.name || "")}
+                                </h3>
+                                <p className="text-center text-sm text-[#8b8070] mt-2">
+                                    {String(selectedPlace?.description || "")}
+                                </p>
+                                <div className="mt-3 bg-[rgba(200,170,100,0.1)] p-4 border-l-[3px] border-[#c8aa64] rounded text-sm text-[#c8aa64]">
+                                    {String(selectedPlace?.story || "")
+                                        .split("\n")
+                                        .map((line: string, idx: number) => (
+                                            <div key={idx}>{line}</div>
+                                        ))}
+                                </div>
+                                <button className="mt-4 w-full bg-gradient-to-r from-[#d4af37] to-[#daa520] text-[#2a2620] py-3 rounded font-serif font-bold">
+                                    이 장소 선택하기
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- Letter 엔진 어댑터(메시지 id → DB 조회 → DialogueFlow 재사용) ---
+function LetterIntro({ flow, onComplete }: { flow: any; onComplete: () => void }) {
+    const [messages, setMessages] = React.useState<DialogueMessage[] | null>(null);
+    React.useEffect(() => {
+        // flow 형태 호환: { ids:[] } | { flow:[{ids:[]}, ...] } | { intro:[{ids:[]}, ...] }
+        const idsFromFlow =
+            (Array.isArray(flow?.ids) && flow.ids) ||
+            (Array.isArray(flow?.flow) && Array.isArray(flow.flow[0]?.ids) && flow.flow[0].ids) ||
+            (Array.isArray(flow?.intro) && Array.isArray(flow.intro[0]?.ids) && flow.intro[0].ids) ||
+            [];
+        const ids = (idsFromFlow as any[]).map((v) => Number(v)).filter((n) => Number.isFinite(n));
+        if (!ids || ids.length === 0) {
+            onComplete();
+            return;
+        }
+        (async () => {
+            try {
+                const res = await fetch(`/api/escape/messages?ids=${ids.join(",")}`, { cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                const list = Array.isArray(data?.messages) ? data.messages : [];
+                const mapped: DialogueMessage[] = list.map((m: any) => {
+                    const raw = String(m?.text ?? "");
+                    // "\n" 리터럴을 실제 줄바꿈으로 변환
+                    const normalized = raw.replace(/\\n/g, "\n");
+                    return {
+                        speaker: String(m?.speaker ?? ""),
+                        text: normalized,
+                        role: String(m?.role ?? "").toLowerCase(),
+                    };
+                });
+                setMessages(mapped);
+            } catch {
+                setMessages([]);
+            }
+        })();
+    }, [flow, onComplete]);
+
+    if (!messages) return <LoadingSpinner />;
+    return <DialogueFlow messages={messages} step={0} onNext={() => {}} onComplete={onComplete} letterMode />;
 }
 
 // --- 타입 정의 ---
@@ -105,9 +549,329 @@ type StoryChapter = {
 
 // --- 로딩 컴포넌트 ---
 function LoadingSpinner() {
+    const [show, setShow] = React.useState(false);
+    React.useEffect(() => {
+        const t = setTimeout(() => setShow(true), 350); // 0.35s 이후에만 노출 → 체감상 짧게
+        return () => clearTimeout(t);
+    }, []);
+    if (!show) return null;
     return (
-        <div className="fixed inset-0 bg-gray-100 flex items-center justify-center z-[1001]">
-            <p className="text-xl text-gray-700 font-serif">이야기를 불러오는 중...</p>
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center">
+            <div className="absolute inset-0 bg-gradient-to-b from-black/70 to-black/50" />
+            <p className="relative text-[#c8aa64] font-serif text-lg font-bold tracking-wider drop-shadow">
+                이야기를 불러오는 중...
+            </p>
+        </div>
+    );
+}
+
+// 로딩 이후 잠깐 보여줄 '시간 되감기' 스플래시
+function PostLoadClockSplash({ text = "시간을 거슬러 이동 중..." }: { text?: string }) {
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        let renderer: any;
+        let scene: any;
+        let camera: any;
+        let stars: any;
+        let starGeo: any;
+        let clockGroup: any;
+        let hourHand: any;
+        let minuteHand: any;
+        let raf = 0;
+        let disposed = false;
+        // cleanup 함수를 effect의 return으로 제대로 전달하기 위해 외부 변수에 보관
+        let cleanup: (() => void) | null = null;
+        (async () => {
+            const THREE = await import("three");
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050505, 0.002);
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.z = 1;
+            camera.rotation.x = Math.PI / 2;
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(2.5, window.devicePixelRatio || 1));
+            // 최신 three 타입 대응
+            // @ts-ignore
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            containerRef.current?.appendChild(renderer.domElement);
+            // Stars tunnel
+            starGeo = new THREE.BufferGeometry();
+            const starCount = 6000;
+            const posArray = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount * 3; i += 3) {
+                const r = Math.random() * 100 + 50;
+                const theta = Math.random() * Math.PI * 2;
+                posArray[i] = r * Math.cos(theta); // x
+                posArray[i + 1] = (Math.random() - 0.5) * 800; // y
+                posArray[i + 2] = r * Math.sin(theta); // z
+            }
+            starGeo.setAttribute("position", new THREE.BufferAttribute(posArray, 3));
+            const starSprite = new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/disc.png");
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xd4af37,
+                size: 0.9,
+                map: starSprite,
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            });
+            stars = new THREE.Points(starGeo, starMaterial);
+            scene.add(stars);
+            // Minimal clock
+            clockGroup = new THREE.Group();
+            const ringGeo1 = new THREE.TorusGeometry(16, 0.22, 32, 180);
+            const ringMat1 = new THREE.MeshPhysicalMaterial({
+                color: 0xd4af37,
+                metalness: 1.0,
+                roughness: 0.25,
+                clearcoat: 0.6,
+                clearcoatRoughness: 0.2,
+                emissive: 0x3a2a00,
+                emissiveIntensity: 0.15,
+            });
+            const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
+            const ringGeo2 = new THREE.TorusGeometry(15.5, 0.08, 32, 180);
+            const ringMat2 = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.35,
+            });
+            const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
+            clockGroup.add(ring1);
+            clockGroup.add(ring2);
+            const handMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const hGeo = new THREE.BoxGeometry(0.7, 10, 0.15);
+            hGeo.translate(0, 5, 0);
+            hourHand = new THREE.Mesh(hGeo, handMat);
+            const mGeo = new THREE.BoxGeometry(0.45, 15, 0.15);
+            mGeo.translate(0, 7.5, 0);
+            minuteHand = new THREE.Mesh(mGeo, handMat);
+            clockGroup.add(hourHand);
+            clockGroup.add(minuteHand);
+            // subtle glow sprite
+            const glowSprite = new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/disc.png");
+            const glowMat = new THREE.SpriteMaterial({
+                map: glowSprite,
+                color: 0xd4af37,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+            });
+            const glow = new THREE.Sprite(glowMat);
+            glow.scale.set(48, 48, 1);
+            clockGroup.add(glow);
+            clockGroup.position.y = 200;
+            clockGroup.rotation.x = -Math.PI / 2;
+            clockGroup.scale.set(1.4, 1.4, 1.4);
+            scene.add(clockGroup);
+            // Resize
+            const onResize = () => {
+                if (!renderer) return;
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            };
+            window.addEventListener("resize", onResize);
+            // Animate
+            const animate = () => {
+                if (disposed) return;
+                const positions = starGeo.attributes.position.array as Float32Array;
+                for (let i = 1; i < positions.length; i += 3) {
+                    positions[i] -= 4;
+                    if (positions[i] < -200) positions[i] = 400;
+                }
+                starGeo.attributes.position.needsUpdate = true;
+                stars.rotation.y -= 0.002;
+                const time = Date.now() * 0.001;
+                // 역방향(되감기)으로 훨씬 빠르게 회전
+                const speedH = 6.0; // 시침 속도(기존 대비 대폭 증가)
+                const speedM = 18.0; // 분침 속도(시침보다 훨씬 빠르게)
+                hourHand.rotation.z = -time * speedH;
+                minuteHand.rotation.z = -time * speedM;
+                clockGroup.rotation.x = -Math.PI / 2 + Math.sin(time) * 0.05;
+                clockGroup.rotation.y = Math.cos(time) * 0.05;
+                renderer.render(scene, camera);
+                raf = requestAnimationFrame(animate);
+            };
+            raf = requestAnimationFrame(animate);
+            // Cleanup (비동기 IIFE 내에서 생성되므로 외부에 전달)
+            cleanup = () => {
+                disposed = true;
+                cancelAnimationFrame(raf);
+                window.removeEventListener("resize", onResize);
+                try {
+                    containerRef.current?.removeChild(renderer.domElement);
+                } catch {}
+                renderer?.dispose?.();
+                starGeo?.dispose?.();
+                // dispose materials/geometries explicitly
+                ringGeo1?.dispose?.();
+                ringGeo2?.dispose?.();
+                hGeo?.dispose?.();
+                mGeo?.dispose?.();
+                ringMat1?.dispose?.();
+                ringMat2?.dispose?.();
+                handMat?.dispose?.();
+                starSprite?.dispose?.();
+                glowSprite?.dispose?.();
+            };
+        })();
+        // 실제 effect의 cleanup 반환
+        return () => {
+            disposed = true;
+            if (cleanup) cleanup();
+        };
+    }, []);
+    return (
+        <div className="fixed inset-0 z-[2000]">
+            {/* 종로 지도 배경 */}
+            <div className="tw3-bg" />
+            <div ref={containerRef} className="absolute inset-0" />
+            {/* 이전 스타일의 2D 시계 오버레이 (가독성 강화용) */}
+            <div className="clock2-container">
+                <div className="clock2-face">
+                    <div className="roman2 r-12">XII</div>
+                    <div className="roman2 r-3">III</div>
+                    <div className="roman2 r-6">VI</div>
+                    <div className="roman2 r-9">IX</div>
+                    <div className="hand2 hour2" />
+                    <div className="hand2 minute2" />
+                    <div className="center2" />
+                </div>
+            </div>
+            <p className="tw3-text">{text}</p>
+            <style jsx>{`
+                .tw3-bg {
+                    position: absolute;
+                    inset: 0;
+                    background-image: url("https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/escape/jongro/jongroMap.png");
+                    background-size: cover;
+                    background-position: center;
+                    filter: brightness(0.35) saturate(0.85);
+                }
+                /* 2D 시계 오버레이 */
+                .clock2-container {
+                    position: absolute;
+                    left: 50%;
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 260px;
+                    height: 260px;
+                    border-radius: 50%;
+                    background: rgba(20, 20, 20, 0.8);
+                    border: 12px solid #d4af37;
+                    box-shadow: 0 0 50px rgba(212, 175, 55, 0.5), inset 0 0 20px #000;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    pointer-events: none;
+                    z-index: 2;
+                    animation: container-pulse 3s infinite alternate;
+                }
+                .clock2-face {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                }
+                .hand2 {
+                    position: absolute;
+                    bottom: 50%;
+                    left: 50%;
+                    transform-origin: bottom center;
+                    background: #d4af37;
+                    border-radius: 4px;
+                }
+                .hour2 {
+                    width: 6px;
+                    height: 62px;
+                    background: #ffffff;
+                    animation: rewind 0.9s linear infinite;
+                }
+                .minute2 {
+                    width: 4px;
+                    height: 92px;
+                    background: #d4af37;
+                    animation: rewind 0.35s linear infinite;
+                }
+                .center2 {
+                    position: absolute;
+                    width: 14px;
+                    height: 14px;
+                    background: #d4af37;
+                    border-radius: 50%;
+                    z-index: 3;
+                    left: 50%;
+                    top: 50%;
+                    transform: translate(-50%, -50%);
+                    box-shadow: 0 0 10px rgba(212, 175, 55, 0.8);
+                }
+                .roman2 {
+                    position: absolute;
+                    color: #d4af37;
+                    font-weight: bold;
+                    font-size: 20px;
+                    text-shadow: 0 0 5px rgba(212, 175, 55, 0.8);
+                }
+                .r-12 {
+                    top: 8px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+                .r-3 {
+                    right: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                }
+                .r-6 {
+                    bottom: 8px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                }
+                .r-9 {
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                }
+                .tw3-text {
+                    position: absolute;
+                    bottom: 10%;
+                    width: 100%;
+                    text-align: center;
+                    color: #c8aa64;
+                    font-family: "Noto Serif KR", serif;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                    text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+                    z-index: 2;
+                }
+                @keyframes rewind {
+                    from {
+                        transform: translateX(-50%) rotate(360deg);
+                    }
+                    to {
+                        transform: translateX(-50%) rotate(0deg);
+                    }
+                }
+                @keyframes container-pulse {
+                    0% {
+                        transform: translate(-50%, -50%) scale(1);
+                        box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+                    }
+                    100% {
+                        transform: translate(-50%, -50%) scale(1.05);
+                        box-shadow: 0 0 80px rgba(212, 175, 55, 0.8);
+                    }
+                }
+            `}</style>
         </div>
     );
 }
@@ -136,6 +900,7 @@ const DialogueFlow = ({
     const [arrived, setArrived] = useState<boolean>(false);
     const [opened, setOpened] = useState<boolean>(false);
     const [visibleMessageCount, setVisibleMessageCount] = useState<number>(1);
+    const [canCloseLetter, setCanCloseLetter] = useState<boolean>(false);
     const messageListRef = useRef<HTMLDivElement | null>(null);
 
     const letterItems = useMemo(() => {
@@ -178,8 +943,8 @@ const DialogueFlow = ({
         return [] as Array<{ text: string; isUser: boolean; speaker?: string }>;
     }, [showLetter, messages, fallbackParts]);
 
-    // 줄 단위 표시 및 수동 진행 설정
-    const autoAdvance = false;
+    // 줄 단위 표시 및 자동 진행 설정
+    const autoAdvance = true;
     const flatLetterLines = useMemo(
         () =>
             (letterItems || []).flatMap((m) =>
@@ -215,7 +980,7 @@ const DialogueFlow = ({
                 if (next === total) clearInterval(id);
                 return next;
             });
-        }, 2000);
+        }, 1000);
         return () => clearInterval(id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [opened, showLetter, flatLetterLines.length]);
@@ -227,6 +992,25 @@ const DialogueFlow = ({
             }
         } catch {}
     }, [visibleMessageCount]);
+
+    // 모든 말풍선이 나타난 뒤 1초 후 버튼 활성화
+    useEffect(() => {
+        if (!showLetter || !opened) return;
+        const total = flatLetterLines.length;
+        if (total === 0) {
+            const tid = setTimeout(() => setCanCloseLetter(true), 1000);
+            return () => clearTimeout(tid);
+        }
+        if (visibleMessageCount >= total) {
+            const tid = setTimeout(() => setCloseAfterAll(), 1000);
+            return () => clearTimeout(tid);
+        } else {
+            setCanCloseLetter(false);
+        }
+        function setCloseAfterAll() {
+            setCanCloseLetter(true);
+        }
+    }, [visibleMessageCount, showLetter, opened, flatLetterLines.length]);
 
     // 도착 알림(중앙 작은 봉투 버튼) – 클릭 시 모달 열림 (텍스트 없이 아이콘만)
     if (letterMode && !showLetter) {
@@ -280,17 +1064,17 @@ const DialogueFlow = ({
             setVisibleMessageCount((n) => Math.min(n + 1, items.length));
         };
         return (
-            <div className="fixed inset-0 z-[1450] bg-transparent flex items-center justify-center p-6">
+            <div className="fixed inset-0 z-[1450] bg-gradient-to-b from-black/60 to-black/20 flex items-end justify-center p-4 pb-[12vh]">
                 <div
                     className={`relative w-full max-w-lg transition-transform duration-700 ease-out ${
                         arrived ? "translate-y-0 scale-100 rotate-0" : "-translate-y-16 scale-95 rotate-3"
                     }`}
                 >
                     {/* 봉투 바디 */}
-                    <div className="relative bg-[#faf7f1] rounded-2xl shadow-2xl border border-amber-200 flex flex-col max-h-[80vh]">
+                    <div className="relative rounded-2xl flex flex-col max-h-[70vh]">
                         {/* 봉투 덮개(열림 효과) */}
                         <div
-                            className={`absolute inset-x-0 top-0 h-10 bg-amber-200/60 transition-all duration-700 ${
+                            className={`absolute inset-x-0 top-0 h-10 bg-transparent transition-all duration-700 ${
                                 opened ? "-translate-y-10 opacity-0" : "translate-y-0 opacity-100"
                             }`}
                         />
@@ -304,7 +1088,7 @@ const DialogueFlow = ({
                             {/* 제목 제거: 디자인 요구사항 */}
                             <div
                                 ref={messageListRef}
-                                className="max-h-[56vh] overflow-y-auto space-y-3 pr-1 pb-3 cursor-pointer"
+                                className="max-h-[46vh] w-full max-w-full overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y space-y-3 pr-1 pb-3 cursor-pointer"
                                 onClick={goNextLine}
                             >
                                 {items.slice(0, visibleMessageCount).map((m, i) => {
@@ -313,6 +1097,7 @@ const DialogueFlow = ({
                                         .toLowerCase();
                                     const isSystem = identity === "system";
                                     if (isSystem) {
+                                        // System: 텍스트만, 가운데에서 말하는 느낌 (말풍선 제거)
                                         return (
                                             <div
                                                 key={i}
@@ -321,12 +1106,16 @@ const DialogueFlow = ({
                                                 }`}
                                                 style={
                                                     i === visibleMessageCount - 1
-                                                        ? { animationDuration: "700ms" }
+                                                        ? { animationDuration: "1000ms" }
                                                         : undefined
                                                 }
                                             >
-                                                <div className="px-5 py-2 rounded-full bg-gradient-to-r from-amber-100 to-yellow-50 text-amber-800 text-base shadow-sm font-medium">
-                                                    <span className="leading-relaxed">{m.text}</span>
+                                                <div className="max-w-[88%]">
+                                                    <div className="rounded-2xl px-5 py-3 bg-white/70 backdrop-blur-[1px] border border-white/40 shadow-md">
+                                                        <p className="text-gray-900 font-medium text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                                            {m.text}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -339,21 +1128,27 @@ const DialogueFlow = ({
                                             }`}
                                             style={
                                                 i === visibleMessageCount - 1
-                                                    ? { animationDuration: "700ms" }
+                                                    ? { animationDuration: "1000ms" }
                                                     : undefined
                                             }
                                         >
-                                            <div className="max-w-[80%]">
+                                            <div className={`max-w-[78%] ${m.isUser ? "mr-2" : "ml-2"}`}>
                                                 <div
-                                                    className={`px-4 py-2 rounded-2xl shadow border text-left ${
+                                                    className={`relative rounded-2xl px-4 py-2.5 text-left shadow-md border ${
                                                         m.isUser
-                                                            ? "bg-amber-100 text-stone-900 border-amber-300"
-                                                            : "bg-amber-50 text-stone-900 border-amber-200"
+                                                            ? "bg-[#B7D3F5] text-[#0F2B46] border-[#30568b]/20"
+                                                            : "bg-[#FFF1D6]/95 text-neutral-900 border-black/5"
                                                     }`}
                                                 >
-                                                    <span className="leading-relaxed whitespace-pre-wrap break-words">
+                                                    {/* 말꼬리: NPC는 왼쪽, Me는 오른쪽 */}
+                                                    {m.isUser ? (
+                                                        <span className="absolute -right-2 bottom-3 w-0 h-0 border-y-[8px] border-y-transparent border-l-[10px] border-l-[#B7D3F5]" />
+                                                    ) : (
+                                                        <span className="absolute -left-2 bottom-3 w-0 h-0 border-y-[8px] border-y-transparent border-r-[10px] border-r-[#FFF1D6]" />
+                                                    )}
+                                                    <p className="font-medium text-sm leading-relaxed whitespace-pre-wrap break-words">
                                                         {m.text}
-                                                    </span>
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
@@ -361,7 +1156,7 @@ const DialogueFlow = ({
                                 })}
                             </div>
                             {((items.length > 0 && visibleMessageCount >= items.length) || items.length === 0) && (
-                                <div className="mt-3 p-3 border-t bg-[#faf7f1] sticky bottom-0 text-center">
+                                <div className="mt-3 p-3 bg-transparent sticky bottom-0 text-center">
                                     <button
                                         onClick={() => {
                                             // 닫기를 눌러야만 진행되도록: 먼저 모달 상태 정리
@@ -374,7 +1169,12 @@ const DialogueFlow = ({
                                             // onComplete 콜백(있다면) 호출
                                             if (typeof onComplete === "function") onComplete();
                                         }}
-                                        className="px-5 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow"
+                                        disabled={!canCloseLetter}
+                                        className={`px-5 py-2 rounded-lg text-white shadow ${
+                                            canCloseLetter
+                                                ? "bg-blue-600 hover:bg-blue-700"
+                                                : "bg-blue-400 opacity-60 cursor-not-allowed"
+                                        }`}
                                     >
                                         닫기
                                     </button>
@@ -393,7 +1193,7 @@ const DialogueFlow = ({
             .map((s) => s.trim())
             .filter(Boolean);
         return (
-            <div className="fixed inset-0 z-[1400] bg-gradient-to-b from-black/60 to-black/20 backdrop-blur-[2px] flex items-end justify-center p-4 animate-fade-in">
+            <div className="fixed inset-0 z-[1400] bg-gradient-to-b from-black/60 to-black/20 flex items-end justify-center p-4 animate-fade-in">
                 <div className="w-full max-w-3xl bg-[#fffef8]/95 rounded-t-2xl p-5 shadow-[0_8px_30px_rgba(0,0,0,0.15)] border-t border-amber-100 font-['Gowun_Dodum']">
                     <div className="max-h-[46vh] overflow-y-auto space-y-4 pr-1 pb-3">
                         {parts.map((t, i) => (
@@ -430,7 +1230,7 @@ const DialogueFlow = ({
         const text = "이 챕터의 이야기가 시작됩니다.";
         return (
             <div className="fixed inset-0 z-[1400] bg-black/60 flex items-end justify-center p-4 animate-fade-in">
-                <div className="w-full max-w-3xl bg-white/90 backdrop-blur-md rounded-t-2xl p-4 shadow-lg border-t">
+                <div className="w-full max-w-3xl bg-white/90 rounded-t-2xl p-4 shadow-lg border-t">
                     <div className="max-h-[46vh] overflow-y-auto space-y-3 pr-1 pb-3">
                         <div className="flex justify-start">
                             <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-2xl max-w-[80%] shadow">
@@ -463,7 +1263,7 @@ const DialogueFlow = ({
 
     return (
         <div className="fixed inset-0 z-[1400] bg-black/60 flex items-end justify-center p-4 animate-fade-in">
-            <div className="w-full max-w-3xl bg-white/90 backdrop-blur-md rounded-t-2xl p-6 shadow-lg border-t">
+            <div className="w-full max-w-3xl bg-white/90 rounded-t-2xl p-6 shadow-lg border-t">
                 {currentMessage.speaker && currentMessage.speaker !== "narrator" && (
                     <p className="font-bold text-lg mb-2 text-gray-800">
                         {currentMessage.speaker === "user" ? "나" : currentMessage.speaker}
@@ -493,6 +1293,8 @@ function EscapeIntroPageInner() {
     const [story, setStory] = useState<Story | null>(null);
     const [chapters, setChapters] = useState<StoryChapter[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    // 로딩이 끝난 직후 시계 스플래시 표시
+    const [showPostClock, setShowPostClock] = useState<boolean>(false);
     const [animationFinished, setAnimationFinished] = useState<boolean>(false);
     const [isClosing, setIsClosing] = useState<boolean>(false);
     const [currentChapterIdx, setCurrentChapterIdx] = useState<number>(0);
@@ -526,6 +1328,14 @@ function EscapeIntroPageInner() {
             } catch {}
         })();
     }, [storyId]);
+    // 로딩 종료 감지 → 2.6초간 시계 스플래시 (체감상 더 길게)
+    useEffect(() => {
+        if (!loading) {
+            setShowPostClock(true);
+            const t = setTimeout(() => setShowPostClock(false), 2600);
+            return () => clearTimeout(t);
+        }
+    }, [loading]);
     // 콜라주 1회 저장 제어를 위한 키/상태
     const COLLAGE_URL_KEY = useMemo(() => `escape_collage_url_${storyId}`, [storyId]);
     const [savedCollageUrl, setSavedCollageUrl] = useState<string | null>(null);
@@ -565,6 +1375,31 @@ function EscapeIntroPageInner() {
     const [dialogueStep, setDialogueStep] = useState<number>(0);
     // 완료된 카테고리(카페 등)를 기록하여 카테고리 선택 화면에서 숨김 처리
     const [completedCategories, setCompletedCategories] = useState<string[]>([]);
+
+    // UI 엔진(스토리별) – 존재 시 엔진별 렌더러로 분기
+    const [uiEngine, setUiEngine] = useState<string | null>(null);
+    const [uiTokens, setUiTokens] = useState<any>(null);
+    const [uiFlow, setUiFlow] = useState<any>(null);
+    useEffect(() => {
+        if (!Number.isFinite(storyId)) return;
+        (async () => {
+            try {
+                const res = await fetch(`/api/escape/ui?storyId=${storyId}`, { cache: "no-store" });
+                const data = await res.json().catch(() => ({}));
+                if (data && data.engine) {
+                    setUiEngine(String(data.engine));
+                    setUiTokens(data.tokens || null);
+                    setUiFlow(data.flow || null);
+                } else {
+                    setUiEngine(null);
+                    setUiTokens(null);
+                    setUiFlow(null);
+                }
+            } catch {
+                setUiEngine(null);
+            }
+        })();
+    }, [storyId]);
 
     // 새 흐름 상태 (책 펼침 제거 UI)
     const [flowStep, setFlowStep] = useState<
@@ -684,7 +1519,9 @@ function EscapeIntroPageInner() {
         return true;
     };
     const [placeDialogueDone, setPlaceDialogueDone] = useState<boolean>(false);
-    const [dialogueQueue, setDialogueQueue] = useState<Array<{ speaker?: string | null; text: string }>>([]);
+    const [dialogueQueue, setDialogueQueue] = useState<
+        Array<{ speaker?: string | null; text: string; missionId?: number | null }>
+    >([]);
     const [piecesCollected, setPiecesCollected] = useState<number>(0);
     const [pendingNextChapterIdx, setPendingNextChapterIdx] = useState<number | null>(null);
     const [noteOpenAnim, setNoteOpenAnim] = useState<boolean>(false);
@@ -703,6 +1540,8 @@ function EscapeIntroPageInner() {
     const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
     const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
     const [lastUploadedUrls, setLastUploadedUrls] = useState<string[]>([]);
+
+    // 대화 중 미션 줄 자동 팝업 (currentChapter 선언 이후에 동작하도록 아래에서 다시 등록)
 
     // 콜라주 미리보기
     const [showCollagePreview, setShowCollagePreview] = useState<boolean>(false);
@@ -733,13 +1572,28 @@ function EscapeIntroPageInner() {
             const base = rootEl.getBoundingClientRect();
             const bw = base.width;
             const bh = base.height;
-            const BASE_W = imgEl.naturalWidth || 1080;
-            const BASE_H = imgEl.naturalHeight || 1920;
+
+            // ----- [수정할 부분] -----
+            // 기존: 이미지 파일의 실제 크기를 따라감 (위험! 파일이 작으면 좌표 엉킴)
+            // const BASE_W = imgEl.naturalWidth || 1080;
+            // const BASE_H = imgEl.naturalHeight || 1920;
+
+            // 변경: 파일 크기가 뭐든 무조건 1080x1920 기준으로 계산 (안전)
+            const BASE_W = 1080;
+            const BASE_H = 1920;
+            // -------------------------
+
+            // 아래 계산식은 그대로 두면,
+            // "1080짜리를 현재 화면(bw)에 맞추려면 몇 배(scale) 줄여야 하나?"가 정확히 계산됩니다.
             const scale = Math.min(bw / BASE_W, bh / BASE_H);
+
+            // 화면에 보여질 실제 이미지 크기
             const iw = Math.round(BASE_W * scale);
             const ih = Math.round(BASE_H * scale);
+
             const offsetX = (bw - iw) / 2;
             const offsetY = (bh - ih) / 2;
+
             setPreviewDims({ iw, ih, offsetX, offsetY, baseW: BASE_W, baseH: BASE_H });
         };
         if (imgEl.complete) calc();
@@ -1142,6 +1996,47 @@ function EscapeIntroPageInner() {
     }, [storyId, router]);
 
     const currentChapter = chapters[currentChapterIdx];
+
+    // 대화 중 미션 줄을 만나면 자동으로 미션 모달을 띄운다 (데이터 주도)
+    useEffect(() => {
+        if (flowStep !== "dialogue") return;
+        if (!dialogueQueue || dialogueQueue.length === 0) return;
+        if (missionModalOpen) return;
+        const currentLine = dialogueQueue[0] as any;
+        try {
+            // 디버깅: 현재 대사와 연결된 미션 ID 확인
+            // eslint-disable-next-line no-console
+            console.log("💬 현재 대사:", currentLine?.text ?? currentLine?.dialogue ?? "");
+            // eslint-disable-next-line no-console
+            console.log("👉 미션 ID:", currentLine?.missionId ?? null);
+        } catch {}
+        if (!currentLine?.missionId) return;
+        try {
+            const placeList = (currentChapter as any)?.placeOptions || [];
+            const place = placeList.find((p: any) => Number(p.id) === Number(selectedPlaceId));
+            const mission = place?.missions?.find((m: any) => Number(m.id) === Number(currentLine.missionId));
+            if (!mission) return;
+            // 대사를 잠깐 읽을 시간(1.2s)을 준 뒤 모달 오픈. 언마운트/변경 시 타이머 정리
+            const timer = window.setTimeout(() => {
+                // 초기화 후 모달 오픈 (홍대와 동일 업로드 로직 재사용)
+                setModalError(null);
+                // @ts-ignore
+                setModalWrongOnce(false);
+                setPhotoFiles([]);
+                setPhotoPreviewUrl(null);
+                setPhotoPreviewUrls([]);
+                setPhotoUploaded(false);
+                setModalAnswer("");
+                try {
+                    // eslint-disable-next-line no-console
+                    console.log("🧩 자동 실행: 미션 오픈", mission?.id);
+                } catch {}
+                setActiveMission(mission);
+                setMissionModalOpen(true);
+            }, 1200);
+            return () => window.clearTimeout(timer);
+        } catch {}
+    }, [flowStep, dialogueQueue, missionModalOpen, currentChapter, selectedPlaceId]);
     // 엔딩 라벨 조건 추가했던 보조 상태 제거 (원복)
 
     // 지도에서는 사용자가 장소를 선택하기 전에는 장소 마커를 표시하지 않습니다.
@@ -1243,15 +2138,17 @@ function EscapeIntroPageInner() {
         }
     }, [inMission, flowStep]);
 
-    // 배경음 세팅 (선택 사항)
+    // 배경음 세팅 (비활성화: 성능/UX 향상 위해 오디오 재생 제거)
+    const ENABLE_ESCAPE_AUDIO = false;
     useEffect(() => {
+        if (!ENABLE_ESCAPE_AUDIO) return;
         try {
             if (!introBgmRef.current) {
                 const a = new Audio("/sounds/intro.mp3");
                 a.loop = true;
-                a.volume = 0.4;
+                a.volume = 0.0;
                 introBgmRef.current = a;
-                a.play().catch(() => {});
+                // a.play().catch(() => {});
             }
         } catch {}
     }, []);
@@ -1318,14 +2215,15 @@ function EscapeIntroPageInner() {
             const clear = setTimeout(() => setNoteOpenAnim(false), 1000);
             return () => clearTimeout(clear);
         }
+        if (!ENABLE_ESCAPE_AUDIO) return;
         if (flowStep === "done") {
             try {
                 if (!endingBgmRef.current) {
                     const a = new Audio("/sounds/ending.mp3");
                     a.loop = true;
-                    a.volume = 0.5;
+                    a.volume = 0.0;
                     endingBgmRef.current = a;
-                    a.play().catch(() => {});
+                    // a.play().catch(() => {});
                 }
             } catch {}
         }
@@ -1376,26 +2274,25 @@ function EscapeIntroPageInner() {
             return;
         }
 
-        const FRAME_OVERLAP = 6;
+        const FRAME_OVERLAP = 0;
 
         // DB에서 템플릿 조회
         let bgUrl = "https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/hongdaeEscape_tamplete.png";
         let framesFromDB: Array<{ x: number; y: number; w: number; h: number }> | null = null;
+        let templateWidth: number | null = null;
+        let templateHeight: number | null = null;
         try {
-            const res = await fetch("/api/collages/templates", { cache: "no-store" });
+            const res = await fetch(`/api/collages/templates?storyId=${storyId}`, { cache: "no-store" });
             const data = await res.json();
             const list = Array.isArray(data?.templates) ? data.templates : [];
-            const t =
-                list.find(
-                    (it: any) =>
-                        String(it?.name || "")
-                            .toLowerCase()
-                            .includes("hongdae") || String(it?.imageUrl || "").includes("hongdaelatter_template")
-                ) || list[0];
+            // API가 storyId 우선으로 정렬하므로 첫 번째 항목을 기본 선택
+            const t = list[0];
 
             if (t) {
                 if (t.imageUrl) bgUrl = String(t.imageUrl);
                 if (t.framesJson && Array.isArray(t.framesJson)) framesFromDB = t.framesJson as any;
+                if (typeof t?.width === "number") templateWidth = Number(t.width);
+                if (typeof t?.height === "number") templateHeight = Number(t.height);
             }
         } catch (err) {
             console.warn("템플릿 조회 실패, 기본값 사용:", err);
@@ -1446,26 +2343,45 @@ function EscapeIntroPageInner() {
 
             console.log("✅ 모든 이미지 로드 완료");
 
-            canvas.width = bg.naturalWidth;
-            canvas.height = bg.naturalHeight;
-            console.log("📐 캔버스 크기:", canvas.width, "x", canvas.height);
+            // ⭐ 템플릿 기준 크기 (메타 > 배경 원본 > 기본값)
+            // 스케일 기준을 템플릿 메타로 고정 (없으면 1080x1920)
+            const baseW = templateWidth ?? 1080;
+            const baseH = templateHeight ?? 1920;
 
-            // 배경 그리기
-            ctx.drawImage(bg, 0, 0, canvas.width, canvas.height);
+            // 출력 고정 크기
+            const outW = 1080;
+            const outH = 1920;
 
-            // 프레임 좌표
+            // 필요 시 고해상도 저장을 위해 DPR 적용 가능
+            // const dpr = window.devicePixelRatio || 1;
+            // canvas.width = Math.round(outW * dpr);
+            // canvas.height = Math.round(outH * dpr);
+            // ctx.scale(dpr, dpr);
+
+            canvas.width = outW;
+            canvas.height = outH;
+            console.log("📐 템플릿 기준 크기:", baseW, "x", baseH);
+            console.log("📐 캔버스 크기(고정):", canvas.width, "x", canvas.height);
+
+            // 배경을 템플릿 크기에 강제로 맞춰서 그리기
+            ctx.drawImage(bg, 0, 0, outW, outH);
+
+            // 프레임 좌표 (DB 우선, 없으면 기본값 - 1080x1920 기준)
             let framesData = framesFromDB || [
-                { x: 196, y: 425, w: 340, h: 461 },
-                { x: 574, y: 420, w: 343, h: 470 },
-                { x: 203, y: 923, w: 336, h: 466 },
-                { x: 575, y: 925, w: 338, h: 460 },
+                { x: 310, y: 270, w: 460, h: 360 },
+                { x: 310, y: 680, w: 460, h: 360 },
+                { x: 310, y: 1090, w: 460, h: 360 },
+                { x: 310, y: 1500, w: 460, h: 360 },
             ];
-            const isPercent = framesData.every((f: any) => f.x <= 1 && f.y <= 1 && f.w <= 1 && f.h <= 1);
-            const frames = framesData.map((f: any) =>
-                isPercent
-                    ? { x: f.x * canvas.width, y: f.y * canvas.height, w: f.w * canvas.width, h: f.h * canvas.height }
-                    : { x: f.x, y: f.y, w: f.w, h: f.h }
-            );
+            // 스케일 변환: base → 출력
+            const sx = outW / baseW;
+            const sy = outH / baseH;
+            const frames = framesData.map((f: any) => ({
+                x: Math.round(f.x * sx),
+                y: Math.round(f.y * sy),
+                w: Math.round(f.w * sx),
+                h: Math.round(f.h * sy),
+            }));
             console.log("📍 프레임 좌표:", frames);
 
             // 각 프레임 합성
@@ -1484,7 +2400,7 @@ function EscapeIntroPageInner() {
                 };
 
                 ctx.save();
-                ctx.filter = "sepia(0.3) contrast(0.9) brightness(0.95) saturate(0.8)";
+                ctx.filter = "sepia(0.2) contrast(0.95) brightness(1.0) saturate(0.9)";
                 ctx.beginPath();
                 ctx.rect(f.x, f.y, f.w, f.h);
                 ctx.clip();
@@ -1505,12 +2421,13 @@ function EscapeIntroPageInner() {
                 }
                 ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
-                ctx.filter = "none";
-                ctx.fillStyle = "rgba(250, 245, 235, 0.15)";
-                ctx.fillRect(f.x, f.y, f.w, f.h);
+                // 회색 덧칠 제거
+                // ctx.filter = "none";
+                // ctx.fillStyle = "rgba(250, 245, 235, 0.15)";
+                // ctx.fillRect(f.x, f.y, f.w, f.h);
                 ctx.restore();
 
-                console.log(`✅ 사진 ${i + 1} 합성 완료`);
+                console.log(`✅ 사진 ${i + 1} 합성 완료 (${f.x}, ${f.y}, ${f.w}x${f.h})`);
             });
 
             const preview = canvas.toDataURL("image/jpeg", 0.93);
@@ -2258,10 +3175,31 @@ function EscapeIntroPageInner() {
             }
         } catch {}
 
-        setPiecesCollected((n) => n + 1);
+        // 1) 현재 선택된 장소의 스토리가 있으면, 다음 카테고리로 넘어가기 전에 해당 스토리를 먼저 노출
+        try {
+            const place = (currentChapter?.placeOptions || []).find(
+                (p: any) => Number(p.id) === Number(selectedPlaceId)
+            );
+            const queue: string[] = Array.isArray((place as any)?.stories)
+                ? (place as any).stories
+                      .map((s: any) => String(s?.dialogue || s?.narration || s || "").trim())
+                      .filter(Boolean)
+                : [];
+            const nextIdxCandidate = currentChapterIdx + 1 < chapters.length ? currentChapterIdx + 1 : null;
+            if (queue.length > 0) {
+                setPostStoryQueue(queue);
+                setPostStoryIdx(0);
+                setShowPostStory(true);
+                setPendingNextChapterIdx(nextIdxCandidate);
+                // 조각 획득은 스토리 모달 종료 시점에 pieceAward 단계에서 처리됨
+                return;
+            }
+        } catch {}
 
         const nextIdx = currentChapterIdx + 1;
         if (nextIdx < chapters.length) {
+            // 스토리가 없는 경우에는 바로 조각 카운트 증가 후 다음 카테고리로 이동
+            setPiecesCollected((n) => n + 1);
             setCurrentChapterIdx(nextIdx);
             changeFlowStep("category", { resetMission: true, resetPlace: true });
             setDialogueStep(0);
@@ -2440,9 +3378,100 @@ function EscapeIntroPageInner() {
     if (loading) {
         return <LoadingSpinner />;
     }
+    // 종로/익선 스토리 식별 (훅 사용 금지: 조기 리턴 경로에서도 훅 순서 고정)
+    const isJongroStory = (() => {
+        const text = `${String(story?.title || "")} ${String((story as any)?.region || "")} ${String(
+            (story as any)?.stationName || ""
+        )}`;
+        return /1919|익선|종로/i.test(text);
+    })();
+    // 로딩 후 웹툰/지도 전, 짧은 시계 연출 (종로 escape 한정)
+    if (showPostClock && isJongroStory) {
+        return <PostLoadClockSplash />;
+    }
+
+    // 강제 렌더 테스트 제거됨
 
     // 새 인트로 UI (책 펼침 제거, 배경 + 오버레이 레이아웃)
     const useNewIntroUI = true;
+    // 엔진이 'webtoon'이면 전용 렌더러로 분기
+    if (uiEngine === "webtoon") {
+        const flowType = String(uiFlow?.type || "");
+        if (flowType === "webtoon_scroll_to_map") {
+            // 1. chapters에 있는 모든 장소(placeOptions)를 하나로 모읍니다.
+            // DB에서 가져온 theme, stories, missions 정보가 여기 다 들어있습니다.
+            const allPlaces = chapters
+                .flatMap((ch: any) => ch.placeOptions || [])
+                .map((p: any) => ({
+                    ...p,
+                    theme: p.theme || p.category || "footsteps",
+
+                    // 👇 [여기 수정!] stories 배열을 만들 때 missionId를 꼭 챙겨야 합니다.
+                    stories: Array.isArray(p.stories)
+                        ? p.stories.map((s: any) => ({
+                              id: s.id,
+                              speaker: s.speaker,
+                              dialogue: s.dialogue || s.narration || s.text || "",
+
+                              // 🚨 [필수] 이 줄이 없으면 미션 모달이 절대 안 뜹니다!
+                              missionId: s.missionId ?? null,
+                          }))
+                        : [],
+
+                    missions: p.missions,
+                }));
+
+            // 2. 모은 장소 정보(allPlaces)를 flow.places에 담아서 넘겨줍니다.
+            return (
+                <JongroMapFinalExact
+                    data={{
+                        flow: {
+                            ...uiFlow,
+                            places: allPlaces, // ✨ 여기가 핵심! 이걸 넘겨야 지도에 뜹니다.
+                        },
+                        tokens: uiTokens,
+                        backgroundImage: story?.imageUrl,
+                        synopsis: story?.synopsis,
+                    }}
+                />
+            );
+        }
+        return (
+            <WebtoonIntro
+                tokens={uiTokens}
+                flow={uiFlow}
+                onComplete={() => {
+                    setFlowStep("category");
+                }}
+            />
+        );
+    }
+
+    // 엔진이 'letter'이면 LetterIntro로 분기 (prologue에서만)
+    if (uiEngine === "letter" && flowStep === "prologue") {
+        // flow 호환: uiFlow.intro[0] | uiFlow.flow[0] | uiFlow
+        const letterFlow =
+            (Array.isArray(uiFlow?.intro) && uiFlow.intro[0]) ||
+            (Array.isArray(uiFlow?.flow) && uiFlow.flow[0]) ||
+            uiFlow ||
+            null;
+        const bgUrl = story?.imageUrl || "https://stylemap-images.s3.ap-southeast-2.amazonaws.com/homepage.png";
+        return (
+            <>
+                <div className="fixed inset-0 z-[1000]">
+                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgUrl})` }} />
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/60 to-black/20" />
+                </div>
+                <LetterIntro
+                    flow={letterFlow}
+                    onComplete={() => {
+                        setFlowStep("category");
+                    }}
+                />
+            </>
+        );
+    }
+
     if (useNewIntroUI) {
         const bgUrl = story?.imageUrl || "https://stylemap-images.s3.ap-southeast-2.amazonaws.com/homepage.png";
         // 편지는 맨 처음(prologue)과 맨 마지막(epilogue)에만 표시
@@ -2686,12 +3715,19 @@ function EscapeIntroPageInner() {
                                                             return;
                                                         }
                                                         // 두번째 클릭: 해당 장소로 확정 → 이동 화면 → 도착 후 대화/미션
-                                                        const lines: Array<{ speaker?: string | null; text: string }> =
+                                                        const lines: Array<{
+                                                            speaker?: string | null;
+                                                            text: string;
+                                                            missionId?: number | null;
+                                                        }> =
                                                             Array.isArray(p.stories) && p.stories.length > 0
                                                                 ? p.stories
                                                                       .map((s: any) => ({
-                                                                          speaker: s.speaker,
-                                                                          text: s.dialogue || s.narration || "",
+                                                                          speaker: s?.speaker || null,
+                                                                          text: String(
+                                                                              s?.dialogue || s?.narration || ""
+                                                                          ).trim(),
+                                                                          missionId: s?.missionId ?? null,
                                                                       }))
                                                                       .filter(
                                                                           (d: any) => d.text && d.text.trim().length > 0
@@ -2702,17 +3738,10 @@ function EscapeIntroPageInner() {
                                                         setIsMoving(true);
                                                         setTimeout(() => {
                                                             setIsMoving(false);
-                                                            if (lines.length === 0) {
-                                                                // 대화가 없더라도 바로 미션 목록을 볼 수 있게 활성화
-                                                                setDialogueQueue([]);
-                                                                setMissionUnlocked(true);
-                                                                setFlowStep("mission");
-                                                                return;
-                                                            }
-                                                            // 대화를 먼저 보여주고, 미션은 대화 종료 시점에 활성화
-                                                            setDialogueQueue(lines);
-                                                            setFlowStep("dialogue");
-                                                            setMissionUnlocked(false);
+                                                            // 장소 선택 후에는 항상 먼저 미션 화면으로 진입
+                                                            // (장소 스토리는 미션 완료 후 proceedAfterMission()에서 모달로 노출)
+                                                            setMissionUnlocked(true);
+                                                            setFlowStep("mission");
                                                         }, 1500);
                                                     }}
                                                 >
@@ -2785,6 +3814,40 @@ function EscapeIntroPageInner() {
                                             <button
                                                 className="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700"
                                                 onClick={() => {
+                                                    const currentLine =
+                                                        dialogueQueue && dialogueQueue.length > 0
+                                                            ? dialogueQueue[0]
+                                                            : null;
+                                                    // 1) 현재 대사에 missionId가 연결되어 있으면 즉시 미션 모달 표시 (대화 일시 정지)
+                                                    if (currentLine && (currentLine as any).missionId) {
+                                                        try {
+                                                            const placeList =
+                                                                (currentChapter as any)?.placeOptions || [];
+                                                            const place = placeList.find(
+                                                                (p: any) => Number(p.id) === Number(selectedPlaceId)
+                                                            );
+                                                            const mission = place?.missions?.find(
+                                                                (m: any) =>
+                                                                    Number(m.id) ===
+                                                                    Number((currentLine as any).missionId)
+                                                            );
+                                                            if (mission) {
+                                                                // 사진/텍스트 모두 기존 모달 로직을 재사용 (S3 업로드 포함)
+                                                                setModalError(null);
+                                                                setModalWrongOnce(false as any);
+                                                                setPhotoFiles([]);
+                                                                setPhotoPreviewUrl(null);
+                                                                setPhotoPreviewUrls([]);
+                                                                setPhotoUploaded(false);
+                                                                setModalAnswer("");
+                                                                setActiveMission(mission);
+                                                                setMissionModalOpen(true);
+                                                                // 대화 진행은 미션 완료 시점에 한 줄 넘김
+                                                                return;
+                                                            }
+                                                        } catch {}
+                                                    }
+                                                    // 2) 미션이 없거나 찾지 못했으면 다음 줄로 진행
                                                     if (dialogueQueue.length > 1) setDialogueQueue((q) => q.slice(1));
                                                     else {
                                                         // 장소 스토리 → 미션: 노트 펼침 효과와 함께 미션으로 전환
@@ -2847,7 +3910,7 @@ function EscapeIntroPageInner() {
                         {/* 우: 엔딩 아웃트로 → 갤러리 */}
                         {flowStep === "done" && endingStep === "badge" && (
                             <ClientPortal>
-                                <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm animate-fade-in">
+                                <div className="fixed inset-0 z-[9999] bg-black/50 animate-fade-in">
                                     {/* ✅ 중앙 정렬 컨테이너 */}
                                     <div className="min-h-screen flex items-center justify-center p-4">
                                         <div
@@ -2918,7 +3981,7 @@ function EscapeIntroPageInner() {
 
                         {flowStep === "done" && endingStep === "gallery" ? (
                             <div className="fixed inset-0 z-[2000] bg-black/40 flex items-end md:items-center justify-center p-2">
-                                <div className="w-[92vw] max-w-[520px] sm:max-w-[640px] max-h-[76vh] md:max-h-[86vh] rounded-2xl bg-white/85 backdrop-blur p-3 border shadow overflow-hidden flex flex-col">
+                                <div className="w-[92vw] max-w-[520px] sm:max-w-[640px] max-h-[76vh] md:max-h-[86vh] rounded-2xl bg-white/90 p-3 border shadow overflow-hidden flex flex-col">
                                     <h3 className="text-lg font-bold text-gray-800 mb-3">
                                         엔딩 갤러리 (최대 {requiredPhotoCount}장 선택)
                                     </h3>
@@ -3002,23 +4065,17 @@ function EscapeIntroPageInner() {
                                                                 h: number;
                                                             }> | null = null;
                                                             try {
-                                                                const res = await fetch("/api/collages/templates", {
-                                                                    cache: "no-store",
-                                                                });
+                                                                const res = await fetch(
+                                                                    `/api/collages/templates?storyId=${storyId}`,
+                                                                    {
+                                                                        cache: "no-store",
+                                                                    }
+                                                                );
                                                                 const data = await res.json();
                                                                 const list = Array.isArray(data?.templates)
                                                                     ? data.templates
                                                                     : [];
-                                                                const t =
-                                                                    list.find(
-                                                                        (it: any) =>
-                                                                            String(it?.name || "")
-                                                                                .toLowerCase()
-                                                                                .includes("hongdae") ||
-                                                                            String(it?.imageUrl || "").includes(
-                                                                                "hongdaelatter_template"
-                                                                            )
-                                                                    ) || list[0];
+                                                                const t = list[0];
                                                                 if (t) {
                                                                     if (t.imageUrl) bgUrl = String(t.imageUrl);
                                                                     if (t.framesJson && Array.isArray(t.framesJson))
@@ -3064,7 +4121,7 @@ function EscapeIntroPageInner() {
                             </div>
                         ) : selectedPlaceId && missionUnlocked && flowStep !== "done" ? (
                             <div
-                                className={`rounded-2xl bg-white/85 backdrop-blur p-4 border shadow transition-opacity duration-500 ${
+                                className={`rounded-2xl bg-white/90 p-4 border shadow transition-opacity duration-500 ${
                                     (flowStep as unknown as string) === "walk" || letterGateActive
                                         ? "opacity-0"
                                         : "opacity-100"
@@ -3344,7 +4401,7 @@ function EscapeIntroPageInner() {
                     >
                         <div className="bg-white rounded-2xl w-full max-w-md h-[78vh] overflow-hidden relative">
                             {isMoving && (
-                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+                                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/90">
                                     <div className="text-4xl mb-3">🚗</div>
                                     <div className="text-gray-800 font-semibold">이동 중...</div>
                                 </div>
@@ -3703,12 +4760,18 @@ function EscapeIntroPageInner() {
                                                                     setToast(
                                                                         "미션 완료! 다음 카테고리로 버튼을 눌러주세요."
                                                                     );
+                                                                    try {
+                                                                        await proceedAfterMission();
+                                                                    } catch {}
                                                                 } else {
                                                                     // 미션이 2개 미완료인 경우: 모달만 닫고 미션 목록으로 돌아감
                                                                     setMissionModalOpen(false);
                                                                     setActiveMission(null);
                                                                     setModalAnswer("");
                                                                     setToast("미션 완료!");
+                                                                    try {
+                                                                        await proceedAfterMission();
+                                                                    } catch {}
                                                                 }
                                                             } catch (err: any) {
                                                                 setModalError(
@@ -3802,13 +4865,28 @@ function EscapeIntroPageInner() {
                                         if (postStoryIdx < postStoryQueue.length - 1) {
                                             setPostStoryIdx((i) => i + 1);
                                         } else {
+                                            // 스토리 종료
                                             setShowPostStory(false);
                                             setPostStoryQueue([]);
                                             setPostStoryIdx(0);
-                                            // 미션 완료 후 조각 수 반영
-                                            setPiecesCollected((n) => n + 1);
-                                            // 스토리 종료 후 조각 획득 단계로 연결
-                                            setFlowStep("pieceAward");
+                                            // 다음 카테고리로 즉시 이동 (완료 표시는 advanceToNextCategory에서 처리됨)
+                                            if (typeof pendingNextChapterIdx === "number") {
+                                                const nextIndex = pendingNextChapterIdx as number;
+                                                setPendingNextChapterIdx(null);
+                                                // 조각은 조용히 증가시키되, UI는 카테고리로 전환
+                                                setPiecesCollected((n) => n + 1);
+                                                setCurrentChapterIdx(nextIndex);
+                                                changeFlowStep("category", { resetMission: true, resetPlace: true });
+                                                setDialogueStep(0);
+                                                setSelectedCategory(null);
+                                                setSelectedPlaceIndex(null);
+                                                setSelectedPlaceId(null);
+                                                setSelectedPlaceConfirm(null);
+                                                setMissionUnlocked(false);
+                                            } else {
+                                                // 안전장치: 다음 인덱스가 설정되지 않았으면 기존 동작 유지하지 않고 카테고리로 복귀
+                                                changeFlowStep("category", { resetMission: true, resetPlace: true });
+                                            }
                                         }
                                     }}
                                     className="px-4 py-2 rounded-lg bg-black text-white"
@@ -3834,3 +4912,5 @@ export default function Page() {
         </Suspense>
     );
 }
+
+// Lite 강제 분기 구현은 제거되었습니다.

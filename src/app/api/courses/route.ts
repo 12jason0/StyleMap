@@ -138,11 +138,6 @@ export async function GET(request: NextRequest) {
                 current_participants: true,
                 view_count: true,
                 createdAt: true,
-                CourseTagToCourses: {
-                    select: {
-                        course_tags: { select: { id: true, name: true } },
-                    },
-                },
                 coursePlaces: {
                     orderBy: { order_index: "asc" },
                     select: {

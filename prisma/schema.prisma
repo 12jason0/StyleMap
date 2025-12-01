@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -56,13 +56,13 @@ model User {
 }
 
 model UserReward {
-  id        Int        @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   amount    Int
-  createdAt DateTime   @default(now())
+  createdAt DateTime     @default(now())
   userId    Int
   type      RewardType
   unit      RewardUnit
-  user      User       @relation(fields: [userId], references: [id])
+  user      User         @relation(fields: [userId], references: [id])
   // 장소 기반 보상(예: escape 장소 클리어 보상) 추적용
   placeId   Int?
   place     PlaceOption? @relation(fields: [placeId], references: [id])
@@ -129,7 +129,7 @@ model Course {
   region               String?              @db.VarChar(50)
   duration             String?              @db.VarChar(45)
   concept              String?              @db.VarChar(45)
-  tags                 Json?                 // AI 추천용 태그: { concept, mood, target, time, budget(예산), theme }
+  tags                 Json? // AI 추천용 태그: { concept, mood, target, time, budget(예산), theme }
   isPopular            Boolean              @default(false)
   rating               Float                @default(0.0)
   current_participants Int                  @default(0)
@@ -151,21 +151,21 @@ model Course {
   userFavorites        UserFavorite[]
   interactions         UserInteraction[]
 
-  @@map("courses")
   @@index([concept])
   @@index([region])
   @@index([title])
+  @@map("courses")
 }
 
 // 코스 부가 정보(추천 시간/계절/유형/교통/주차 등)
 model CourseDetail {
-  id               Int      @id @default(autoincrement())
-  course_id        Int      @unique
-  recommended_start_time String?  @db.VarChar(100)
-  season           String?  @db.VarChar(50)
-  course_type      String?  @db.VarChar(50)
-  transportation   String?  @db.VarChar(50)
-  course           Course   @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  id                     Int     @id @default(autoincrement())
+  course_id              Int     @unique
+  recommended_start_time String? @db.VarChar(100)
+  season                 String? @db.VarChar(50)
+  course_type            String? @db.VarChar(50)
+  transportation         String? @db.VarChar(50)
+  course                 Course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
 
   @@map("course_details")
 }
@@ -188,13 +188,13 @@ model Place {
   created_at           DateTime         @default(now())
   updated_at           DateTime         @updatedAt
   // 코스와 동일하게 JSON 형식으로 보관 (배열/객체 모두 허용)
-  tags                 Json?              // AI 추천용 태그: { concept, mood, target, time, budget(예산), theme }
+  tags                 Json? // AI 추천용 태그: { concept, mood, target, time, budget(예산), theme }
   coursePlaces         CoursePlace[]
   closed_days          PlaceClosedDay[]
 
-  @@map("places")
   @@index([name])
   @@index([address])
+  @@map("places")
 }
 
 model CourseTag {
@@ -229,8 +229,25 @@ model Story {
   CollageTemplate        CollageTemplate[]
   reward_badge           Badge?              @relation(fields: [reward_badge_id], references: [id])
   userstoryprogress      UserStoryProgress[]
+  ui                     StoryUI?
 
   @@map("stories")
+}
+
+/// UI/연출 설정을 스토리 단위로 보관 (엔진 전환/테마/플로우)
+model StoryUI {
+  id          Int      @id @default(autoincrement())
+  storyId     Int      @unique
+  engine_key  String   @db.VarChar(50) // letter | webtoon | visual_novel ...
+  tokens_json Json? // 색/폰트/곡률 등 테마 토큰
+  flow_json   Json? // 연출/씬/메시지 시퀀스(참조 id 기반)
+  version     Int      @default(1)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  story       Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([engine_key])
+  @@map("story_ui")
 }
 
 model PlaceOption {
@@ -247,8 +264,10 @@ model PlaceOption {
   placeDialogues PlaceDialogue[]
   missions       PlaceMission[]
   stories        PlaceStory[]
+  theme          PlaceTheme?
+
   // UserReward와의 역관계(장소 기반 보상 기록)
-  userRewards    UserReward[]
+  userRewards UserReward[]
 }
 
 model PlaceDialogue {
@@ -269,7 +288,7 @@ model PlaceDialogue {
 }
 
 model PlaceMission {
-  id             Int         @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   placeId        Int
   missionNumber  Int
   missionPayload Json?
@@ -278,18 +297,21 @@ model PlaceMission {
   hint           String?
   question       String?
   missionType    MissionType
-  place          PlaceOption @relation(fields: [placeId], references: [id])
+  place          PlaceOption  @relation(fields: [placeId], references: [id])
+  placeStories   PlaceStory[]
 }
 
 model PlaceStory {
-  id          Int         @id @default(autoincrement())
+  id          Int           @id @default(autoincrement())
   placeId     Int
   order       Int
   speaker     String?
   dialogue    String?
   narration   String?
   nextTrigger String?
-  place       PlaceOption @relation(fields: [placeId], references: [id])
+  missionId   Int?
+  mission     PlaceMission? @relation(fields: [missionId], references: [id])
+  place       PlaceOption   @relation(fields: [placeId], references: [id])
 }
 
 model UserCollage {
@@ -318,6 +340,7 @@ model CollageTemplate {
   story       Story?        @relation(fields: [storyId], references: [id], onDelete: Cascade)
   userCollage UserCollage[]
 
+  @@unique([storyId])
   @@map("collage_templates")
 }
 
@@ -622,6 +645,8 @@ enum SpeakerRole {
   user
   npc
   system
+  clear_place
+  mission_start
 }
 
 enum TreeStatus {
@@ -635,4 +660,11 @@ enum WaterSource {
   escape
   admin
   bonus
+}
+
+enum PlaceTheme {
+  footsteps // 발자취
+  history // 역사
+  time // 시간간
+  location // 장소
 }

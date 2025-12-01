@@ -4,6 +4,23 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "@/components/ImageFallback";
 
+// --- [설정] 한글 변환 맵 ---
+const CATEGORY_MAP: Record<string, string> = {
+    footsteps: "발자취",
+    history: "역사",
+    time: "시간",
+    person: "인물",
+    location: "장소",
+    cafe: "카페",
+    restaurant: "식당",
+    lunch: "점심",
+    dinner: "저녁",
+    sights: "명소",
+    complex: "복합문화",
+    culture: "문화",
+    store: "상점",
+};
+
 // --- 타입 정의 ---
 type Badge = { id: number; name: string; description: string; image_url?: string };
 type Story = {
@@ -25,6 +42,7 @@ type StoryChapter = {
     story_id: number;
     chapter_number: number;
     title: string;
+    placeOptions?: any[];
     location_name?: string;
     address?: string;
     latitude?: number | null;
@@ -43,7 +61,7 @@ type UserStoryProgress = {
 };
 type ProgressMap = Record<string, UserStoryProgress>;
 
-// --- LocalStorage 헬퍼 함수 ---
+// --- LocalStorage 헬퍼 ---
 const STORAGE_KEY = "escape_progress_v1";
 function readProgress(): ProgressMap {
     if (typeof window === "undefined") return {};
@@ -61,7 +79,7 @@ function writeProgress(map: ProgressMap) {
     } catch {}
 }
 
-// --- 커스텀 훅: 게임 로직 분리 ---
+// --- 훅 ---
 function useEscapeGame() {
     const router = useRouter();
     const [stories, setStories] = useState<Story[]>([]);
@@ -85,7 +103,6 @@ function useEscapeGame() {
                 storyData.forEach((s: any) => {
                     if (s.badge) badgeData.push(s.badge);
                 });
-
                 setStories(storyData);
                 setBadges(badgeData);
             } catch (e) {
@@ -101,7 +118,23 @@ function useEscapeGame() {
     useEffect(() => {
         const token = localStorage.getItem("authToken");
         setIsLoggedIn(!!token);
-        const handleAuthChange = () => setIsLoggedIn(!!localStorage.getItem("authToken"));
+        if (token) {
+            fetch("/api/users/profile", {
+                headers: { Authorization: `Bearer ${token}` },
+                cache: "no-store",
+            })
+                .then((res) => {
+                    if (!res.ok) {
+                        localStorage.removeItem("authToken");
+                        setIsLoggedIn(false);
+                    }
+                })
+                .catch(() => {});
+        }
+        const handleAuthChange = () => {
+            const newToken = localStorage.getItem("authToken");
+            setIsLoggedIn(!!newToken);
+        };
         window.addEventListener("authTokenChange", handleAuthChange);
         return () => window.removeEventListener("authTokenChange", handleAuthChange);
     }, []);
@@ -124,20 +157,19 @@ function useEscapeGame() {
                 setChapters((prev) => ({ ...prev, [storyId]: sortedChapters }));
                 return sortedChapters;
             } catch (e) {
-                console.error("Failed to load chapters for story", storyId, e);
-                setToast("챕터 정보를 불러오는데 실패했습니다.");
+                console.error("Failed to load chapters", e);
                 return [];
             }
         },
         [chapters]
     );
 
-    const handleStartStory = (storyId: number) => {
-        if (!isLoggedIn) {
+    const handleStartStory = async (storyId: number) => {
+        const token = localStorage.getItem("authToken");
+        if (!token && !isLoggedIn) {
             router.push(`/login?message=${encodeURIComponent("로그인 후 이용 가능합니다.")}`);
             return;
         }
-
         const existingProgress = progressMap[String(storyId)];
         if (!existingProgress || existingProgress.status === "not_started") {
             const newProgress: UserStoryProgress = {
@@ -167,28 +199,12 @@ function useEscapeGame() {
     };
 }
 
-// --- UI 컴포넌트들 ---
-
-const StoryCard = ({
-    story,
-    badge,
-    progress,
-    onStart,
-    onResume,
-    onDetails,
-    isFirst,
-}: {
-    story: Story;
-    badge?: Badge;
-    progress?: UserStoryProgress;
-    onStart: (id: number) => void;
-    onResume: (id: number) => void; // ✅ onResume 타입을 추가하여 에러 해결
-    onDetails: (id: number) => void;
-    isFirst: boolean;
-}) => {
+// --- UI: StoryCard ---
+const StoryCard = ({ story, badge, progress, onStart, onResume, onDetails, isFirst }: any) => {
     const imageSrc = story.imageUrl || badge?.image_url || "";
     const isCompleted = progress?.status === "completed";
     const isInProgress = progress?.status === "in_progress";
+    const isPopular = /종로|익선동|1919|Jongro|Jongno/i.test(`${story.title} ${story.region || ""}`);
 
     const getDifficultyStars = (level?: number | string) => {
         let lv = 0;
@@ -217,6 +233,13 @@ const StoryCard = ({
             onClick={() => onDetails(story.id)}
         >
             <div className="relative h-40 rounded-2xl overflow-hidden">
+                {isPopular && (
+                    <div className="absolute top-2 left-2 z-10">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold bg-amber-500 text-white shadow">
+                            <span>🔥</span> 인기
+                        </span>
+                    </div>
+                )}
                 <Image
                     src={imageSrc || ""}
                     alt={story.title}
@@ -242,18 +265,7 @@ const StoryCard = ({
                 <div className="mb-2">
                     <h3 className="text-xl font-bold text-gray-900">{story.title}</h3>
                 </div>
-
-                <p
-                    className="text-gray-600 mb-4"
-                    style={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                    }}
-                >
-                    {story.synopsis}
-                </p>
+                <p className="text-gray-600 mb-4 line-clamp-2">{story.synopsis}</p>
                 {badge && (
                     <div className="text-xs text-amber-700 mb-4 bg-amber-50 px-2 py-1 rounded-md inline-block">
                         🏅 보상 배지: {badge.name}
@@ -297,73 +309,105 @@ const StoryCard = ({
     );
 };
 
-const DetailsModal = ({
-    story,
-    chapters,
-    badge,
-    isOpen,
-    onClose,
-    onStart,
-}: {
-    story: Story | null;
-    chapters: StoryChapter[];
-    badge?: Badge | null;
-    isOpen: boolean;
-    onClose: () => void;
-    onStart: (id: number) => void;
-}) => {
+// --- DetailsModal: 화면 정중앙 팝업 스타일 ---
+const DetailsModal = ({ story, chapters, isOpen, onClose, onStart }: any) => {
     if (!isOpen || !story) return null;
 
-    return (
-        <div className="fixed inset-0 z-50 bg-black/50" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="absolute inset-x-0 bottom-15">
-                <div
-                    className="mx-auto max-w-[500px] bg-white rounded-2xl shadow-2xl overflow-hidden"
-                    onClick={(e) => e.stopPropagation()}
+    // 렌더링 로직을 JSX 밖으로 분리하여 오류 방지
+    const renderChapters = () => {
+        if (!chapters || chapters.length === 0) {
+            return <li className="text-sm text-gray-500 text-center py-4">챕터 정보를 불러오는 중...</li>;
+        }
+
+        return chapters.map((c: any) => {
+            // 1. 데이터 추출
+            const place = c.placeOptions?.[0];
+            const themeRaw = (place?.theme || "").trim();
+            const catRaw = (place?.category || "").trim();
+            const themeKey = themeRaw.toLowerCase();
+            const catKey = catRaw.toLowerCase();
+
+            // 2. 제목 표시 로직 (테마 우선 -> 없으면 시그니처)
+            let mainDisplay = c.title;
+            if (themeKey && CATEGORY_MAP[themeKey]) {
+                mainDisplay = CATEGORY_MAP[themeKey];
+            } else if (themeRaw) {
+                // 매핑 키가 없어도 값이 있으면 그대로 사용
+                mainDisplay = themeRaw;
+            }
+
+            // 3. 뱃지 표시 로직 (카테고리)
+            const badgeLabel = catKey ? CATEGORY_MAP[catKey] || catRaw : null;
+
+            return (
+                <li
+                    key={c.id}
+                    className="text-sm text-gray-700 bg-gray-50 rounded-lg px-4 py-3 flex items-center justify-between"
                 >
-                    <div className="p-6 max-h-[70vh] overflow-auto">
-                        <div className="relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100">
-                            <Image
-                                src={story.imageUrl || ""}
-                                alt={story.title}
-                                fill
-                                className="object-cover"
-                                sizes="100vw"
-                            />
-                        </div>
-                        <h2 className="text-2xl font-bold text-gray-900">{story.title}</h2>
-                        <p className="text-gray-700 mt-2">{story.synopsis}</p>
-                        <div className="mt-6">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-3">챕터 목록</h3>
-                            <ul className="space-y-2">
-                                {chapters.length > 0 ? (
-                                    chapters.map((c) => (
-                                        <li
-                                            key={c.id}
-                                            className="text-sm text-gray-700 bg-gray-50 rounded-md px-4 py-3"
-                                        >
-                                            <span className="font-semibold">Chapter {c.chapter_number}:</span> {c.title}
-                                        </li>
-                                    ))
-                                ) : (
-                                    <li className="text-sm text-gray-500">챕터 정보를 불러오는 중...</li>
-                                )}
-                            </ul>
-                        </div>
-                        <div className="mt-6 flex justify-end gap-3">
-                            <button
-                                onClick={onClose}
-                                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                            >
-                                닫기
-                            </button>
-                            <button
-                                onClick={() => onStart(story.id)}
-                                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                            >
-                                시작하기
-                            </button>
-                        </div>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="font-bold text-gray-900 whitespace-nowrap">Chapter {c.chapter_number}</span>
+                        <span className="truncate">{mainDisplay}</span>
+                    </div>
+                    {badgeLabel && (
+                        <span className="ml-2 flex-shrink-0 text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                            {badgeLabel}
+                        </span>
+                    )}
+                </li>
+            );
+        });
+    };
+
+    return (
+        <div
+            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+        >
+            <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
+            <div
+                className="w-full max-w-[450px] bg-white rounded-2xl shadow-2xl overflow-hidden relative"
+                style={{ animation: "slideUp 0.3s ease-out forwards" }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="p-6 max-h-[80vh] overflow-y-auto">
+                    <div className="relative w-full h-48 rounded-xl overflow-hidden mb-4 bg-gray-100">
+                        <Image
+                            src={story.imageUrl || ""}
+                            alt={story.title}
+                            fill
+                            className="object-cover"
+                            sizes="100vw"
+                        />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900">{story.title}</h2>
+                    <p className="text-gray-700 mt-2 text-sm leading-relaxed">{story.synopsis}</p>
+
+                    <div className="mt-6">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-3">챕터 목록</h3>
+                        <ul className="space-y-2">{renderChapters()}</ul>
+                    </div>
+
+                    <div className="mt-6 flex justify-end gap-3">
+                        <button
+                            onClick={onClose}
+                            className="px-5 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                        >
+                            닫기
+                        </button>
+                        <button
+                            onClick={() => onStart(story.id)}
+                            className="px-5 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-md"
+                        >
+                            시작하기
+                        </button>
                     </div>
                 </div>
             </div>
@@ -371,11 +415,10 @@ const DetailsModal = ({
     );
 };
 
-// --- 메인 페이지 컴포넌트 ---
+// --- 메인 페이지 ---
 export default function EscapePage() {
-    const { stories, badges, chapters, progressMap, isLoading, toast, fetchChaptersForStory, handleStartStory } =
+    const { stories, badges, chapters, progressMap, isLoading, fetchChaptersForStory, handleStartStory } =
         useEscapeGame();
-
     const [activeModalStoryId, setActiveModalStoryId] = useState<number | null>(null);
 
     const handleOpenDetails = (storyId: number) => {
@@ -383,14 +426,8 @@ export default function EscapePage() {
         setActiveModalStoryId(storyId);
     };
 
-    const handleCloseModal = () => {
-        setActiveModalStoryId(null);
-    };
-
-    // 이어하기 로직도 시작하기와 동일하게 intro 페이지로 이동
-    const handleResumeStory = (storyId: number) => {
-        handleStartStory(storyId);
-    };
+    const handleCloseModal = () => setActiveModalStoryId(null);
+    const handleResumeStory = (storyId: number) => handleStartStory(storyId);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -409,12 +446,8 @@ export default function EscapePage() {
         <div className="min-h-screen bg-gray-50">
             <div className="bg-white shadow-sm">
                 <div className="max-w-[400px] mx-auto px-4 py-5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">사건 파일</h1>
-                            <p className="text-gray-600 mt-2">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
-                        </div>
-                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900">사건 파일</h1>
+                    <p className="text-gray-600 mt-2">도심을 누비며 챕터를 완료하고 배지를 획득하세요!</p>
                 </div>
             </div>
 
@@ -422,15 +455,7 @@ export default function EscapePage() {
                 <div className="grid grid-cols-1 gap-6">
                     {isLoading
                         ? [...Array(3)].map((_, i) => (
-                              <div key={i} className="bg-white rounded-2xl shadow-md animate-pulse">
-                                  <div className="h-40 bg-gray-200 rounded-t-2xl" />
-                                  <div className="p-6 space-y-3">
-                                      <div className="h-6 bg-gray-300 rounded w-2/3" />
-                                      <div className="h-4 bg-gray-200 rounded w-1/3" />
-                                      <div className="h-4 bg-gray-200 rounded w-full" />
-                                      <div className="h-10 bg-gray-300 rounded w-28 ml-auto" />
-                                  </div>
-                              </div>
+                              <div key={i} className="bg-white rounded-2xl shadow-md animate-pulse h-60" />
                           ))
                         : stories.map((story, index) => (
                               <StoryCard
@@ -452,7 +477,6 @@ export default function EscapePage() {
                 onClose={handleCloseModal}
                 story={stories.find((s) => s.id === activeModalStoryId) || null}
                 chapters={chapters[activeModalStoryId!] || []}
-                badge={badges.find((b) => b.id === stories.find((s) => s.id === activeModalStoryId)?.reward_badge_id)}
                 onStart={handleStartStory}
             />
             <div className="md:hidden h-20" />

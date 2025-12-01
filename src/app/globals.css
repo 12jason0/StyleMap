@@ -185,3 +185,14 @@ body {
     font-weight: 700;
     font-style: normal;
 }
+
+/* 개발 편의 배지(Next.js Dev Tools) 숨김 - 로컬 개발 화면 가독성 개선 */
+[data-next-badge],
+[data-nextjs-dev-tools-button],
+button[data-nextjs-dev-tools-button],
+#nextjs-dev-tools-menu,
+#nextjs-devtools-container {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}

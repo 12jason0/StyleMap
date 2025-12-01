@@ -154,7 +154,8 @@ export default function Home() {
         // 초기 목록은 로딩 속도를 위해 30개만 로드
         params.set("limit", "30");
         params.set("imagePolicy", "any");
-        if (query.trim()) params.set("q", query.trim());
+        const qTrim = query.trim();
+        if (qTrim) params.set("q", qTrim);
         if (selectedTagIds.length > 0) params.set("tagIds", selectedTagIds.join(","));
         return `/api/courses?${params.toString()}`;
     };
@@ -182,7 +183,7 @@ export default function Home() {
         };
         fetchCourses();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [query, selectedTagIds.join(","), searchNonce]);
+    }, [selectedTagIds.join(","), searchNonce]);
 
     const toggleTag = (id: number) => {
         setSelectedTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -836,11 +837,21 @@ export default function Home() {
                                     placeholder="코스 검색 (제목/설명/지역)"
                                     className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
                                     aria-label="코스 검색"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                            const sp = new URLSearchParams();
+                                            const qTrim = query.trim();
+                                            if (qTrim) sp.set("q", qTrim);
+                                            if (selectedTagIds.length > 0) sp.set("tagIds", selectedTagIds.join(","));
+                                            router.push(`/nearby?${sp.toString()}`);
+                                        }
+                                    }}
                                 />
                                 <button
                                     onClick={() => {
                                         const sp = new URLSearchParams();
-                                        if (query.trim()) sp.set("q", query.trim());
+                                        const qTrim = query.trim();
+                                        if (qTrim) sp.set("q", qTrim);
                                         if (selectedTagIds.length > 0) sp.set("tagIds", selectedTagIds.join(","));
                                         router.push(`/nearby?${sp.toString()}`);
                                     }}

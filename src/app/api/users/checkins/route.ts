@@ -40,86 +40,98 @@ function startOfWeekMonday(date: Date): Date {
     return d;
 }
 
-function computeConsecutiveStreak(sortedDescCheckins: { date: Date }[], now: Date): number {
-    if (sortedDescCheckins.length === 0) return 0;
-    let streak = 0;
-    let expected = startOfDayKST(now);
-    for (const c of sortedDescCheckins) {
-        const day = startOfDayKST(new Date(c.date));
-        if (isSameDayKST(day, expected)) {
-            streak += 1;
-            expected = new Date(expected);
-            expected.setDate(expected.getDate() - 1);
-            continue;
-        }
-        // 허용되는 것은 정확히 연속된 하루씩만. 하나라도 비면 스트릭 종료
-        break;
-    }
-    return streak;
+// 기준(anchor) 날짜(보통 '오늘' 또는 '어제')을 포함하여 역방향으로 연속 출석을 계산
+function computeConsecutiveStreakUpTo(sortedDescCheckins: { date: Date }[], anchorDate: Date): number {
+	if (sortedDescCheckins.length === 0) return 0;
+	let streak = 0;
+	let expected = startOfDayKST(anchorDate);
+	for (const c of sortedDescCheckins) {
+		const day = startOfDayKST(new Date(c.date));
+		if (isSameDayKST(day, expected)) {
+			streak += 1;
+			expected = new Date(expected);
+			expected.setDate(expected.getDate() - 1);
+			continue;
+		}
+		// 첫 불일치가 나오는 즉시 종료 (중간에 빈 날이 있으면 연속 끊김)
+		// day가 expected보다 이전이면 더 이상 연속 아님
+		if (day < expected) break;
+	}
+	return streak;
 }
 
 // 보상(award)된 날을 기준으로 다음날부터 스트릭을 1부터 다시 시작
-function computeEffectiveStreak(sortedDescCheckins: { date: Date; rewarded?: boolean }[], now: Date): number {
-    const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
-    if (!lastRewarded) {
-        return computeConsecutiveStreak(sortedDescCheckins, now);
-    }
-    // 같은 날 보상이 발생한 경우, 그 날은 7개 달성 상태로 표기
-    if (isSameDayKST(startOfDayKST(new Date(lastRewarded.date)), startOfDayKST(now))) {
-        return 7;
-    }
-    // 보상 발생일 이후부터 다시 1부터 연속 계산
-    const cutoff = startOfDayKST(new Date(lastRewarded.date));
-    const filtered = sortedDescCheckins.filter((c) => startOfDayKST(new Date(c.date)) > cutoff);
-    return computeConsecutiveStreak(filtered, now);
+function computeEffectiveStreakUpTo(
+	sortedDescCheckins: { date: Date; rewarded?: boolean }[],
+	anchorDate: Date
+): number {
+	const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
+	if (!lastRewarded) {
+		return computeConsecutiveStreakUpTo(sortedDescCheckins, anchorDate);
+	}
+	const anchorStart = startOfDayKST(anchorDate);
+	// 보상일이 앵커일과 동일하면 7개 달성 상태로 취급
+	if (isSameDayKST(startOfDayKST(new Date(lastRewarded.date)), anchorStart)) {
+		return 7;
+	}
+	// 보상일 이후부터 다시 1부터 연속 계산
+	const cutoff = startOfDayKST(new Date(lastRewarded.date));
+	const filtered = sortedDescCheckins.filter((c) => startOfDayKST(new Date(c.date)) > cutoff);
+	return computeConsecutiveStreakUpTo(filtered, anchorDate);
 }
 
 // 보상일 기반 7칸 사이클 도장 배열 생성
 function buildCycleStamps(
-    sortedDescCheckins: { date: Date; rewarded?: boolean }[],
-    now: Date
+	sortedDescCheckins: { date: Date; rewarded?: boolean }[],
+	now: Date,
+	todayChecked: boolean
 ): { stamps: boolean[]; todayIndex: number | null } {
-    const todayStart = startOfDayKST(now);
-    const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
+	const todayStart = startOfDayKST(now);
+	const lastRewarded = sortedDescCheckins.find((c) => c.rewarded === true);
 
-    let cycleStart = new Date(todayStart);
-    // 보상 당일: 7칸 모두 채워서 보여주기 위해 오늘-6일부터 표시
-    if (lastRewarded && isSameDayKST(startOfDayKST(new Date(lastRewarded.date)), todayStart)) {
-        cycleStart.setDate(cycleStart.getDate() - 6);
-    } else if (lastRewarded) {
-        // 보상 다음날부터 1칸부터 시작
-        const rewardedDay = startOfDayKST(new Date(lastRewarded.date));
-        cycleStart = new Date(rewardedDay);
-        cycleStart.setDate(cycleStart.getDate() + 1);
-    } else {
-        // 보상 이력 없으면 현재 유효 스트릭 길이에 맞춰 시작점 계산
-        const effective = computeConsecutiveStreak(sortedDescCheckins, now);
-        cycleStart.setDate(cycleStart.getDate() - Math.max(0, effective - 1));
-    }
+	// 앵커: 오늘이 찍혀 있지 않다면 '어제'를 기준으로 연속계산/표시 영역을 잡는다
+	const anchor = new Date(todayStart);
+	if (!todayChecked) {
+		anchor.setDate(anchor.getDate() - 1);
+	}
 
-    const dayKey = (d: Date) => {
-        const sd = startOfDayKST(d);
-        // 월은 0-기반이므로 +1, 두 자리 패딩
-        const y = sd.getUTCFullYear();
-        const m = String(sd.getUTCMonth() + 1).padStart(2, "0");
-        const day = String(sd.getUTCDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-    };
-    const checkedDaySet = new Set(sortedDescCheckins.map((c) => dayKey(new Date(c.date))));
-    const todayKey = dayKey(todayStart);
+	let cycleStart = new Date(anchor);
+	// 보상 당일: 7칸 모두 채워서 보여주기 위해 앵커일 -6일부터 표시
+	if (lastRewarded && isSameDayKST(startOfDayKST(new Date(lastRewarded.date)), startOfDayKST(anchor))) {
+		cycleStart.setDate(cycleStart.getDate() - 6);
+	} else if (lastRewarded) {
+		// 보상 다음날부터 1칸부터 시작
+		const rewardedDay = startOfDayKST(new Date(lastRewarded.date));
+		cycleStart = new Date(rewardedDay);
+		cycleStart.setDate(cycleStart.getDate() + 1);
+	} else {
+		// 보상 이력 없으면 현재 유효 스트릭(앵커 기준)에 맞춰 시작점 계산
+		const effective = computeConsecutiveStreakUpTo(sortedDescCheckins, anchor);
+		cycleStart.setDate(cycleStart.getDate() - Math.max(0, effective - 1));
+	}
 
-    let todayIndex: number | null = null;
-    const stamps = Array.from({ length: 7 }, (_, i) => {
-        const dt = new Date(cycleStart);
-        dt.setDate(cycleStart.getDate() + i);
-        const dtKey = dayKey(dt);
-        if (dtKey === todayKey) {
-            todayIndex = i;
-        }
-        return checkedDaySet.has(dtKey);
-    });
+	const dayKey = (d: Date) => {
+		const sd = startOfDayKST(d);
+		const y = sd.getUTCFullYear();
+		const m = String(sd.getUTCMonth() + 1).padStart(2, "0");
+		const day = String(sd.getUTCDate()).padStart(2, "0");
+		return `${y}-${m}-${day}`;
+	};
+	const checkedDaySet = new Set(sortedDescCheckins.map((c) => dayKey(new Date(c.date))));
+	const todayKey = dayKey(todayStart);
 
-    return { stamps, todayIndex };
+	let todayIndex: number | null = null;
+	const stamps = Array.from({ length: 7 }, (_, i) => {
+		const dt = new Date(cycleStart);
+		dt.setDate(cycleStart.getDate() + i);
+		const dtKey = dayKey(dt);
+		if (dtKey === todayKey) {
+			todayIndex = i;
+		}
+		return checkedDaySet.has(dtKey);
+	});
+
+	return { stamps, todayIndex };
 }
 
 export async function GET(request: NextRequest) {
@@ -144,12 +156,15 @@ export async function GET(request: NextRequest) {
             return d >= todayStart && d < todayEnd;
         });
 
-        // 유효 스트릭 계산 (오늘 포함하여 계산)
-        const streak = computeEffectiveStreak(checkins, now);
+        // 유효 스트릭 계산
+        // 오늘 미체크 시에는 '어제'를 기준으로 연속일을 계산하여 프리마킹에 활용
+        const anchorForStreak = new Date(todayStart);
+        if (!todayChecked) anchorForStreak.setDate(anchorForStreak.getDate() - 1);
+        const streak = computeEffectiveStreakUpTo(checkins, anchorForStreak);
 
         // 실제 출석 날짜를 기반으로 올바른 배열 생성
-        const { stamps: weekStamps, todayIndex } = buildCycleStamps(checkins, now);
-        // 프리마킹 제거: 오늘 미체크 상태에서는 오늘 칸을 채우지 않습니다.
+        const { stamps: weekStamps, todayIndex } = buildCycleStamps(checkins, now, todayChecked);
+        // 주간 진행도(0~7)
         const weekCount = Math.min(7, Math.max(0, streak));
 
         return NextResponse.json({ success: true, checkins, streak, todayChecked, weekCount, weekStamps, todayIndex });
@@ -179,8 +194,8 @@ export async function POST(request: NextRequest) {
                 orderBy: { date: "desc" },
                 take: 120,
             });
-            const streak = computeEffectiveStreak(recent, now);
-            const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now);
+            const streak = computeEffectiveStreakUpTo(recent, now);
+            const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now, true);
             const weekCount = Math.min(7, Math.max(0, streak));
             return NextResponse.json({
                 success: true,
@@ -201,9 +216,9 @@ export async function POST(request: NextRequest) {
             orderBy: { date: "desc" },
             take: 120,
         });
-        const effectiveStreak = computeEffectiveStreak(recent, now);
+        const effectiveStreak = computeEffectiveStreakUpTo(recent, now);
         // 실제 출석 날짜를 기반으로 올바른 배열 생성 (오늘 포함)
-        const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now);
+        const { stamps: weekStamps, todayIndex } = buildCycleStamps(recent, now, true);
         const weekCount = Math.min(7, Math.max(0, effectiveStreak));
         const todayStart = startOfDayKST(now);
         const hasRewardedToday = recent.some(

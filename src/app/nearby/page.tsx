@@ -113,24 +113,53 @@ export default function NearbyPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
 
+    // 검색과 선택은 독립 동작: 자동 지역 매핑은 사용하지 않음
+
     const [showCategoryModal, setShowCategoryModal] = useState(false);
     const [modalSelectedLabels, setModalSelectedLabels] = useState<string[]>([]);
-    const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
-    const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+    // URL 파라미터 기반 초기값 즉시 반영
+    const [selectedActivities, setSelectedActivities] = useState<string[]>(() => {
+        const c = (searchParams.get("concept") || "").trim();
+        return c ? [c] : [];
+    });
+    const [selectedRegions, setSelectedRegions] = useState<string[]>(() => {
+        const r = (searchParams.get("region") || "").trim();
+        return r ? [r] : [];
+    });
     // 예산 기능 제거
     const [courses, setCourses] = useState<Course[]>([]);
     // 되돌림: 페이징 상태 제거
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [hideClosedPlaces, setHideClosedPlaces] = useState(false);
-    const [searchInput, setSearchInput] = useState("");
-    const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+    const [hideClosedPlaces, setHideClosedPlaces] = useState<boolean>(() => searchParams.get("hideClosed") === "1");
+    const [searchInput, setSearchInput] = useState<string>(() => (searchParams.get("q") || "").trim());
+    const [selectedTagIds, setSelectedTagIds] = useState<number[]>(() => {
+        return (searchParams.get("tagIds") || "")
+            .split(",")
+            .map((v) => Number(v))
+            .filter((n) => Number.isFinite(n) && n > 0);
+    });
     const [allTags, setAllTags] = useState<Array<{ id: number; name: string }>>([]);
+    // 강제 재조회 트리거(초기화 등)
+    const [refreshNonce, setRefreshNonce] = useState(0);
 
     // 페이지 로드 시 스크롤을 맨 위로
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
+
+    // 메인에서 /nearby?q=... 로 진입하거나 q 값이 바뀐 경우 동기화
+    useEffect(() => {
+        const q = (searchParams.get("q") || "").trim();
+        if (q && q !== searchInput) {
+            setSelectedRegions([]);
+            setSelectedActivities([]);
+            setSelectedTagIds([]);
+            setSearchInput(q);
+            setCourses([]);
+            setRefreshNonce((n) => n + 1);
+        }
+    }, [searchParams, searchInput]);
 
     // 태그 목록 불러오기 (이름 -> id 매핑에 사용)
     useEffect(() => {
@@ -172,10 +201,10 @@ export default function NearbyPage() {
                             .trim()
                     )
                     .map((name) => allTags.find((t) => String(t?.name || "").trim() === name)?.id)
-                    .filter((id): id is number => Number.isFinite(id as any))
+                    .filter((id): id is number => Number.isFinite(id as any) && (id as any) > 0)
             )
         );
-        const finalIds = ids.length === 0 && modalSelectedLabels.length > 0 ? [-1] : ids;
+        const finalIds = ids; // 매핑 실패 시에도 잘못된 ID를 넣지 않음
         setSelectedTagIds(finalIds);
 
         const sp = new URLSearchParams();
@@ -199,18 +228,13 @@ export default function NearbyPage() {
                 if (concept) qs.set("concept", concept);
                 if (searchInput.trim()) qs.set("q", searchInput.trim());
                 if (selectedRegions.length > 0) qs.set("region", selectedRegions[0]);
-                if (selectedTagIds.length > 0) qs.set("tagIds", selectedTagIds.join(","));
-                qs.set("limit", "80");
+                const validTagIds = selectedTagIds.filter((id) => Number.isFinite(id) && id > 0);
+                if (validTagIds.length > 0) qs.set("tagIds", validTagIds.join(","));
+                // 충분히 여유 있게 요청 (현재 전체 60개 기준)
+                qs.set("limit", "200");
                 qs.set("nocache", "1");
-                // 이전 동작으로 복원: 완전 무필터일 때만 완화, 필터 존재 시 엄격 정책
-                const imagePolicy =
-                    selectedActivities.length === 0 &&
-                    selectedRegions.length === 0 &&
-                    selectedTagIds.length === 0 &&
-                    !searchInput.trim()
-                        ? "any"
-                        : "all-or-one-missing";
-                qs.set("imagePolicy", imagePolicy);
+                // 이미지 정책 완화: 필터 유무와 관계없이 기본값을 'any'로 사용해 결과 누락 방지
+                qs.set("imagePolicy", "any");
 
                 const res = await fetch(`/api/courses?${qs.toString()}`, {
                     signal: controller.signal,
@@ -223,59 +247,67 @@ export default function NearbyPage() {
                     ? ((data as any).courses as Course[])
                     : [];
 
-                // 결과가 비어 있고, 완전 무필터 상태일 때만 안전망으로 기본 호출
-                const isUnfiltered =
+                // 최종 안전망: '필터가 전혀 없을 때'만 전체 호출
+                if (
+                    list.length === 0 &&
                     selectedActivities.length === 0 &&
                     selectedRegions.length === 0 &&
                     selectedTagIds.length === 0 &&
-                    !searchInput.trim();
-
-                if (list.length === 0 && isUnfiltered) {
-                    const fallbackQs = new URLSearchParams();
-                    fallbackQs.set("limit", "50");
-                    fallbackQs.set("imagePolicy", "any");
-                    fallbackQs.set("nocache", "1");
-                    const res2 = await fetch(`/api/courses?${fallbackQs.toString()}`, {
+                    !searchInput.trim()
+                ) {
+                    const fb2 = new URLSearchParams();
+                    fb2.set("limit", "200");
+                    fb2.set("imagePolicy", "any");
+                    fb2.set("nocache", "1");
+                    const res3 = await fetch(`/api/courses?${fb2.toString()}`, {
                         signal: controller.signal,
                         cache: "no-store",
                     });
-                    const data2 = await res2.json().catch(() => null);
-                    list = Array.isArray(data2)
-                        ? (data2 as Course[])
-                        : Array.isArray((data2 as any)?.courses)
-                        ? ((data2 as any).courses as Course[])
+                    const data3 = await res3.json().catch(() => null);
+                    list = Array.isArray(data3)
+                        ? (data3 as Course[])
+                        : Array.isArray((data3 as any)?.courses)
+                        ? ((data3 as any).courses as Course[])
                         : [];
                 }
                 setCourses(list);
             } catch (e: any) {
-                if (e?.name !== "AbortError") setError("데이터를 불러오지 못했습니다.");
+                // 네트워크/서버 오류 시에도 기본 목록을 시도
+                try {
+                    const fb2 = new URLSearchParams();
+                    fb2.set("limit", "200");
+                    fb2.set("imagePolicy", "any");
+                    fb2.set("nocache", "1");
+                    const res3 = await fetch(`/api/courses?${fb2.toString()}`, {
+                        signal: controller.signal,
+                        cache: "no-store",
+                    });
+                    const data3 = await res3.json().catch(() => null);
+                    const list: Course[] = Array.isArray(data3)
+                        ? (data3 as Course[])
+                        : Array.isArray((data3 as any)?.courses)
+                        ? ((data3 as any).courses as Course[])
+                        : [];
+                    setCourses(list);
+                    setError(null);
+                } catch (err) {
+                    if (e?.name !== "AbortError") setError("데이터를 불러오지 못했습니다.");
+                }
             } finally {
                 setLoading(false);
             }
         };
         fetchCourses();
         return () => controller.abort();
-    }, [selectedActivities.join(","), searchInput, selectedRegions.join(","), selectedTagIds.join(",")]);
+    }, [
+        selectedActivities.join(","),
+        searchInput,
+        selectedRegions.join(","),
+        selectedTagIds.join(","),
+        hideClosedPlaces,
+        refreshNonce,
+    ]);
 
-    // 쿼리 파라미터로 초기 상태 세팅
-    useEffect(() => {
-        const concept = (searchParams.get("concept") || "").trim();
-        const region = (searchParams.get("region") || "").trim();
-        const q = (searchParams.get("q") || "").trim();
-        const hideClosed = searchParams.get("hideClosed") === "1";
-        const tagIds = (searchParams.get("tagIds") || "")
-            .split(",")
-            .map((v) => Number(v))
-            .filter((n) => Number.isFinite(n));
-
-        if (concept) setSelectedActivities([concept]);
-        if (region) setSelectedRegions([region]);
-        if (q) setSearchInput(q);
-        if (hideClosed) setHideClosedPlaces(true);
-        if (tagIds.length > 0) setSelectedTagIds(tagIds);
-        // 한 번만 초기화
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     // 되돌림: 필터 변경에 따른 페이징 초기화 제거
 
@@ -358,7 +390,12 @@ export default function NearbyPage() {
     const toggleRegionSingle = (value: string) => {
         const next = selectedRegions.includes(value) ? [] : [value];
         setSelectedRegions(next);
-        pushUrlFromState({ regions: next });
+        // 지역 선택 시: 검색어/활동/태그 초기화 후 지역만 적용
+        setSearchInput("");
+        setSelectedActivities([]);
+        setSelectedTagIds([]);
+        setCourses([]);
+        pushUrlFromState({ regions: next, q: "", activities: [], tagIds: [] });
     };
 
     return (
@@ -371,18 +408,27 @@ export default function NearbyPage() {
                         placeholder="코스 검색 (제목/컨셉/지역)"
                         className="flex-1 border border-gray-300 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-gray-900"
                         aria-label="코스 검색"
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                // 검색 실행 시: 지역/활동/태그 초기화 후 q만 적용
+                                const q = searchInput.trim();
+                                setSelectedRegions([]);
+                                setSelectedActivities([]);
+                                setSelectedTagIds([]);
+                                setCourses([]);
+                                pushUrlFromState({ regions: [], activities: [], tagIds: [], q });
+                            }
+                        }}
                     />
                     <button
                         onClick={() => {
-                            const sp = new URLSearchParams();
-                            if (searchInput.trim()) sp.set("q", searchInput.trim());
-                            if (selectedActivities[0]) sp.set("concept", selectedActivities[0]);
-                            if (selectedRegions[0]) sp.set("region", selectedRegions[0]);
-                            // 검색 시 태그가 유효한 경우에만 유지(-1 등 무효 ID는 제외)
-                            const validTagIds = selectedTagIds.filter((id) => Number.isFinite(id) && id > 0);
-                            if (validTagIds.length > 0) sp.set("tagIds", String(validTagIds.join(",")));
-                            if (hideClosedPlaces) sp.set("hideClosed", "1");
-                            router.push(`/nearby?${sp.toString()}`);
+                            // 검색 실행 시: 지역/활동/태그 초기화 후 q만 적용
+                            const q = searchInput.trim();
+                            setSelectedRegions([]);
+                            setSelectedActivities([]);
+                            setSelectedTagIds([]);
+                            setCourses([]);
+                            pushUrlFromState({ regions: [], activities: [], tagIds: [], q });
                         }}
                         className="px-3 py-2 rounded-xl text-sm font-semibold border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
                         aria-label="검색 실행"
@@ -490,11 +536,16 @@ export default function NearbyPage() {
                             <p className="text-sm text-gray-600">총 {filtered.length}개 결과</p>
                             <button
                                 onClick={() => {
+                                    // 상태 초기화
                                     setSelectedActivities([]);
                                     setSelectedRegions([]);
                                     setSelectedTagIds([]);
                                     setSearchInput("");
+                                    setHideClosedPlaces(false);
+                                    // URL도 초기화하여 북마크/새로고침 일관성 유지
                                     router.push("/nearby");
+                                    // 즉시 재조회 트리거
+                                    setRefreshNonce((n) => n + 1);
                                 }}
                                 className="text-sm text-gray-600 hover:text-gray-800 border px-3 py-1.5 rounded-lg hover:cursor-pointer "
                             >

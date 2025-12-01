@@ -1,4 +1,3 @@
-// ✅ 수정된 /api/escape/chapters.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 
@@ -24,8 +23,16 @@ export async function GET(request: NextRequest) {
         const placeOptions = await prisma.placeOption.findMany({
             where: { storyId },
             include: {
-                missions: true,
-                stories: true,
+                // 👇 여기가 핵심입니다!
+                missions: true, // (1) 장소에 속한 전체 미션 목록 가져오기 (필수)
+
+                stories: {
+                    // (2) 스토리 가져올 때 정렬해서 가져오기 (선택이지만 추천)
+                    orderBy: { order: "asc" },
+                    // 필요하다면 여기서 스토리별 연결된 미션 정보도 가져올 수 있음
+                    // include: { mission: true }
+                },
+
                 placeDialogues: true,
             },
             orderBy: { id: "asc" },
@@ -137,6 +144,8 @@ export async function GET(request: NextRequest) {
                         id: p.id,
                         name: p.name,
                         category: p.category, // 프론트 필터링 호환을 위해 카테고리도 포함
+                        // ✨ [수정] theme 필드 추가! (이게 없어서 안 나왔던 것)
+                        theme: (p as any).theme || null,
                         address: p.address ?? undefined,
                         latitude: p.latitude ?? undefined,
                         longitude: p.longitude ?? undefined,
@@ -153,9 +162,12 @@ export async function GET(request: NextRequest) {
                                       speaker: s.speaker,
                                       dialogue: normalizeText(s.dialogue),
                                       narration: normalizeText(s.narration),
+
+                                      // ✅ [핵심 추가] 이 줄이 없으면 프론트엔드에서 미션 ID를 못 받습니다!
+                                      // DB에 값이 있으면(종로) 숫자가 들어가고, 없으면(홍대) null이 됩니다.
+                                      missionId: s.missionId ?? null,
                                   }))
                             : [],
-                        // ✅ 모든 미션 배열 제공
                         missions: missions.map((m: any) => {
                             const raw = m?.missionPayload as unknown;
                             const obj =
@@ -164,12 +176,15 @@ export async function GET(request: NextRequest) {
                                     : {};
                             return {
                                 id: m.id,
+                                missionNumber: (m as any).missionNumber ?? null,
                                 missionType: m.missionType,
                                 missionPayload: {
                                     ...obj,
                                     question: m.question ?? obj.question,
                                     hint: m.hint ?? obj.hint,
                                     description: m.description ?? obj.description,
+                                    // ✅ 정답도 내려보내 텍스트/퀴즈 검증 가능
+                                    answer: (m as any).answer ?? obj.answer,
                                 },
                             };
                         }),
@@ -181,6 +196,7 @@ export async function GET(request: NextRequest) {
                             question: fm?.question ?? mp.question,
                             hint: fm?.hint ?? mp.hint,
                             description: fm?.description ?? mp.description,
+                            answer: (fm as any)?.answer ?? mp.answer,
                         },
                     };
                 }),

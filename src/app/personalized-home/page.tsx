@@ -269,10 +269,15 @@ const AIRecommender = () => {
             const result = await postCheckin();
             if (result.ok && result.success) {
                 await fetchUserData();
-                const now = new Date();
-                const day = now.getDay();
-                const idx = (day + 6) % 7;
-                setWeekStamps((prev) => prev.map((v, i) => (i === idx ? true : v)));
+                // 서버가 내려준 todayIndex가 있으면 그 위치만 true로 반영 (KST 기준 안전)
+                if (typeof result.todayIndex === "number") {
+                    setWeekStamps((prev) => prev.map((v, i) => (i === result.todayIndex ? true : v)));
+                } else {
+                    const now = new Date();
+                    const day = now.getDay();
+                    const idx = (day + 6) % 7;
+                    setWeekStamps((prev) => prev.map((v, i) => (i === idx ? true : v)));
+                }
                 setAttendanceModalOpen(false);
 
                 if (result.awarded) {
