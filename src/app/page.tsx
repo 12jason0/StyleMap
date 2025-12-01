@@ -69,7 +69,7 @@ const LandingPage = () => {
 
                     {/* CTA 버튼 (카카오) */}
                     <a
-                        href="https://pf.kakao.com/_xxxxx" // 👈 실제 링크 수정 필요
+                        href="https://pf.kakao.com/_uxnZHn" // 👈 실제 링크 수정 필요
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full block"
