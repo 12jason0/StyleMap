@@ -60,8 +60,8 @@ const LandingPage = () => {
                     {/* 이미지/일러스트 영역 (높이를 줄여 공간 확보) */}
                     <div className="w-full h-32 rounded-lg bg-gray-100 mb-6 relative overflow-hidden shadow-inner">
                         <Image
-                            src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/escape/jongro/jongroTemplate.png"
-                            alt="미션 프리뷰"
+                            src="https://stylemap-seoul.s3.ap-northeast-2.amazonaws.com/sampleMap.png"
+                            alt="코스 미리보기"
                             fill
                             className="object-cover hover:scale-105 transition-transform duration-500"
                         />
